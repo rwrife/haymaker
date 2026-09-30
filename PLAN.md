@@ -36,7 +36,7 @@ Rules:
 | SpriteKit (match) | First-party 2D game framework on iOS 26; physics-light, deterministic update loop, no third-party engine dependency. |
 | GRDB (SQLite) | Proven fleet data layer with versioned migrations + fixture DB pattern. |
 | Xcode 26.0.1 (17A400) / iOS SDK 26 pin | Fleet toolchain contract in `toolchain.json`, enforced by CI. |
-| iPhone-only (`TARGETED_DEVICE_FAMILY = 1`) | User directive; simplifies build + submission; iPad requires explicit opt-in. |
+| iPhone-only (`TARGETED_DEVICE_FAMILY = 1`) | Fleet policy: Native iPad support is disabled; enabling it requires explicit user opt-in. User directive; simplifies build + submission. |
 | Bundle `com.infinityball.haymaker` | Fleet `com.infinityball.` prefix convention; registered in ASC. |
 
 ## Milestones and dependency order
