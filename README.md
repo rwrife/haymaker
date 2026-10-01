@@ -2,7 +2,7 @@
 
 **Haymaker is a local-first iPhone boss-rush arcade boxing game: read telegraphed opponent patterns, throw one-thumb combos, and climb an original fighter career — with a dual-screen battle layout as the design target — no accounts, no cloud.**
 
-Public repo under the Auto Tool Lab program (`auto-tool-lab`). Documentation and backlog only at scaffold time — no app build, tests, store artifact, or device verification is claimed yet.
+Public repo under the Auto Tool Lab program (`auto-tool-lab`). M1 (project skeleton + CI contract gates) has landed; domain logic, gameplay, persistence, and release automation land in later milestones. No app build, tests, store artifact, or device verification is claimed until the pinned Apple CI lane proves them.
 
 ## Overview
 
@@ -83,17 +83,26 @@ Full dual-screen/foldable SDK support does not exist yet. Haymaker therefore sca
 
 ## Current status and milestones
 
-Scaffold only: README, PLAN, toolchain pin, App Store copy draft, labels, and issue backlog. No Xcode project, build, tests, icon, archive, or TestFlight binary exists yet.
+Early build-out: the repository now carries the native Swift project skeleton — `Haymaker.xcodeproj` (app target `Haymaker`), the pure-domain package `Packages/HaymakerKit`, and the persistence package `Packages/HaymakerStore` — plus the pinned CI contract gates (iOS 26 toolchain pin, iPhone-only pre/post-build, zero-network allowlist, native-only framework scan). No gameplay code, store artifact, icon, archive, or TestFlight binary exists yet.
 
-1. **M1** — Xcode project + pure-Swift HaymakerKit package + CI (iOS 26 pin, iPhone-only gate, zero-network gate).
-2. **M2** — Match engine core: pattern books, tell windows, damage/stamina state machine, seeded determinism + tests.
-3. **M3** — SpriteKit fight scene + one-thumb controls + first opponent playable.
-4. **M4** — Career ladder (6 opponents), records ledger, stats derivations.
-5. **M5** — Backup/restore, CSV export, accessibility pass, `FightWorkspaceLayout` dual-screen seam (design target).
-6. **M6** — App Store copy finalization, generated icon wired into the asset catalog, TestFlight publish Action.
+1. ✅ **M1** — Xcode project + pure-Swift HaymakerKit package + CI (iOS 26 pin, iPhone-only gate, zero-network gate). (issue #1)
+2. 🔜 **M2** — Match engine core: pattern books, tell windows, damage/stamina state machine, seeded determinism + tests.
+3. 🔜 **M3** — SpriteKit fight scene + one-thumb controls + first opponent playable.
+4. 🔜 **M4** — Career ladder (6 opponents), records ledger, stats derivations.
+5. 🔜 **M5** — Backup/restore, CSV export, accessibility pass, `FightWorkspaceLayout` dual-screen seam (design target).
+6. 🔜 **M6** — App Store copy finalization, generated icon wired into the asset catalog, TestFlight publish Action.
 
-## Development / build quickstart (planned)
+## Development / build quickstart
 
-- macOS with Xcode 26.0.1 (17A400), iOS 26 SDK. Clone, open `Haymaker.xcodeproj` (created in M1).
-- Domain logic in `Packages/HaymakerKit` (Swift Package Manager, `swift test` runnable on Linux CI; UI/gameplay verification requires the pinned macOS CI runner).
-- The repository is documentation/backlog-only until M1 lands a skeleton.
+- macOS with Xcode 26.0.1 (17A400), iOS 26 SDK. Clone, open `Haymaker.xcodeproj`.
+- Domain logic in `Packages/HaymakerKit` (Swift Package Manager, `swift test` runnable on Linux CI; UI/gameplay verification requires the pinned macOS CI runner):
+  ```bash
+  swift test --package-path Packages/HaymakerKit
+  swift test --package-path Packages/HaymakerStore
+  ```
+- Run the contract gates locally:
+  ```bash
+  bash scripts/check_zero_network.sh
+  bash scripts/check_native_only.sh
+  ```
+- CI on `macos-26` asserts the exact Xcode 26.0.1 (17A400) pin, iOS 26 SDK, `TARGETED_DEVICE_FAMILY = 1` pre- and post-build (`UIDeviceFamily == [1]` on the built app), the `com.infinityball.haymaker` bundle id, and privacy-manifest embedding.
