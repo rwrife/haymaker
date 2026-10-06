@@ -182,3 +182,46 @@ jobs:
           [ -f "$APP/PrivacyInfo.xcprivacy" ] \
             || { echo "::error::PrivacyInfo.xcprivacy not embedded in app bundle"; exit 1; }
           echo "Privacy manifest embedded: PASS"
+
+      - name: Run playable-bout UI journey on pinned simulator
+        timeout-minutes: 40
+        run: |
+          set -euo pipefail
+          SDK_VER=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          RUNTIME_ID="com.apple.CoreSimulator.SimRuntime.iOS-$(echo "$SDK_VER" | cut -d. -f1,2 | tr '.' '-')"
+          export RUNTIME_ID
+          # Select a real available iPhone device under the PINNED runtime;
+          # create one if the runtime is installed but has no device.
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, os, sys
+          devices = json.load(sys.stdin)["devices"].get(os.environ["RUNTIME_ID"], [])
+          print(next((d["udid"] for d in devices if d["name"].startswith("iPhone")), ""))')
+          if [ -z "$UDID" ]; then
+            echo "No iPhone device for $RUNTIME_ID — creating one."
+            DEVTYPE=$(xcrun simctl list devicetypes -j | python3 -c '
+          import json, sys
+          types = json.load(sys.stdin)["devicetypes"]
+          iphones = [t["identifier"] for t in types if ".iPhone" in t["identifier"]]
+          prefer = [t for t in iphones if "iPhone 17" in t]
+          print((prefer or iphones)[0])')
+            UDID=$(xcrun simctl create "Haymaker CI" "$DEVTYPE" "$RUNTIME_ID")
+            trap 'xcrun simctl delete "$UDID" >/dev/null 2>&1 || true' EXIT
+          fi
+          echo "Testing exact head: $(git rev-parse HEAD) on simulator $UDID"
+          xcodebuild -project Haymaker.xcodeproj \
+            -scheme Haymaker \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=$UDID" \
+            -derivedDataPath DerivedData \
+            -resultBundlePath HaymakerUITests.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            -parallel-testing-enabled NO \
+            test
+
+      - name: Upload UI journey evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: haymaker-uitests-xcresult
+          path: HaymakerUITests.xcresult
+          if-no-files-found: ignore
