@@ -59,19 +59,10 @@ final class HaymakerUITests: XCTestCase {
 
         // 5. Reach results card (short test bout completes in ~10 seconds).
         let resultsHeader = app.staticTexts["bout.results"]
-        let resultsDeadline = Date().addingTimeInterval(25)
-        var reachedResults = false
-        while Date() < resultsDeadline {
-            if resultsHeader.exists {
-                reachedResults = true
-                break
-            }
-            if jabButton.isHittable {
-                jabButton.tap()
-            }
-            usleep(250_000)
-        }
-        XCTAssertTrue(reachedResults, "Bout ended and transitioned to the results card")
+        // The engine clock finishes the bout. Do not query a disappearing jab
+        // control during the results transition (the Apple run exposed this race).
+        XCTAssertTrue(resultsHeader.waitForExistence(timeout: 25),
+                      "Bout ended and transitioned to the results card")
         XCTAssertTrue(app.buttons["bout.again"].exists, "Fight again button is present on the results card")
     }
 }
