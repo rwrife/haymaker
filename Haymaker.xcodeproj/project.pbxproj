@@ -14,6 +14,7 @@
 /* Begin PBXFileReference section */
 		AA00000000000000000000B1 /* Haymaker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Haymaker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA00000000000000000000B3 /* toolchain.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = toolchain.json; sourceTree = "<group>"; };
+		BB0000000000000000000009 /* HaymakerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HaymakerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -26,9 +27,25 @@
 			path = Haymaker;
 			sourceTree = "<group>";
 		};
+		BB0000000000000000000008 /* HaymakerUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = HaymakerUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		BB0000000000000000000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		AA00000000000000000000AA /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -45,6 +62,7 @@
 			isa = PBXGroup;
 			children = (
 				AA00000000000000000000AC /* Haymaker */,
+                BB0000000000000000000008 /* HaymakerUITests */,
 				AA00000000000000000000B3 /* toolchain.json */,
 				AA00000000000000000000B2 /* Products */,
 			);
@@ -54,13 +72,32 @@
 			isa = PBXGroup;
 			children = (
 				AA00000000000000000000B1 /* Haymaker.app */,
+                BB0000000000000000000009 /* HaymakerUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
+/* Begin PBXContainerItemProxy section */
+        BB0000000000000000000001 = {isa = PBXContainerItemProxy; containerPortal = AA00000000000000000000A1; proxyType = 1; remoteGlobalIDString = AA00000000000000000000A2; remoteInfo = Haymaker; };
+/* End PBXContainerItemProxy section */
+/* Begin PBXTargetDependency section */
+        BB0000000000000000000002 = {isa = PBXTargetDependency; target = AA00000000000000000000A2; targetProxy = BB0000000000000000000001; };
+/* End PBXTargetDependency section */
 /* Begin PBXNativeTarget section */
+        BB0000000000000000000003 = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = BB0000000000000000000004;
+            buildPhases = (BB0000000000000000000005, BB0000000000000000000006, BB0000000000000000000007);
+            buildRules = ();
+            dependencies = (BB0000000000000000000002);
+            fileSystemSynchronizedGroups = (BB0000000000000000000008);
+            name = HaymakerUITests;
+            productName = HaymakerUITests;
+            productReference = BB0000000000000000000009;
+            productType = "com.apple.product-type.bundle.ui-testing";
+        };
 		AA00000000000000000000A2 /* Haymaker */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = AA00000000000000000000A4 /* Build configuration list for PBXNativeTarget "Haymaker" */;
@@ -118,11 +155,19 @@
 			projectRoot = "";
 			targets = (
 				AA00000000000000000000A2 /* Haymaker */,
+                BB0000000000000000000003 /* HaymakerUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		BB0000000000000000000007 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		AA00000000000000000000AB /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -133,6 +178,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		BB0000000000000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		AA00000000000000000000A9 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -143,6 +195,34 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
+        BB000000000000000000000A /* Debug UITests */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                CODE_SIGN_STYLE = Automatic;
+                GENERATE_INFOPLIST_FILE = YES;
+                IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+                PRODUCT_BUNDLE_IDENTIFIER = com.infinityball.haymaker.uitests;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SWIFT_VERSION = 6.0;
+                TARGETED_DEVICE_FAMILY = 1;
+                TEST_TARGET_NAME = Haymaker;
+            };
+            name = Debug;
+        };
+        BB000000000000000000000B /* Release UITests */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                CODE_SIGN_STYLE = Automatic;
+                GENERATE_INFOPLIST_FILE = YES;
+                IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+                PRODUCT_BUNDLE_IDENTIFIER = com.infinityball.haymaker.uitests;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SWIFT_VERSION = 6.0;
+                TARGETED_DEVICE_FAMILY = 1;
+                TEST_TARGET_NAME = Haymaker;
+            };
+            name = Release;
+        };
 		AA00000000000000000000A5 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -278,6 +358,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+        BB0000000000000000000004 = {
+            isa = XCConfigurationList;
+            buildConfigurations = (
+                BB000000000000000000000A,
+                BB000000000000000000000B,
+            );
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
 		AA00000000000000000000A3 /* Build configuration list for PBXProject "Haymaker" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

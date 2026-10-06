@@ -28,6 +28,13 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES">
       <Testables>
+         <TestableReference skipped="NO">
+            <BuildableReference BuildableIdentifier="primary"
+               BlueprintIdentifier="BB0000000000000000000003"
+               BuildableName="HaymakerUITests.xctest"
+               BlueprintName="HaymakerUITests"
+               ReferencedContainer="container:Haymaker.xcodeproj" />
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction
