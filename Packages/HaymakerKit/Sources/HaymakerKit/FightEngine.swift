@@ -135,9 +135,11 @@ public struct EngineConfig: Sendable, Codable, Hashable {
         rounds * roundTicks + (rounds - 1) * max(0, restTicks)
     }
 
-    /// Absolute safety bound so `simulate` can never spin.
+    /// Absolute safety bound so `simulate` can never spin. A non-positive
+    /// knockdown window is treated as immediate resolution, never negative
+    /// time that removes the entire bout from the simulation budget.
     public var hardTickCap: Int {
-        totalFightTicks + damage.knockdownTicks + 4096
+        totalFightTicks + max(0, damage.knockdownTicks) + 4096
     }
 }
 
@@ -175,6 +177,10 @@ public enum FightEvent: Sendable, Codable, Hashable {
 
 /// Complete, comparable result of a simulated bout.
 public struct BoutResult: Sendable, Codable, Hashable {
+    /// Rule snapshots: opponent IDs alone cannot replay a bout if the
+    /// authored book or balance configuration changes in a later version.
+    public let config: EngineConfig
+    public let book: OpponentBook
     public let seed: UInt64
     public let opponentID: String
     public let outcome: FightOutcome
@@ -578,6 +584,7 @@ public struct FightEngine: Sendable {
         if isCounter { playerStats.counters += 1 }
 
         if blocked {
+            opponentStats.blocksMade += 1
             events.append(.blocked(tick: totalTicks, by: .player, move: move, damage: damage))
             if DamageModel.isOutOfCold(hpAfterBlow: opponent.hp) { knockDown(.opponent, ko: true) }
         } else {
@@ -811,6 +818,8 @@ public extension FightEngine {
         }
         let outcome = engine.outcome ?? .draw
         return BoutResult(
+            config: config,
+            book: book,
             seed: seed,
             opponentID: book.id,
             outcome: outcome,

@@ -86,7 +86,7 @@ Full dual-screen/foldable SDK support does not exist yet. Haymaker therefore sca
 Early build-out: the repository now carries the native Swift project skeleton — `Haymaker.xcodeproj` (app target `Haymaker`), the pure-domain match-engine package `Packages/HaymakerKit` (pattern books, fixed-tick fight engine, damage state machine, deterministic scoring), and the persistence package `HaymakerStore` — plus the pinned CI contract gates (iOS 26 toolchain pin, iPhone-only pre/post-build, zero-network allowlist, native-only framework scan). No SpriteKit scene, store artifact, icon, archive, or TestFlight binary exists yet.
 
 1. ✅ **M1** — Xcode project + pure-Swift HaymakerKit package + CI (iOS 26 pin, iPhone-only gate, zero-network gate). (issue #1)
-2. 🔄 **M2** — Match engine core: data-driven pattern books (first two opponents), fixed-tick FightEngine with tell-window resolution, stamina/damage state machine with KO/three-count rules, deterministic scoring + personal-best model, 49 swift-testing cases (golden-seed fixtures, replay determinism, state tables) proposed in issue #2; pending Apple CI.
+2. 🔄 **M2** — Match engine core: data-driven pattern books (first two opponents), fixed-tick FightEngine with tell-window resolution, stamina/damage state machine with KO/three-count rules, deterministic scoring + personal-best model, 51 swift-testing cases (golden-seed fixtures, replay determinism, state tables) proposed in issue #2; pending Apple CI.
 3. 🔜 **M3** — SpriteKit fight scene + one-thumb controls + first opponent playable.
 4. 🔜 **M4** — Career ladder (6 opponents), records ledger, stats derivations.
 5. 🔜 **M5** — Backup/restore, CSV export, accessibility pass, `FightWorkspaceLayout` dual-screen seam (design target).

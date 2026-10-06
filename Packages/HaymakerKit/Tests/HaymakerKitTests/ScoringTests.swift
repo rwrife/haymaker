@@ -101,6 +101,7 @@ struct BoutLedgerTests {
             finishBonus: zero.finishBonus, points: points
         )
         return BoutResult(
+            config: .standard, book: opponent == "anvil" ? .anvil : .twitch,
             seed: 7, opponentID: opponent, outcome: outcome,
             roundsCompleted: rounds, ticksElapsed: ticks,
             playerHP: 50, opponentHP: 50,

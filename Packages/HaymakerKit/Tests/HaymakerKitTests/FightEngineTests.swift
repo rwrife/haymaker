@@ -132,6 +132,22 @@ struct FightEngineDeterminismTests {
         let replay = FightEngine.simulate(config: testConfig, seed: 5, book: .twitch, inputs: result.inputLog)
         #expect(replay == result)
     }
+
+    @Test("result retains the exact book and rules for replay after balance changes")
+    func resultRetainsRules() {
+        let custom = OpponentBook(
+            id: "twitch", name: "Twitch test variant",
+            sequence: [PatternEntry(move: .hook, tell: 2, impact: 2, recover: 4, staminaCost: 1, damage: 4)]
+        )
+        let rules = EngineConfig(rounds: 1, roundTicks: 50, restTicks: 0)
+        let result = FightEngine.simulate(config: rules, seed: 7, book: custom, inputs: [])
+        #expect(result.config == rules)
+        #expect(result.book == custom)
+        #expect(FightEngine.simulate(
+            config: result.config, seed: result.seed, book: result.book, inputs: result.inputLog
+        ) == result)
+        #expect(FightEngine.simulate(config: rules, seed: 7, book: .twitch, inputs: []) != result)
+    }
 }
 
 @Suite("FightEngine: tell-window resolution tables")
@@ -247,6 +263,7 @@ struct TellWindowResolutionTests {
         for _ in 0..<jab.windup { e.tick(.none) }
         let afterJab = e.opponent.hp
         #expect(afterJab == hpBefore - max(0, jab.damage - reduction), "jab vs guard uses full reduction")
+        #expect(e.opponentStats.blocksMade == 1, "guarded punch must award opponent defense credit")
 
         // (b) Uppercut into a fresh guard: halved reduction (guard break).
         let (engine2, _) = try Helpers.catchTell(entryIndex: 3)
@@ -451,6 +468,17 @@ struct RoundFlowTests {
             #expect(result.roundsCompleted == 2)
             #expect(result.events.contains { if case .boutEnd = $0 { true } else { false } })
         }
+    }
+
+    @Test("negative knockdown window cannot skip a bout before its first tick")
+    func negativeKnockdownWindowDoesNotShortCircuit() {
+        let config = EngineConfig(
+            rounds: 1, roundTicks: 1,
+            damage: DamageConfig(knockdownTicks: -5_000)
+        )
+        let result = FightEngine.simulate(config: config, seed: 11, book: .twitch, inputs: [])
+        #expect(result.ticksElapsed == 1)
+        #expect(result.events.contains { if case .boutEnd = $0 { true } else { false } })
     }
 
     @Test("round clock advances, rest separates rounds")
