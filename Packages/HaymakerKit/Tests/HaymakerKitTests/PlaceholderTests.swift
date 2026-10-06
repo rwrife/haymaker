@@ -8,8 +8,8 @@ struct PlaceholderTests {
         #expect(HaymakerKit.domain == "HaymakerKit")
     }
 
-    @Test("milestone marker is set for M1")
+    @Test("milestone marker is set for M2")
     func milestoneMarker() {
-        #expect(HaymakerKit.milestone == "M1-skeleton")
+        #expect(HaymakerKit.milestone == "M2-engine")
     }
 }

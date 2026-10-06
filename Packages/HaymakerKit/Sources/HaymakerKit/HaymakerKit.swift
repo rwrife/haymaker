@@ -10,5 +10,5 @@ public enum HaymakerKit {
     public static let domain = "HaymakerKit"
 
     /// Current build/CI milestone marker consumed by the app's debug surface.
-    public static let milestone = "M1-skeleton"
+    public static let milestone = "M2-engine"
 }
