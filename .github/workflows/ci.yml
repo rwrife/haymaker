@@ -114,6 +114,9 @@ jobs:
           count=$(grep -c "TARGETED_DEVICE_FAMILY = 1;" Haymaker.xcodeproj/project.pbxproj)
           echo "TARGETED_DEVICE_FAMILY = 1 asserted in $count places"
 
+      - name: Run HaymakerKit package tests on pinned macOS toolchain
+        run: swift test --package-path Packages/HaymakerKit
+
       - name: Ensure iOS simulator platform runtime
         timeout-minutes: 40
         run: |

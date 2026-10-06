@@ -2,7 +2,7 @@
 
 **Haymaker is a local-first iPhone boss-rush arcade boxing game: read telegraphed opponent patterns, throw one-thumb combos, and climb an original fighter career — with a dual-screen battle layout as the design target — no accounts, no cloud.**
 
-Public repo under the Auto Tool Lab program (`auto-tool-lab`). M1 (project skeleton + CI contract gates) has landed; domain logic, gameplay, persistence, and release automation land in later milestones. No app build, tests, store artifact, or device verification is claimed until the pinned Apple CI lane proves them.
+Public repo under the Auto Tool Lab program (`auto-tool-lab`). M1 (skeleton + CI contract gates) and M2 (pure-Swift match engine in `Packages/HaymakerKit`) have landed; gameplay, persistence, and release automation land in later milestones. The pinned Apple CI lane verifies a simulator app build, not a store artifact or physical-device run.
 
 ## Overview
 
@@ -12,7 +12,7 @@ The pitch: **a pocket arcade boxing cabinet** — every opponent is a distinct p
 
 ## Motivation
 
-Chart-topping casual arcade games prove the appetite for one-thumb, session-short, progression-driven play, but most hide their depth behind energy systems, accounts, or ad loops. Classic arcade boxing (in the Punch-Out!! lineage) is the purest expression of "learn the tell, execute the counter," and that genre is nearly extinct on mobile in a modern, privacy-first form. Haymaker rebuilds the boss-rush boxing loop as a deterministic, offline, original-IP arcade game with honest local records.
+Chart-topping casual arcade games prove the appetite for one-thumb, session-short, progression-driven play, but most hide their depth behind energy systems, accounts, or ad loops. Readable arcade boxing is a pure expression of "learn the tell, execute the counter," and that genre is nearly extinct on mobile in a modern, privacy-first form. Haymaker builds an original boss-rush boxing loop as a deterministic, offline arcade game with honest local records.
 
 The concept also maps naturally to the **iPhone Duo dual-screen** design target: opponent and fight read on one screen, player, stamina, and the big one-thumb control surface on the other (see the dual-screen section).
 
@@ -83,10 +83,10 @@ Full dual-screen/foldable SDK support does not exist yet. Haymaker therefore sca
 
 ## Current status and milestones
 
-Early build-out: the repository now carries the native Swift project skeleton — `Haymaker.xcodeproj` (app target `Haymaker`), the pure-domain package `Packages/HaymakerKit`, and the persistence package `Packages/HaymakerStore` — plus the pinned CI contract gates (iOS 26 toolchain pin, iPhone-only pre/post-build, zero-network allowlist, native-only framework scan). No gameplay code, store artifact, icon, archive, or TestFlight binary exists yet.
+Early build-out: the repository now carries the native Swift project skeleton — `Haymaker.xcodeproj` (app target `Haymaker`), the pure-domain match-engine package `Packages/HaymakerKit` (pattern books, fixed-tick fight engine, damage state machine, deterministic scoring), and the persistence package `HaymakerStore` — plus the pinned CI contract gates (iOS 26 toolchain pin, iPhone-only pre/post-build, zero-network allowlist, native-only framework scan). No SpriteKit scene, store artifact, icon, archive, or TestFlight binary exists yet.
 
 1. ✅ **M1** — Xcode project + pure-Swift HaymakerKit package + CI (iOS 26 pin, iPhone-only gate, zero-network gate). (issue #1)
-2. 🔜 **M2** — Match engine core: pattern books, tell windows, damage/stamina state machine, seeded determinism + tests.
+2. ✅ **M2** — Match engine core: data-driven pattern books (first two opponents), fixed-tick FightEngine with tell-window resolution, stamina/damage state machine with KO/three-count rules, deterministic scoring + personal-best model, 51 swift-testing cases (golden-seed fixtures, replay determinism, state tables). (issue #2)
 3. 🔜 **M3** — SpriteKit fight scene + one-thumb controls + first opponent playable.
 4. 🔜 **M4** — Career ladder (6 opponents), records ledger, stats derivations.
 5. 🔜 **M5** — Backup/restore, CSV export, accessibility pass, `FightWorkspaceLayout` dual-screen seam (design target).

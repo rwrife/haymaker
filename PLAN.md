@@ -42,7 +42,7 @@ Rules:
 ## Milestones and dependency order
 
 1. ✅ **M1 Skeleton + CI** (#1) — done: `Haymaker.xcodeproj` (app target, bundle `com.infinityball.haymaker`, `TARGETED_DEVICE_FAMILY = 1` in all configurations), `Packages/HaymakerKit` (pure Swift 6) + `Packages/HaymakerStore` stub packages with swift-testing suites, macos-26 CI with exact Xcode 26.0.1 (17A400) pin, iOS 26 SDK assert, iPhone-only pre/post-build gates, zero-network gate, native-only framework scan. Everything else depends on this.
-2. **M2 Engine core** (#2) — PatternBook + FightEngine + DamageModel with seeded determinism, property-style tests, golden-seed fixtures. Depends on M1.
+2. ✅ **M2 Engine core** (#2) — done: data-driven `PatternBook` (Twitch + Anvil authored), fixed-tick integer `FightEngine` (round clock, guard/dodge/parry/jab/hook/uppercut resolution, tell-window hit/whiff/counter outcomes, replay with captured config/book + seed + input log), `DamageModel` stamina/damage state machine with named KD/KO states and three-count rule, deterministic `Scoring` + personal-best comparison. 51 swift-testing cases passed on Linux and the pinned macOS CI lane. Depends on M1 (merged).
 3. **M3 Playable fight** (#3) — SpriteKit scene, one-thumb controls, one opponent end-to-end, hit-feedback, round flow. Depends on M2.
 4. **M4 Career + records** (#4) — 6-opponent ladder, endless sparring, append-only ledger, PB derivations, results cards. Depends on M2 (UI needs M3).
 5. **M5 Data & accessibility** (#5) — backup/restore/export, accessibility pass, `FightWorkspaceLayout` seam documenting the dual-screen target. Depends on M4.
