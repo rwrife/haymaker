@@ -24,6 +24,8 @@ Prompt:
 
 ## Native 3D assets
 
+Four user-supplied T-pose character models are archived in [`Models`](Models/README.md) for future integration: Mack, Goldie Voltage, Nico “Nightshift” Navarro, and Bruiser Baxter. See [character backstories](character-backstories.md) for their story reference, including new player and final-boss histories.
+
 `Haymaker/Models/baxter-torso.obj` and `Haymaker/Models/boxer-head.obj` are smooth sculpted meshes authored by `scripts/build_fighter_meshes.py`, using Blender's voxel remesh, smoothing, subdivision, and decimation. Limbs, articulated joints, gloves, swept hair, clothing, boots, ring, crowd, lights and impact particles are constructed as native 3D scene geometry in `Haymaker/MatchScene.swift`.
 
 The meshes use Y-up coordinates in meters, smooth vertex normals, and a mobile polygon budget. Materials and animation are applied in the native scene. The runtime requires no Blender installation.
