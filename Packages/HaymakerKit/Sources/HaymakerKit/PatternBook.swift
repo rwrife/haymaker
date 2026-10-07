@@ -126,7 +126,7 @@ public struct PatternScheduler: Sendable {
     }
 }
 
-// MARK: - v0 roster (the first two authored opponents)
+// MARK: - v0 roster (six authored opponents)
 //
 // All names are original codenames — no real boxers, gyms, or
 // existing-game characters are referenced anywhere.
@@ -167,5 +167,42 @@ public extension OpponentBook {
     )
 
     /// The v0 authored roster in ladder order.
-    static let v0Roster: [OpponentBook] = [.twitch, .anvil]
+    static let v0Roster: [OpponentBook] = [.twitch, .anvil, .lattice, .switchback, .undertow, .kiln]
+
+    static let lattice = OpponentBook(id: "lattice", name: "Lattice", sequence: [
+        PatternEntry(move: .block, tell: 7, impact: 20, recover: 7, staminaCost: 5, damage: 0),
+        PatternEntry(move: .uppercut, tell: 10, impact: 5, recover: 14, staminaCost: 10, damage: 18),
+        PatternEntry(move: .jab, tell: 7, impact: 3, recover: 8, staminaCost: 4, damage: 9)
+    ], minGap: 4, gapSpread: 6)
+    static let switchback = OpponentBook(id: "switchback", name: "Switchback", sequence: [
+        PatternEntry(move: .feint, tell: 5, impact: 0, recover: 6, staminaCost: 2, damage: 0),
+        PatternEntry(move: .hook, tell: 8, impact: 4, recover: 10, staminaCost: 8, damage: 16),
+        PatternEntry(move: .feint, tell: 5, impact: 0, recover: 6, staminaCost: 2, damage: 0),
+        PatternEntry(move: .uppercut, tell: 9, impact: 4, recover: 12, staminaCost: 10, damage: 20)
+    ], minGap: 3, gapSpread: 5)
+    static let undertow = OpponentBook(id: "undertow", name: "Undertow", sequence: [
+        PatternEntry(move: .jab, tell: 5, impact: 3, recover: 6, staminaCost: 3, damage: 10),
+        PatternEntry(move: .hook, tell: 7, impact: 3, recover: 7, staminaCost: 6, damage: 17),
+        PatternEntry(move: .jab, tell: 5, impact: 3, recover: 6, staminaCost: 3, damage: 10),
+        PatternEntry(move: .uppercut, tell: 8, impact: 4, recover: 10, staminaCost: 9, damage: 22)
+    ], minGap: 2, gapSpread: 4)
+    static let kiln = OpponentBook(id: "kiln", name: "Kiln", sequence: [
+        PatternEntry(move: .feint, tell: 4, impact: 0, recover: 5, staminaCost: 2, damage: 0),
+        PatternEntry(move: .block, tell: 5, impact: 12, recover: 5, staminaCost: 4, damage: 0),
+        PatternEntry(move: .jab, tell: 5, impact: 2, recover: 5, staminaCost: 3, damage: 12),
+        PatternEntry(move: .hook, tell: 6, impact: 3, recover: 6, staminaCost: 6, damage: 20),
+        PatternEntry(move: .uppercut, tell: 7, impact: 3, recover: 8, staminaCost: 9, damage: 25)
+    ], minGap: 1, gapSpread: 3)
+
+    var bio: String {
+        switch id {
+        case "twitch": "A restless rhythm student. Read the repeated jabs and punish the long hook recovery."
+        case "anvil": "A patient workshop bruiser. Let the feint pass, then counter the heavy uppercut."
+        case "lattice": "A meticulous guard specialist. Break the shield with an uppercut before the reply."
+        case "switchback": "A winding-road trickster. Alternating feints conceal hooks and uppercuts."
+        case "undertow": "A relentless dockside sparrer. Short jab-hook waves demand stamina discipline."
+        case "kiln": "The ladder’s furnace keeper. Tight feints, guards and rising combinations test every read."
+        default: "No biography recorded."
+        }
+    }
 }

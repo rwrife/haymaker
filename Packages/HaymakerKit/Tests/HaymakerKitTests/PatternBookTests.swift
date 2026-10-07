@@ -3,9 +3,9 @@ import Testing
 
 @Suite("PatternBook: sequence order + seeded gap determinism")
 struct PatternBookTests {
-    @Test("v0 roster carries the first two authored opponents in order")
+    @Test("v0 roster carries the six authored opponents in order")
     func roster() {
-        #expect(OpponentBook.v0Roster.map(\.id) == ["twitch", "anvil"])
+        #expect(OpponentBook.v0Roster.map(\.id) == ["twitch", "anvil", "lattice", "switchback", "undertow", "kiln"])
         #expect(OpponentBook.twitch.sequence.count == 6)
         #expect(OpponentBook.anvil.sequence.count == 6)
     }

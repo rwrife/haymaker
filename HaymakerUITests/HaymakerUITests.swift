@@ -4,7 +4,7 @@ final class HaymakerUITests: XCTestCase {
     @MainActor
     func testBoutPlaythroughAndSettingsInspection() throws {
         let app = XCUIApplication()
-        app.launchArguments += ["-haymakerUITestShortBout"]
+        app.launchArguments += ["-haymakerUITestShortBout", "-haymakerUITestIsolatedStore"]
         app.launch()
 
         // 1. Settings check: inspect colorblind cues and reduced motion toggles.
@@ -65,4 +65,56 @@ final class HaymakerUITests: XCTestCase {
                       "Bout ended and transitioned to the results card")
         XCTAssertTrue(app.buttons["bout.again"].exists, "Fight again button is present on the results card")
     }
+    @MainActor
+    func testCareerLocksDetailsAndUnknownRecords() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-haymakerUITestIsolatedStore"]
+        app.launch()
+        XCTAssertTrue(app.buttons["bout.start"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["career.start.anvil"].isEnabled)
+        XCTAssertEqual(app.buttons["opponent.detail.twitch"].label, "Twitch bio and records")
+        XCTAssertEqual(app.buttons["opponent.detail.anvil"].label, "Anvil bio and records")
+        app.buttons["opponent.detail.twitch"].tap()
+        XCTAssertTrue(app.staticTexts["records.unknown.twitch"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'restless rhythm student'")).firstMatch.exists)
+    }
+
+    @MainActor
+    func testSavedCareerResultAppearsInRecords() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-haymakerUITestShortBout", "-haymakerUITestIsolatedStore", "-haymakerUITestJabEachTick"]
+        app.launch()
+        app.buttons["bout.start"].tap()
+        XCTAssertTrue(app.staticTexts["bout.results"].waitForExistence(timeout: 25))
+        XCTAssertTrue(app.staticTexts["results.pb"].exists)
+        app.buttons["records.open"].tap()
+        XCTAssertTrue(app.staticTexts["Career bouts 1"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'Recorded bouts 1'")).firstMatch.exists)
+        XCTAssertFalse(app.staticTexts["records.unknown.twitch"].exists)
+        app.buttons["Done"].tap()
+        app.buttons["career.home"].tap()
+        XCTAssertTrue(app.buttons["bout.start"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["career.status.twitch"].label, "Beaten")
+        XCTAssertTrue(app.buttons["career.start.anvil"].isEnabled)
+    }
+
+    @MainActor
+    func testEndlessSparringKeepsOpponentAndCountsRounds() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-haymakerUITestShortBout", "-haymakerUITestIsolatedStore"]
+        app.launch()
+        for _ in 0..<5 {
+            if app.buttons["sparring.start.twitch"].isHittable { break }
+            app.swipeUp()
+        }
+        app.buttons["sparring.start.twitch"].tap()
+        XCTAssertTrue(app.staticTexts["bout.results"].waitForExistence(timeout: 25))
+        XCTAssertTrue(app.staticTexts["sparring.stats"].label.contains("Run: 1 rounds"))
+        app.buttons["sparring.next"].tap()
+        XCTAssertTrue(app.staticTexts["bout.clock"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["bout.results"].waitForExistence(timeout: 25))
+        XCTAssertTrue(app.staticTexts["sparring.stats"].label.contains("Run: 2 rounds"))
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Twitch •'")).firstMatch.exists)
+    }
+
 }

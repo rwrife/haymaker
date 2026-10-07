@@ -23,8 +23,15 @@ jobs:
         run: swift --version
       - name: Run HaymakerKit package tests
         run: swift test --package-path Packages/HaymakerKit
+      - name: Install SQLite development headers
+        run: apt-get update -qq && apt-get install -y libsqlite3-dev
       - name: Run HaymakerStore package tests
-        run: swift test --package-path Packages/HaymakerStore
+        # Ubuntu's SQLite omits the optional snapshot API; DatabaseQueue does not use it.
+        run: swift test --package-path Packages/HaymakerStore -Xswiftc -DGRDBCUSTOMSQLITE
+      - name: Run app session host adapter probe
+        env:
+          HAYMAKER_PROBE_SCRATCH: /var/local/haymaker-probes
+        run: bash scripts/test_host_sessions.sh
       - name: Zero-network gate
         run: bash scripts/check_zero_network.sh
       - name: Native-only framework gate
@@ -116,6 +123,12 @@ jobs:
 
       - name: Run HaymakerKit package tests on pinned macOS toolchain
         run: swift test --package-path Packages/HaymakerKit
+      - name: Run HaymakerStore package tests and migrations on pinned macOS toolchain
+        run: swift test --package-path Packages/HaymakerStore
+      - name: Run app session host adapter probe on pinned macOS toolchain
+        env:
+          HAYMAKER_PROBE_SCRATCH: ${{ runner.temp }}/haymaker-probes
+        run: bash scripts/test_host_sessions.sh
 
       - name: Ensure iOS simulator platform runtime
         timeout-minutes: 40

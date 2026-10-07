@@ -9,11 +9,11 @@ import HaymakerKit
     private(set) var lastEvent: FightEvent?
     private var pending: [PlayerInput] = []
 
-    init(seed: UInt64 = 0xCAFE_2026, shortUITestBout: Bool = false) {
+    init(seed: UInt64 = 0xCAFE_2026, book: OpponentBook = .twitch, sparring: Bool = false, shortUITestBout: Bool = false) {
         let config = shortUITestBout
             ? EngineConfig(rounds: 1, roundTicks: 600, restTicks: 0)
-            : EngineConfig.standard
-        engine = FightEngine(config: config, seed: seed, book: .twitch)
+            : (sparring ? EngineConfig(rounds: 1, roundTicks: 3600, restTicks: 0) : EngineConfig.standard)
+        engine = FightEngine(config: config, seed: seed, book: book)
     }
 
     func submit(_ input: PlayerInput) {
@@ -22,9 +22,22 @@ import HaymakerKit
         if pending.count < 4 { pending.append(input) }
     }
 
+    @discardableResult
+    func advanceIfActive(settingsPresented: Bool, recordsPresented: Bool, sceneActive: Bool) -> Bool {
+        guard !settingsPresented, !recordsPresented, sceneActive, !engine.isOver else { return false }
+        advance()
+        return true
+    }
+
     func advance() {
         guard !engine.isOver else { return }
-        let input = pending.isEmpty ? PlayerInput.none : pending.removeFirst()
+        var input = pending.isEmpty ? PlayerInput.none : pending.removeFirst()
+        #if DEBUG
+        // Deterministic UI journey input driver; outcomes still come from the real engine.
+        if ProcessInfo.processInfo.arguments.contains("-haymakerUITestJabEachTick") {
+            input = .jab
+        }
+        #endif
         inputLog.append(input)
         let eventCount = engine.events.count
         var fighting = engine
