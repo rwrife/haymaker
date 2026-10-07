@@ -9,9 +9,9 @@ Story reference for the supplied character models and intro portraits. These sto
 | Nico “Nightshift” Navarro | Opponent | [nico.obj](Models/nico.obj) | [nico.png](IntroScenes/nico.png) |
 | Atlas “Undertow” Reed | Opponent | [atlas.obj](Models/atlas.obj) | [atlas.png](IntroScenes/atlas.png) |
 | Vera Velvet | Opponent | Not supplied | [vera.png](IntroScenes/vera.png) |
-| Duke Doubletake | Opponent | Not supplied | [duke.png](IntroScenes/duke.png) |
-| Sylvie “Slipstream” Sloane | Opponent | Not supplied | [sylvie.png](IntroScenes/sylvie.png) |
-| Cassian “Saint” Sterling | Championship contender | Not supplied | [cassian.png](IntroScenes/cassian.png) |
+| Duke Doubletake | Opponent | [duke.obj](Models/duke.obj) | [duke.png](IntroScenes/duke.png) |
+| Sylvie “Slipstream” Sloane | Opponent | [sylvie.obj](Models/sylvie.obj) | [sylvie.png](IntroScenes/sylvie.png) |
+| Cassian “Saint” Sterling | Championship contender | [cassian.obj](Models/cassian.obj) | [cassian.png](IntroScenes/cassian.png) |
 | Bruiser Baxter | Final boss | [bruiser.obj](Models/bruiser.obj) | [bruiser.png](IntroScenes/bruiser.png) |
 
 ## Mack — the player
