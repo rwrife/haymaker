@@ -1,13 +1,18 @@
 # Haymaker character backstories
 
-Story reference for the four supplied T-pose character models. These stories guide future career scenes, dialogue, and animation; they do not change the current playable roster. Goldie and Nico retain their established concept backgrounds. Mack and Bruiser's histories are new story proposals for the player and final boss.
+Story reference for the supplied character models and intro portraits. These stories guide future career scenes, dialogue, and animation; they do not change the current playable roster. Goldie and Nico retain their established concept backgrounds. Atlas, Vera, Duke, Sylvie, and Cassian's stories expand their existing concept backgrounds. Mack and Bruiser's histories are story proposals for the player and final boss. Bruiser remains the final boss as requested; Cassian is a championship contender rather than a replacement final boss. Bout order for the other opponents remains to be decided.
 
-| Character | Career role | Model |
-| --- | --- | --- |
-| Mack | Player | [mack.obj](Models/mack.obj) |
-| Goldie Voltage | Opponent | [goldie.obj](Models/goldie.obj) |
-| Nico “Nightshift” Navarro | Opponent | [nico.obj](Models/nico.obj) |
-| Bruiser Baxter | Final boss | [bruiser.obj](Models/bruiser.obj) |
+| Character | Career role | Model | Intro portrait |
+| --- | --- | --- | --- |
+| Mack | Player | [mack.obj](Models/mack.obj) | Not supplied |
+| Goldie Voltage | Opponent | [goldie.obj](Models/goldie.obj) | [goldie.png](IntroScenes/goldie.png) |
+| Nico “Nightshift” Navarro | Opponent | [nico.obj](Models/nico.obj) | [nico.png](IntroScenes/nico.png) |
+| Atlas “Undertow” Reed | Opponent | [atlas.obj](Models/atlas.obj) | [atlas.png](IntroScenes/atlas.png) |
+| Vera Velvet | Opponent | Not supplied | [vera.png](IntroScenes/vera.png) |
+| Duke Doubletake | Opponent | Not supplied | [duke.png](IntroScenes/duke.png) |
+| Sylvie “Slipstream” Sloane | Opponent | Not supplied | [sylvie.png](IntroScenes/sylvie.png) |
+| Cassian “Saint” Sterling | Championship contender | Not supplied | [cassian.png](IntroScenes/cassian.png) |
+| Bruiser Baxter | Final boss | [bruiser.obj](Models/bruiser.obj) | [bruiser.png](IntroScenes/bruiser.png) |
 
 ## Mack — the player
 
@@ -66,3 +71,73 @@ The final bout tests everything Mack has learned: readable power, feints, changi
 **Fighting identity:** heavyweight pressure backed by experience; mixes big windups, feints, guarded pauses, and punishing counters.
 
 **Voice:** “You want this corner? Earn it.”
+
+## Atlas “Undertow” Reed
+
+Atlas works as a harbor salvage diver, lifting what the sea has swallowed and bringing it back into daylight. Years of difficult work have given him immense strength and a patient respect for forces that cannot be hurried. He speaks softly, checks his equipment twice, and never mistakes a loud promise for a reliable one.
+
+His estranged father was a champion whose old belt still sits wrapped in a towel at the back of Atlas's wardrobe. Atlas tells people boxing is simply another job he is good at. Privately, he entered Haymaker to discover whether the sport can give him something of his own, beyond a surname and a complicated inheritance.
+
+Mack's loyalty to a neighborhood gym unsettles him: it is easier to dismiss the past when nobody around you believes it is worth saving. Atlas's arc is learning that honoring the good in his father's legacy does not require excusing the rest. In the ring, his calm pressure forces Mack to respect distance and find a way around power rather than trade with it.
+
+**Personality:** patient, practical, quietly sentimental; intimidating without enjoying intimidation.
+
+**Fighting identity:** grounded heavyweight; deliberate body hooks and sustained pressure reward opponents who move and punish those who stand still.
+
+**Voice:** “The tide doesn't rush. Neither do I.”
+
+## Vera Velvet
+
+Vera spent years as the sparring partner champions called when their strategies stopped working. She studied their opponents, repaired their habits, and gave them the hardest rounds of training camp. On fight night, someone else's name went on the poster. Her reputation grew inside gyms while the audience rarely learned who she was.
+
+Now in her late forties, Vera has entered Haymaker under her own name. She is not chasing a farewell tour or asking anyone to admire her persistence. She wants the opportunity she helped prepare so many other people to take—and intends to arrive better prepared than every one of them.
+
+Vera recognizes Mack's willingness to learn, but refuses to turn their bout into another unpaid lesson. Her tight guard and precise counters make every careless attack expensive. Her story turns on accepting that claiming the spotlight is compatible with the discipline that made her valuable behind it. After the fight, her advice carries weight because Mack had to earn it.
+
+**Personality:** composed, analytical, direct; warm once trust is earned, never indulgent.
+
+**Fighting identity:** disciplined high guard and exact counters; rewards deliberate openings over repeated attacks into her defense.
+
+**Voice:** “This time, the name on the poster is mine.”
+
+## Duke Doubletake
+
+Duke learned to hold a crowd's attention on a traveling carnival stage. The trick was never just what his hands did; it was knowing where everyone would look next. When the carnival closed, he carried that timing into a boxing gym and discovered that a convincing feint could earn applause of its own.
+
+He entered Haymaker to build a new stage for himself and put money aside for the performers who once traveled with him. His mismatched gloves, crooked grin, and theatrical confidence make every entrance feel like an invitation to be fooled. Underneath the showmanship is a working performer who knows exactly how much practice a seemingly effortless moment takes.
+
+Duke fears that without another surprise, the audience will stop caring. Mack challenges him by watching his feet and shoulders instead of following the glove he advertises. When the misdirection stops working, Duke has to trust the boxer he has become rather than reach for one more trick.
+
+**Personality:** charming, slippery, exuberant; jokes freely, takes his craft seriously.
+
+**Fighting identity:** feints and deceptive rhythm changes; the obvious threat often conceals the real counter.
+
+**Voice:** “Keep your eyes on this glove. Please.”
+
+## Sylvie “Slipstream” Sloane
+
+Sylvie once competed as a speed skater, building her days around split times, clean turns, and the narrowest possible advantage. After leaving competition, she missed the intensity more than the medals. Boxing began as off-season conditioning and became the first sport in years that made her feel like a beginner again.
+
+She brings powerful legs, fluid weight shifts, and an instinct for escaping along an angle instead of retreating in a straight line. Haymaker gives her a new kind of race: there is no fixed lane, no predictable finish, and another person can change the rhythm at any moment.
+
+Sylvie enters to prove she can build an identity beyond her old results. At first she treats every exchange as something she must win on speed alone. Mack's patience forces her to acknowledge that movement only matters when it takes her somewhere useful. Her growth is learning to commit to an exchange, not simply remain too quick to catch.
+
+**Personality:** focused, competitive, self-possessed; enjoys a challenge more than easy praise.
+
+**Fighting identity:** evasive footwork and quick counters; lateral slips create openings, but predictable exits can be read.
+
+**Voice:** “Try to meet me where I'm going.”
+
+## Cassian “Saint” Sterling
+
+Cassian grew up above a failing boxing gym and won an earlier title that kept its doors open. People turned that victory into a story about a flawless young hero. His pearl-white gear and careful public manner became part of the image, and the nickname “Saint” stuck long before he felt he deserved it.
+
+Now a championship contender in Haymaker, Cassian is admired for making difficult boxing look effortless. He has trained relentlessly to sustain that reputation, but each polished performance has made it harder to admit uncertainty. He wants a worthy challenger and dreads what that challenger might reveal.
+
+Mack's attempt to save another neighborhood gym feels uncomfortably familiar. Cassian sees both the determination that once drove him and the temptation to let one victory define an entire life. Their bout is a contest of fundamentals: balance, timing, and the courage to act without a guarantee of perfection. Cassian's story leaves room for him to support Mack without becoming another mentor who hides behind advice.
+
+**Personality:** calm, exacting, quietly charismatic; generous in private, guarded in public.
+
+**Fighting identity:** economical technical boxing; measured attacks and layered defense test timing rather than sheer speed or power.
+
+**Voice:** “Let's see what we do when the plan breaks.”
