@@ -24,7 +24,7 @@ Prompt:
 
 ## Native 3D assets
 
-Five user-supplied character models are archived in [`Models`](Models/README.md) for future integration: Mack, Goldie Voltage, Nico “Nightshift” Navarro, Bruiser Baxter, and Atlas “Undertow” Reed. Eight supplied 2D portraits are archived in [`IntroScenes`](IntroScenes/README.md) for future character introductions. See [character backstories](character-backstories.md) for story direction for all nine characters, including the player and final boss.
+Eight user-supplied character models are archived in [`Models`](Models/README.md) for future integration: Mack, Goldie Voltage, Nico “Nightshift” Navarro, Bruiser Baxter, Atlas “Undertow” Reed, Duke Doubletake, Sylvie “Slipstream” Sloane, and Cassian “Saint” Sterling. Eight supplied 2D portraits are archived in [`IntroScenes`](IntroScenes/README.md) for future character introductions. See [character backstories](character-backstories.md) for story direction for all nine characters, including the player and final boss.
 
 `Haymaker/Models/baxter-torso.obj` and `Haymaker/Models/boxer-head.obj` are smooth sculpted meshes authored by `scripts/build_fighter_meshes.py`, using Blender's voxel remesh, smoothing, subdivision, and decimation. Limbs, articulated joints, gloves, swept hair, clothing, boots, ring, crowd, lights and impact particles are constructed as native 3D scene geometry in `Haymaker/MatchScene.swift`.
 
