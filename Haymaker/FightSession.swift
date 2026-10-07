@@ -12,8 +12,8 @@ import HaymakerKit
     init(seed: UInt64 = 0xCAFE_2026, shortUITestBout: Bool = false) {
         let config = shortUITestBout
             ? EngineConfig(rounds: 1, roundTicks: 600, restTicks: 0)
-            : EngineConfig.standard
-        engine = FightEngine(config: config, seed: seed, book: .twitch)
+            : EngineConfig(roundTicks: 10800, restTicks: 240, dodgeTicks: 20)
+        engine = FightEngine(config: config, seed: seed, book: shortUITestBout ? .twitch : .baxter)
     }
 
     func submit(_ input: PlayerInput) {

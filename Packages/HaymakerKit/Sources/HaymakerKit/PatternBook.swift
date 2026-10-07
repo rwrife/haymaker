@@ -169,3 +169,19 @@ public extension OpponentBook {
     /// The v0 authored roster in ladder order.
     static let v0Roster: [OpponentBook] = [.twitch, .anvil]
 }
+
+// A readable, heavyweight arcade rhythm for the Metal arena. Existing roster
+// books remain unchanged so stored engine snapshots and replays stay valid.
+public extension OpponentBook {
+    static let baxter = OpponentBook(
+        id: "baxter", name: "Bruiser Baxter",
+        sequence: [
+            PatternEntry(move: .jab, tell: 42, impact: 12, recover: 32, staminaCost: 5, damage: 8),
+            PatternEntry(move: .hook, tell: 54, impact: 16, recover: 46, staminaCost: 10, damage: 16),
+            PatternEntry(move: .feint, tell: 32, impact: 0, recover: 16, staminaCost: 3, damage: 0),
+            PatternEntry(move: .jab, tell: 34, impact: 10, recover: 26, staminaCost: 5, damage: 8),
+            PatternEntry(move: .block, tell: 28, impact: 65, recover: 30, staminaCost: 6, damage: 0),
+            PatternEntry(move: .uppercut, tell: 60, impact: 18, recover: 54, staminaCost: 14, damage: 22),
+        ], minGap: 32, gapSpread: 24
+    )
+}
