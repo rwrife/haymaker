@@ -1,18 +1,18 @@
 # Haymaker character backstories
 
-Story reference for the supplied character models and intro portraits. These stories guide future career scenes, dialogue, and animation; they do not change the current playable roster. Goldie and Nico retain their established concept backgrounds. Atlas, Vera, Duke, Sylvie, and Cassian's stories expand their existing concept backgrounds. Mack and Bruiser's histories are story proposals for the player and final boss. Bruiser remains the final boss as requested; Cassian is a championship contender rather than a replacement final boss. Bout order for the other opponents remains to be decided.
+Story reference for the supplied character models, intro portraits, and defeated cut-scene portraits. These stories guide future career scenes, dialogue, and animation; they do not change the current playable roster. Goldie and Nico retain their established concept backgrounds. Atlas, Vera, Duke, Sylvie, and Cassian's stories expand their existing concept backgrounds. Mack and Bruiser's histories are story proposals for the player and final boss. Bruiser remains the final boss as requested; Cassian is a championship contender rather than a replacement final boss. Bout order for the other opponents remains to be decided.
 
-| Character | Career role | Model | Intro portrait |
-| --- | --- | --- | --- |
-| Mack | Player | [mack.obj](Models/mack.obj) | Not supplied |
-| Goldie Voltage | Opponent | [goldie.obj](Models/goldie.obj) | [goldie.png](IntroScenes/goldie.png) |
-| Nico “Nightshift” Navarro | Opponent | [nico.obj](Models/nico.obj) | [nico.png](IntroScenes/nico.png) |
-| Atlas “Undertow” Reed | Opponent | [atlas.obj](Models/atlas.obj) | [atlas.png](IntroScenes/atlas.png) |
-| Vera Velvet | Opponent | Not supplied | [vera.png](IntroScenes/vera.png) |
-| Duke Doubletake | Opponent | [duke.obj](Models/duke.obj) | [duke.png](IntroScenes/duke.png) |
-| Sylvie “Slipstream” Sloane | Opponent | [sylvie.obj](Models/sylvie.obj) | [sylvie.png](IntroScenes/sylvie.png) |
-| Cassian “Saint” Sterling | Championship contender | [cassian.obj](Models/cassian.obj) | [cassian.png](IntroScenes/cassian.png) |
-| Bruiser Baxter | Final boss | [bruiser.obj](Models/bruiser.obj) | [bruiser.png](IntroScenes/bruiser.png) |
+| Character | Career role | Model | Intro portrait | Defeated portrait |
+| --- | --- | --- | --- | --- |
+| Mack | Player | [mack.obj](Models/mack.obj) | Not supplied | [`mack-defeated.png`](DefeatedPortraits/mack-defeated.png) |
+| Goldie Voltage | Opponent | [goldie.obj](Models/goldie.obj) | [goldie.png](IntroScenes/goldie.png) | [`goldie-defeated.png`](DefeatedPortraits/goldie-defeated.png) |
+| Nico “Nightshift” Navarro | Opponent | [nico.obj](Models/nico.obj) | [nico.png](IntroScenes/nico.png) | [`nico-defeated.png`](DefeatedPortraits/nico-defeated.png) |
+| Atlas “Undertow” Reed | Opponent | [atlas.obj](Models/atlas.obj) | [atlas.png](IntroScenes/atlas.png) | [`atlas-defeated.png`](DefeatedPortraits/atlas-defeated.png) |
+| Vera Velvet | Opponent | Not supplied | [vera.png](IntroScenes/vera.png) | [`vera-defeated.png`](DefeatedPortraits/vera-defeated.png) |
+| Duke Doubletake | Opponent | [duke.obj](Models/duke.obj) | [duke.png](IntroScenes/duke.png) | [`duke-defeated.png`](DefeatedPortraits/duke-defeated.png) |
+| Sylvie “Slipstream” Sloane | Opponent | [sylvie.obj](Models/sylvie.obj) | [sylvie.png](IntroScenes/sylvie.png) | [`sylvie-defeated.png`](DefeatedPortraits/sylvie-defeated.png) |
+| Cassian “Saint” Sterling | Championship contender | [cassian.obj](Models/cassian.obj) | [cassian.png](IntroScenes/cassian.png) | [`cassian-defeated.png`](DefeatedPortraits/cassian-defeated.png) |
+| Bruiser Baxter | Final boss | [bruiser.obj](Models/bruiser.obj) | [bruiser.png](IntroScenes/bruiser.png) | [`bruiser-defeated.png`](DefeatedPortraits/bruiser-defeated.png) |
 
 ## Mack — the player
 
