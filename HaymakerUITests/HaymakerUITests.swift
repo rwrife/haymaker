@@ -107,7 +107,7 @@ final class HaymakerUITests: XCTestCase {
             if spar.exists && spar.isHittable { break }
             ladder.swipeUp()
         }
-        XCTAssertTrue(spar.waitForExistence(timeout: 5))
+        XCTAssertTrue(spar.isHittable, "Sparring action must become visible in ladder scroller")
         spar.tap()
         XCTAssertTrue(app.staticTexts["bout.results"].waitForExistence(timeout: 25))
         XCTAssertTrue(app.staticTexts["sparring.stats"].label.contains("Run: 1 rounds"))

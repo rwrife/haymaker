@@ -100,7 +100,9 @@ struct ContentView: View {
             if let error = career.error { Text(error).foregroundStyle(.red) }
             Text("CAREER LADDER").font(RingStyle.type(23)).foregroundStyle(RingStyle.gold)
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 8) {
+                // Non-lazy: all ladder + sparring rows must exist in the AX hierarchy so
+                // XCUITest can scroll to them (LazyVStack never realizes offscreen rows here).
+                VStack(alignment: .leading, spacing: 8) {
                     if career.historyLoaded && OpponentBook.v0Roster.allSatisfy({ career.records.wins($0.id, careerOnly: true) > 0 }) {
                         Text("Career complete — all six opponents beaten")
                     }
