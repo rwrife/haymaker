@@ -1,14 +1,20 @@
 import SwiftUI
-import SpriteKit
 import UIKit
 import Combine
 import HaymakerKit
-import HaymakerStore
 
 private enum ControlStyle: String, CaseIterable, Identifiable {
     case oneThumb = "One thumb"
     case twoHanded = "Two hands"
     var id: String { rawValue }
+}
+
+private enum RingStyle {
+    static let gold = Color(red: 0.98, green: 0.72, blue: 0.25)
+    static let green = Color(red: 0.31, green: 0.92, blue: 0.39)
+    static let red = Color(red: 0.97, green: 0.24, blue: 0.19)
+    static let ink = Color(red: 0.025, green: 0.04, blue: 0.075)
+    static func type(_ size: CGFloat) -> Font { .custom("AvenirNextCondensed-Heavy", size: size) }
 }
 
 struct ContentView: View {
@@ -18,87 +24,152 @@ struct ContentView: View {
     @AppStorage("hapticsEnabled") private var hapticsEnabled = true
     @State private var career = CareerSession()
     @State private var showingRecords = false
+    @State private var selectedDetail: OpponentBook?
     @State private var session: FightSession?
-    @State private var scene = MatchScene(size: CGSize(width: 390, height: 510))
+    @State private var scene = MatchScene()
     @State private var lastEventCount = 0
     @State private var showingSettings = false
+    @State private var paused = false
+    @State private var feedback = ""
+    @State private var feedbackUntil = 0
+    @State private var feedbackColor = RingStyle.gold
+    @State private var lastFrame: TimeInterval?
+    @State private var tickAccumulator: TimeInterval = 0
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     private var effectiveReducedMotion: Bool { reducedMotion || systemReduceMotion }
     private let clock = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        NavigationStack {
-            Group {
+        GeometryReader { geometry in
+            let portrait = geometry.size.height > geometry.size.width
+            ZStack {
+                MetalArenaView(arena: scene, portrait: portrait, paused: paused || showingSettings || scenePhase != .active)
+                    .ignoresSafeArea()
+                    .accessibilityHidden(true)
+                LinearGradient(colors: [.black.opacity(0.8), .clear, .clear, RingStyle.ink.opacity(0.95)], startPoint: .top, endPoint: .bottom)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
                 if let session {
-                    if session.engine.isOver { results(session) }
-                    else { arena(session) }
-                } else { home }
+                    match(session, portrait: portrait)
+                    if session.engine.isOver { results(session, portrait: portrait) }
+                    else if paused { pauseMenu }
+                } else { home(portrait: portrait) }
             }
-            .navigationTitle("Haymaker")
-            .toolbar {
-                Button("Records") { showingRecords = true }.accessibilityIdentifier("records.open")
-                Button("Settings", systemImage: "gearshape") { showingSettings = true }
-                    .accessibilityIdentifier("settings.open")
-            }
+            .foregroundStyle(.white)
+            .preferredColorScheme(.dark)
             .sheet(isPresented: $showingSettings) { settings }
             .sheet(isPresented: $showingRecords) { recordsWall }
+            .sheet(item: $selectedDetail) { book in opponentDetail(book) }
+            .statusBarHidden()
         }
-        .onReceive(clock) { _ in
-            guard let session, session.advanceIfActive(settingsPresented: showingSettings,
-                recordsPresented: showingRecords, sceneActive: scenePhase == .active) else { return }
-            if session.engine.isOver { career.save(session) }
-            scene.render(session.engine, reducedMotion: effectiveReducedMotion, highContrast: colorblindCues)
-            if session.engine.events.count > lastEventCount {
-                if hapticsEnabled && session.engine.events.dropFirst(lastEventCount).contains(where: {
-                    if case .landed = $0 { return true }
-                    return false
-                }) { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
-                lastEventCount = session.engine.events.count
-            }
+        .onReceive(clock) { _ in advanceFrame() }
+        .onChange(of: scenePhase) { _, phase in
+            lastFrame = nil
+            if phase != .active, session != nil, session?.engine.isOver == false { paused = true }
         }
+        .onChange(of: showingSettings) { _, _ in lastFrame = nil }
+        .onChange(of: showingRecords) { _, _ in lastFrame = nil }
+        .onChange(of: selectedDetail?.id) { _, _ in lastFrame = nil }
+        .onChange(of: paused) { _, _ in lastFrame = nil }
     }
 
-    private var home: some View {
-        List {
-            if let error = career.error { Text(error).foregroundStyle(.red) }
-            Section("Career ladder") {
-                if career.historyLoaded && OpponentBook.v0Roster.allSatisfy({ career.records.wins($0.id, careerOnly: true) > 0 }) {
-                    Text("Career complete — all six opponents beaten")
+    private func home(portrait: Bool) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Label("THE MAIN EVENT", systemImage: "sparkle")
+                    .font(.system(size: 11, weight: .heavy)).tracking(3)
+                    .foregroundStyle(RingStyle.gold)
+                Spacer()
+                settingsButton
+            }
+            .padding(.top, 10)
+            Spacer(minLength: 18)
+            HStack {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("HAYMAKER").font(RingStyle.type(portrait ? 61 : 76)).italic()
+                        .shadow(color: .black, radius: 8, y: 4)
+                        .minimumScaleFactor(0.6).lineLimit(1)
+                    Text("READ THE TELL. LAND THE COUNTER.")
+                        .font(.system(size: 10, weight: .heavy)).tracking(2)
+                        .foregroundStyle(RingStyle.gold)
                 }
-                ForEach(OpponentBook.v0Roster) { book in
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(book.name).font(.headline)
-                        Text(!career.historyLoaded ? "History unavailable" : career.records.wins(book.id, careerOnly: true) > 0 ? "Beaten" :
-                             (career.records.isUnlocked(book.id) ? "Ready" : "Locked — beat the previous opponents"))
-                            .accessibilityIdentifier("career.status.\(book.id)")
-                        NavigationLink("\(book.name) bio and records") { opponentDetail(book) }
-                            .accessibilityIdentifier("opponent.detail.\(book.id)")
-                        Button(book.id == "twitch" ? "Start bout" : "Fight \(book.name)") {
-                            if career.begin(book, mode: .career) { startBout() }
+                Spacer(minLength: 0)
+            }
+            Spacer()
+            if let error = career.error { Text(error).foregroundStyle(.red) }
+            Text("CAREER LADDER").font(RingStyle.type(23)).foregroundStyle(RingStyle.gold)
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 8) {
+                    if career.historyLoaded && OpponentBook.v0Roster.allSatisfy({ career.records.wins($0.id, careerOnly: true) > 0 }) {
+                        Text("Career complete — all six opponents beaten")
+                    }
+                    ForEach(OpponentBook.v0Roster) { book in
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(book.name).font(RingStyle.type(20))
+                                Text(!career.historyLoaded ? "History unavailable" : career.records.wins(book.id, careerOnly: true) > 0 ? "Beaten" :
+                                     (career.records.isUnlocked(book.id) ? "Ready" : "Locked — beat previous opponents"))
+                                    .font(.caption).accessibilityIdentifier("career.status.\(book.id)")
+                                Button("\(book.name) bio and records") { selectedDetail = book }
+                                    .font(.caption).accessibilityIdentifier("opponent.detail.\(book.id)")
+                            }
+                            Spacer()
+                            Button(book.id == "twitch" ? "Start bout" : "Fight \(book.name)") {
+                                if career.begin(book, mode: .career) { startBout() }
+                            }
+                            .disabled(!career.historyLoaded || !career.records.isUnlocked(book.id))
+                            .accessibilityIdentifier("career.start.\(book.id)")
                         }
-                        .buttonStyle(.bordered)
-                        .disabled(!career.historyLoaded || !career.records.isUnlocked(book.id))
-                        .accessibilityIdentifier(book.id == "twitch" ? "bout.start" : "career.start.\(book.id)")
+                        .padding(8).background(RingStyle.ink.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
+                    }
+                    Text("ENDLESS SPARRING").font(RingStyle.type(20)).foregroundStyle(RingStyle.gold)
+                    Text("Practice one opponent in seeded one-round bouts.").font(.caption)
+                    ForEach(OpponentBook.v0Roster) { book in
+                        Button("Spar with \(book.name)") { if career.begin(book, mode: .sparring) { startBout() } }
+                            .accessibilityIdentifier("sparring.start.\(book.id)")
                     }
                 }
             }
-            Section("Endless sparring") {
-                Text("Practice one opponent in seeded one-round bouts. Continue for as many rounds as you like.")
-                ForEach(OpponentBook.v0Roster) { book in
-                    Button("Spar with \(book.name)") { if career.begin(book, mode: .sparring) { startBout() } }
-                        .accessibilityIdentifier("sparring.start.\(book.id)")
+            .frame(maxHeight: portrait ? 320 : 160)
+            Button { showingRecords = true } label: {
+                Text("RECORDS").frame(maxWidth: .infinity).frame(height: 44)
+            }.accessibilityIdentifier("records.open")
+            Button { if career.begin(.twitch, mode: .career) { startBout() } } label: {
+                HStack {
+                    Image(systemName: "bolt.fill")
+                    Text("STEP INTO THE RING").font(RingStyle.type(22)).italic().tracking(1)
+                    Spacer()
+                    Image(systemName: "arrow.right")
                 }
+                .padding(.horizontal, 22).frame(height: 62)
+                .foregroundStyle(RingStyle.ink)
+                .background(LinearGradient(colors: [Color(red: 1, green: 0.83, blue: 0.42), RingStyle.gold], startPoint: .top, endPoint: .bottom), in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(.white.opacity(0.45)))
             }
+            .accessibilityIdentifier("bout.start")
+            HStack(spacing: 16) {
+                Label("3 ROUNDS", systemImage: "timer")
+                Label("ALL SKILL", systemImage: "target")
+                Label("OFFLINE", systemImage: "bolt.shield")
+            }
+            .font(.system(size: 9, weight: .heavy)).tracking(1)
+            .foregroundStyle(.white.opacity(0.5)).padding(.top, 15).padding(.bottom, 12)
         }
+        .padding(.horizontal, portrait ? 25 : 36)
     }
 
-    private func opponentDetail(_ book: OpponentBook) -> some View {
-        List {
-            Text(book.bio)
-            Text("Pattern: " + book.sequence.map { $0.move.rawValue }.joined(separator: " → "))
-            recordSummary(book)
-        }.navigationTitle(book.name)
+    @ViewBuilder private func opponentDetail(_ book: OpponentBook) -> some View {
+        NavigationStack {
+            List {
+                Text(book.bio)
+                Text("Pattern: " + book.sequence.map { $0.move.rawValue }.joined(separator: " → "))
+                recordSummary(book)
+            }
+            .navigationTitle(book.name)
+            .toolbar { Button("Done") { selectedDetail = nil } }
+        }
+        .preferredColorScheme(.dark)
     }
 
     @ViewBuilder private func recordSummary(_ book: OpponentBook) -> some View {
@@ -138,163 +209,417 @@ struct ContentView: View {
             .accessibilityIdentifier("records.wall")
             .toolbar { Button("Done") { showingRecords = false } }
         }
+        .preferredColorScheme(.dark)
     }
 
-    private func arena(_ session: FightSession) -> some View {
+    private func match(_ session: FightSession, portrait: Bool) -> some View {
         let fight = session.engine
-        return ScrollView {
-        VStack(spacing: 6) {
+        return VStack(spacing: 0) {
+            hud(fight, portrait: portrait)
             HStack {
-                Text("Round \(fight.round) / \(fight.config.rounds)")
+                HStack(spacing: 5) {
+                    Circle().fill(RingStyle.red).frame(width: 5, height: 5)
+                    Text("MAIN EVENT").tracking(2)
+                }
                 Spacer()
-                Text(fight.phase == .resting ? "REST" : "\(max(0, fight.config.roundTicks - fight.tickInRound) / 60)s")
+                Button { paused = true } label: {
+                    Image(systemName: "pause.fill").frame(width: 44, height: 44)
+                        .background(.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+                }
+                .accessibilityLabel("Pause bout").accessibilityIdentifier("bout.pause")
+            }
+            .font(.system(size: 9, weight: .heavy))
+            .foregroundStyle(.white.opacity(0.65))
+            .padding(.top, 5)
+            Spacer(minLength: 0)
+            if !feedback.isEmpty && fight.totalTicks < feedbackUntil {
+                Text(feedback).font(RingStyle.type(portrait ? 32 : 38)).italic()
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 20).padding(.vertical, 5)
+                    .background(feedbackColor, in: SlantedPanel())
+                    .overlay(SlantedPanel().stroke(.black, lineWidth: 3))
+                    .rotationEffect(.degrees(-3))
+                    .shadow(color: .black.opacity(0.5), radius: 4, y: 5)
+                    .accessibilityIdentifier("bout.feedback")
+            }
+            Spacer(minLength: 0)
+            VStack(spacing: portrait ? 12 : 6) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(tellTitle(fight)).font(RingStyle.type(18)).italic()
+                            .foregroundStyle(tellColor(fight))
+                            .accessibilityIdentifier("bout.tell")
+                        if portrait { Text(tellHint(fight)).font(.system(size: 10, weight: .medium)).foregroundStyle(.white.opacity(0.7)) }
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 3) {
+                        Text("Landed: \(fight.playerStats.landed)")
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .accessibilityIdentifier("bout.landed")
+                        Text("\(fight.playerStats.counters) COUNTERS").font(.system(size: 9, weight: .bold)).tracking(1).foregroundStyle(RingStyle.gold)
+                    }
+                }
+                stamina(fight)
+                if controlStyle == ControlStyle.oneThumb.rawValue {
+                    oneThumbControls(session, portrait: portrait)
+                } else { twoHandedControls(session, portrait: portrait) }
+            }
+            .padding(portrait ? 14 : 10)
+            .background(LinearGradient(colors: [RingStyle.ink.opacity(0.6), RingStyle.ink.opacity(0.96)], startPoint: .top, endPoint: .bottom), in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(.white.opacity(0.13)))
+            .padding(.bottom, portrait ? 8 : 0)
+        }
+        .padding(.horizontal, portrait ? 16 : 24)
+        .padding(.top, portrait ? 6 : 8)
+    }
+
+    private func hud(_ fight: FightEngine, portrait: Bool) -> some View {
+        HStack(alignment: .top, spacing: portrait ? 10 : 22) {
+            fighterHUD(name: fight.book.name.uppercased(), hp: fight.opponent.hp, maxHP: fight.config.damage.maxHP, knockdowns: fight.playerStats.knockdownsScored, color: RingStyle.red, rival: true, compact: portrait)
+            VStack(spacing: 0) {
+                Text("ROUND \(fight.round)").font(RingStyle.type(portrait ? 15 : 18)).foregroundStyle(RingStyle.gold)
+                Text(clockText(fight)).font(RingStyle.type(portrait ? 31 : 36)).monospacedDigit()
                     .accessibilityIdentifier("bout.clock")
+                Text("OF \(fight.config.rounds)").font(.system(size: 8, weight: .heavy)).tracking(2).foregroundStyle(.white.opacity(0.5))
             }
-            .font(.headline.monospacedDigit())
-            HStack {
-                meter("Your health", value: fight.player.hp, maximum: fight.config.damage.maxHP)
-                meter("\(fight.book.name) health", value: fight.opponent.hp, maximum: fight.config.damage.maxHP)
+            .frame(width: portrait ? 65 : 80)
+            fighterHUD(name: "ROOK", hp: fight.player.hp, maxHP: fight.config.damage.maxHP, knockdowns: fight.opponentStats.knockdownsScored, color: RingStyle.green, rival: false, compact: portrait)
+        }
+    }
+
+    private func fighterHUD(name: String, hp: Int, maxHP: Int, knockdowns: Int, color: Color, rival: Bool, compact: Bool) -> some View {
+        VStack(alignment: rival ? .leading : .trailing, spacing: 4) {
+            Text(name).font(RingStyle.type(compact ? 17 : 24)).lineLimit(1).minimumScaleFactor(0.6)
+            GeometryReader { geometry in
+                ZStack(alignment: rival ? .leading : .trailing) {
+                    RoundedRectangle(cornerRadius: 3).fill(.black.opacity(0.7))
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(LinearGradient(colors: [color.opacity(0.6), color, color.opacity(0.9)], startPoint: .bottom, endPoint: .top))
+                        .frame(width: max(0, geometry.size.width - 6) * CGFloat(max(0, hp)) / CGFloat(maxHP))
+                        .padding(3)
+                }
+                .overlay(RoundedRectangle(cornerRadius: 4).stroke(LinearGradient(colors: [.white.opacity(0.8), .gray.opacity(0.6), .white.opacity(0.6)], startPoint: .top, endPoint: .bottom), lineWidth: 2))
+                .shadow(color: color.opacity(0.35), radius: 7)
             }
-            meter("Your stamina", value: fight.player.stamina, maximum: fight.config.damage.maxStamina)
-            HStack {
-                Text("Tell: \(fight.opponent.state == .telling ? fight.opponent.currentMove.rawValue : "watch")")
-                    .accessibilityIdentifier("bout.tell")
-                Spacer()
-                if fight.opponent.state == .telling {
-                    Text("\(max(0, fight.opponent.stateDuration - fight.opponent.ticksInCurrentState)) ticks")
+            .frame(height: compact ? 17 : 21)
+            HStack(spacing: 4) {
+                if !rival { Spacer(minLength: 0) }
+                ForEach(0..<3) { index in
+                    Image(systemName: "star.fill")
+                        .foregroundStyle(index < knockdowns ? RingStyle.gold : .white.opacity(0.18))
+                }
+                if rival { Spacer(minLength: 0) }
+            }
+            .font(.system(size: compact ? 11 : 14))
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(name), health \(hp) of \(maxHP), \(knockdowns) knockdowns suffered")
+    }
+
+    private func stamina(_ fight: FightEngine) -> some View {
+        HStack(spacing: 9) {
+            Image(systemName: "bolt.fill").foregroundStyle(RingStyle.green)
+            Text("STAMINA").font(.system(size: 8, weight: .heavy)).tracking(1.4)
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(.white.opacity(0.1))
+                    Capsule().fill(fight.player.stamina < 20 ? RingStyle.red : RingStyle.green)
+                        .frame(width: geometry.size.width * CGFloat(fight.player.stamina) / CGFloat(fight.config.damage.maxStamina))
                 }
             }
-            .font(.headline)
-            SpriteView(scene: scene)
-                .frame(height: 300)
-                .accessibilityHidden(true) // HUD text and control labels carry equivalent information.
-            Text("Landed: \(fight.playerStats.landed)")
-                .font(.headline.monospacedDigit())
-                .accessibilityIdentifier("bout.landed")
-            if controlStyle == ControlStyle.oneThumb.rawValue { oneThumbControls(session) }
-            else { twoHandedControls(session) }
+            .frame(height: 5)
+            Text("\(fight.player.stamina)").font(.system(size: 10, weight: .bold, design: .monospaced))
         }
-        .padding(.horizontal, 14)
-        }
+        .font(.system(size: 10))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Stamina \(fight.player.stamina) of \(fight.config.damage.maxStamina)")
     }
 
-    private func meter(_ title: String, value: Int, maximum: Int) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text("\(title): \(value) / \(maximum)")
-                .font(.caption.bold())
-            ProgressView(value: Double(value), total: Double(maximum))
-                .tint(title.contains("stamina") ? .cyan : .orange)
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private func oneThumbControls(_ session: FightSession) -> some View {
-        VStack(spacing: 6) {
-            Text("Tap jab • drag left hook • drag up uppercut • swipe right dodge • swipe down guard")
-                .font(.caption)
-                .multilineTextAlignment(.center)
+    private func oneThumbControls(_ session: FightSession, portrait: Bool) -> some View {
+        HStack(spacing: 10) {
+            control("GUARD", icon: "shield.lefthalf.filled", hint: "HOLD THE LINE", input: .block, id: "bout.guard", session: session, color: .white, height: portrait ? 67 : 44)
+                .frame(maxWidth: .infinity)
             Button { session.submit(.jab) } label: {
-                Text("Jab — drag for combo").frame(maxWidth: .infinity, minHeight: 64)
+                VStack(spacing: 2) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "bolt.fill").font(.system(size: 15, weight: .black))
+                        Text("PUNCH").font(RingStyle.type(portrait ? 25 : 22)).italic()
+                    }
+                    if portrait { Text("TAP JAB · SWIPE COMBO").font(.system(size: 7, weight: .heavy)).tracking(0.6) }
+                }
+                .frame(maxWidth: .infinity).frame(height: portrait ? 67 : 44)
+                .foregroundStyle(RingStyle.ink)
+                .background(LinearGradient(colors: [RingStyle.gold, Color(red: 0.96, green: 0.49, blue: 0.13)], startPoint: .top, endPoint: .bottom), in: RoundedRectangle(cornerRadius: 9))
+                .overlay(RoundedRectangle(cornerRadius: 9).stroke(.white.opacity(0.45)))
             }
-                .buttonStyle(.borderedProminent)
-                .accessibilityIdentifier("bout.jab")
-                .simultaneousGesture(DragGesture(minimumDistance: 26).onEnded { drag in
-                    session.submit(ControlInput.resolve(dx: Double(drag.translation.width), dy: Double(drag.translation.height)))
-                })
-                .accessibilityAction(named: "Hook") { session.submit(.hook) }
-                .accessibilityAction(named: "Uppercut") { session.submit(.uppercut) }
-            HStack {
-                action("Guard", input: .block, id: "bout.guard", session: session)
-                action("Dodge", input: .dodge, id: "bout.dodge", session: session)
+            .accessibilityLabel("Jab. Swipe left for hook, up for uppercut, right for dodge, down for guard.")
+            .accessibilityIdentifier("bout.jab")
+            .highPriorityGesture(DragGesture(minimumDistance: 26).onEnded { drag in
+                session.submit(ControlInput.resolve(dx: Double(drag.translation.width), dy: Double(drag.translation.height)))
+            })
+            .accessibilityAction(named: "Hook") { session.submit(.hook) }
+            .accessibilityAction(named: "Uppercut") { session.submit(.uppercut) }
+            .frame(maxWidth: .infinity)
+            control("DODGE", icon: "arrow.turn.up.left", hint: "MAKE HIM MISS", input: .dodge, id: "bout.dodge", session: session, color: RingStyle.green, height: portrait ? 67 : 44)
+                .frame(maxWidth: .infinity)
+        }
+    }
+
+    private func twoHandedControls(_ session: FightSession, portrait: Bool) -> some View {
+        VStack(spacing: 7) {
+            HStack(spacing: 8) {
+                control("JAB", icon: "arrow.up.right", input: .jab, id: "bout.jab", session: session, color: RingStyle.gold)
+                control("HOOK", icon: "arrow.uturn.left", input: .hook, id: "bout.hook", session: session, color: RingStyle.gold)
+                control("UPPERCUT", icon: "arrow.up", input: .uppercut, id: "bout.uppercut", session: session, color: RingStyle.gold)
+            }
+            HStack(spacing: 8) {
+                control("GUARD", icon: "shield.fill", input: .block, id: "bout.guard", session: session)
+                control("DODGE", icon: "arrow.turn.up.left", input: .dodge, id: "bout.dodge", session: session, color: RingStyle.green)
+                control("PARRY", icon: "hand.raised.fill", input: .parry, id: "bout.parry", session: session)
             }
         }
     }
 
-    private func twoHandedControls(_ session: FightSession) -> some View {
-        VStack(spacing: 8) {
-            HStack {
-                action("Jab", input: .jab, id: "bout.jab", session: session)
-                action("Hook", input: .hook, id: "bout.hook", session: session)
-                action("Uppercut", input: .uppercut, id: "bout.uppercut", session: session)
+    private func control(_ title: String, icon: String, hint: String? = nil, input: PlayerInput, id: String, session: FightSession, color: Color = .white, height: CGFloat = 44) -> some View {
+        Button { session.submit(input) } label: {
+            VStack(spacing: 3) {
+                HStack(spacing: 4) {
+                    Image(systemName: icon).font(.system(size: 13, weight: .bold))
+                    Text(title).font(RingStyle.type(16))
+                }
+                if let hint, height > 50 { Text(hint).font(.system(size: 6, weight: .heavy)).tracking(0.4).foregroundStyle(.white.opacity(0.45)) }
             }
-            HStack {
-                action("Guard", input: .block, id: "bout.guard", session: session)
-                action("Dodge", input: .dodge, id: "bout.dodge", session: session)
-                action("Parry", input: .parry, id: "bout.parry", session: session)
-            }
+            .frame(maxWidth: .infinity).frame(height: height)
+            .foregroundStyle(color)
+            .background(LinearGradient(colors: [.white.opacity(0.13), .white.opacity(0.035)], startPoint: .top, endPoint: .bottom), in: RoundedRectangle(cornerRadius: 9))
+            .overlay(RoundedRectangle(cornerRadius: 9).stroke(color.opacity(0.25)))
         }
+        .accessibilityIdentifier(id)
     }
 
-    private func action(_ title: String, input: PlayerInput, id: String, session: FightSession) -> some View {
-        Button(title) { session.submit(input) }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
-            .frame(maxWidth: .infinity, minHeight: 50)
-            .accessibilityIdentifier(id)
-    }
-
-    private func results(_ session: FightSession) -> some View {
-        ScrollView {
-            VStack(spacing: 18) {
-                Text("Bout results").font(.largeTitle.bold()).accessibilityIdentifier("bout.results")
-                Text("\(session.engine.book.name) • \(session.engine.outcome?.rawValue ?? "Unknown outcome")")
-                Text("Landed \(session.engine.playerStats.landed) of \(session.engine.playerStats.thrown) punches")
-                Text("Damage dealt \(session.engine.playerStats.damageDealt) • taken \(session.engine.playerStats.damageTaken)")
-                Text("Round \(session.engine.round) • \(session.engine.totalTicks) ticks • score \(session.engine.playerScore().points)")
-                Text(session.replayMatches ? "Seeded replay verified" : "Replay mismatch")
-                if career.saved {
-                    Text(career.comparison?.shouldStore == true ? "Personal best recorded" : "Previous personal best stands")
+    private func results(_ session: FightSession, portrait: Bool) -> some View {
+        let win = session.engine.outcome?.isPlayerWin == true
+        let draw = session.engine.outcome == .draw
+        return ZStack {
+            RingStyle.ink.opacity(0.85).ignoresSafeArea()
+            VStack(spacing: portrait ? 19 : 10) {
+                Text("BOUT RESULTS").font(.system(size: 11, weight: .heavy)).tracking(4).foregroundStyle(RingStyle.gold)
+                    .accessibilityIdentifier("bout.results")
+                Text(draw ? "DRAW" : win ? "VICTORY" : "DEFEAT")
+                    .font(RingStyle.type(portrait ? 64 : 50)).italic().foregroundStyle(win ? RingStyle.gold : .white)
+                Text(session.engine.book.name).font(.headline).foregroundStyle(.white.opacity(0.65))
+                Text(outcomeDescription(session.engine.outcome)).font(.system(size: 13, weight: .medium)).foregroundStyle(.white.opacity(0.65))
+                Text(session.replayMatches ? "Seeded replay verified" : "Replay mismatch").font(.caption)
+                if career.saved, let comparison = career.comparison {
+                    Text(comparison.shouldStore ? "Personal best recorded" : "Previous personal best stands")
                         .accessibilityIdentifier("results.pb")
                 }
                 if let error = career.error {
                     Text(error).foregroundStyle(.red)
                     Button("Retry saving") { career.save(session) }
                 }
+                HStack(spacing: 25) {
+                    resultStat("SCORE", value: session.engine.playerScore().points.formatted())
+                    resultStat("LANDED", value: "\(session.engine.playerStats.landed)/\(session.engine.playerStats.thrown)")
+                    resultStat("COUNTERS", value: "\(session.engine.playerStats.counters)")
+                }
+                .padding(.vertical, 10)
                 if career.mode == .sparring {
                     Text("Run: \(career.runBouts.count) rounds • score \(career.runBouts.reduce(0) { $0 + $1.result.score.points }) • landed \(career.runBouts.reduce(0) { $0 + $1.result.playerStats.landed })")
                         .accessibilityIdentifier("sparring.stats")
-                    Button("Next sparring round") { if career.nextRound() { startBout() } }
-                        .disabled(!career.saved).accessibilityIdentifier("sparring.next")
+                    Button { if career.nextRound() { startBout() } } label: {
+                        Text("NEXT SPARRING ROUND").font(RingStyle.type(19)).frame(maxWidth: .infinity).frame(height: 48)
+                            .background(RingStyle.gold.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))
+                    }
+                    .disabled(!career.saved).accessibilityIdentifier("sparring.next")
                 } else if let next = OpponentBook.v0Roster.first(where: {
                     career.records.isUnlocked($0.id) && career.records.wins($0.id, careerOnly: true) == 0
                 }), next.id != career.opponent.id {
-                    Button("Next career bout: \(next.name)") { if career.begin(next, mode: .career) { startBout() } }
-                        .disabled(!career.saved).accessibilityIdentifier("career.next")
+                    Button { if career.begin(next, mode: .career) { startBout() } } label: {
+                        Text("NEXT CAREER BOUT: \(next.name.uppercased())").font(RingStyle.type(17)).frame(maxWidth: .infinity).frame(height: 48)
+                            .background(RingStyle.gold.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))
+                    }
+                    .disabled(!career.saved).accessibilityIdentifier("career.next")
                 }
-                Button("Fight again") { if career.begin(career.opponent, mode: career.mode) { startBout() } }
-                    .disabled(!career.saved).buttonStyle(.borderedProminent).accessibilityIdentifier("bout.again")
-                Button("Career ladder") { if career.saved { self.session = nil } }
+                Button { if career.begin(career.opponent, mode: career.mode) { startBout() } } label: {
+                    Text("REMATCH").font(RingStyle.type(23)).italic().frame(maxWidth: .infinity).frame(height: 52)
+                        .foregroundStyle(RingStyle.ink).background(RingStyle.gold, in: RoundedRectangle(cornerRadius: 8))
+                }
+                .disabled(!career.saved)
+                .accessibilityIdentifier("bout.again")
+                Button("CAREER LADDER") { if career.saved { sessionReset() } }
+                    .font(.system(size: 11, weight: .heavy)).tracking(1.4).padding(8)
                     .disabled(!career.saved).accessibilityIdentifier("career.home")
-            }.padding()
+            }
+            .frame(maxWidth: 400).padding(28)
         }
+    }
+
+    private func resultStat(_ title: String, value: String) -> some View {
+        VStack(spacing: 3) {
+            Text(value).font(RingStyle.type(28)).foregroundStyle(RingStyle.gold)
+            Text(title).font(.system(size: 8, weight: .heavy)).tracking(1.5).foregroundStyle(.white.opacity(0.6))
+        }
+    }
+
+    private var pauseMenu: some View {
+        ZStack {
+            RingStyle.ink.opacity(0.9).ignoresSafeArea()
+            VStack(spacing: 20) {
+                Text("IN YOUR CORNER").font(RingStyle.type(38)).italic()
+                Text("Take a breath. The ring can wait.").font(.system(size: 13)).foregroundStyle(.white.opacity(0.6))
+                Button { paused = false } label: {
+                    Text("RESUME BOUT").font(RingStyle.type(22)).frame(width: 240, height: 55)
+                        .foregroundStyle(RingStyle.ink).background(RingStyle.gold, in: RoundedRectangle(cornerRadius: 8))
+                }
+                .accessibilityIdentifier("bout.resume")
+                Button("Settings") { showingSettings = true }.font(.headline)
+                Button("Leave bout") { sessionReset() }.font(.subheadline).foregroundStyle(.white.opacity(0.6))
+            }
+        }
+    }
+
+    private var settingsButton: some View {
+        Button { showingSettings = true } label: {
+            Image(systemName: "gearshape.fill").font(.system(size: 18)).frame(width: 44, height: 44)
+                .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+        }
+        .accessibilityLabel("Settings").accessibilityIdentifier("settings.open")
     }
 
     private var settings: some View {
         NavigationStack {
             Form {
-                Picker("Controls", selection: $controlStyle) {
-                    ForEach(ControlStyle.allCases) { style in Text(style.rawValue).tag(style.rawValue) }
+                Section("Your corner") {
+                    Picker("Controls", selection: $controlStyle) {
+                        ForEach(ControlStyle.allCases) { style in Text(style.rawValue).tag(style.rawValue) }
+                    }.accessibilityIdentifier("settings.controls")
+                    Toggle("High contrast tell cues", isOn: $colorblindCues).accessibilityIdentifier("settings.colorblind")
+                    Toggle("Reduced motion", isOn: $reducedMotion).accessibilityIdentifier("settings.reducedMotion")
+                    Toggle("Haptics", isOn: $hapticsEnabled).accessibilityIdentifier("settings.haptics")
                 }
-                .accessibilityIdentifier("settings.controls")
-                Toggle("Shape and text tell cues", isOn: $colorblindCues)
-                    .accessibilityIdentifier("settings.colorblind")
-                Toggle("Reduced motion", isOn: $reducedMotion)
-                    .accessibilityIdentifier("settings.reducedMotion")
-                Toggle("Haptics", isOn: $hapticsEnabled)
-                    .accessibilityIdentifier("settings.haptics")
-                Text("Tell shapes and text remain on for every player; this setting records your preference for future visual themes.")
-                    .font(.footnote)
+                Section("Learn the rhythm") {
+                    Text("Tap PUNCH for a jab. Swipe left for a hook, up for an uppercut, right to dodge, and down to guard. Two hands gives every move its own button.")
+                    Text("Counter during Baxter’s windup for double damage. Dodge just before his glove lands. An uppercut breaks his guard. Feints are a trap—wait for the opening.")
+                }
+                Section {
+                    Text("3D arena rendered with Metal. All fights and records stay on your device.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
             }
-            .navigationTitle("Settings")
+            .tint(RingStyle.gold)
+            .navigationTitle("Your corner")
             .toolbar { Button("Done") { showingSettings = false } }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private func clockText(_ fight: FightEngine) -> String {
+        if fight.phase == .resting { return "REST" }
+        let seconds = max(0, fight.config.roundTicks - fight.tickInRound + 59) / 60
+        return String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+
+    private func tellTitle(_ fight: FightEngine) -> String {
+        if fight.phase == .resting { return "BACK TO YOUR CORNER" }
+        switch fight.opponent.state {
+        case .telling: return fight.opponent.currentMove == .feint ? "FEINT — DON’T BITE" : "\(fight.opponent.currentMove.rawValue.uppercased()) — WINDING UP"
+        case .attacking: return "INCOMING!"
+        case .blocking: return "GUARD UP"
+        case .recovering: return "OPENING — GO!"
+        case .knockedDown, .ko: return "BAXTER IS DOWN!"
+        default: return "READ HIS NEXT MOVE"
+        }
+    }
+    private func tellHint(_ fight: FightEngine) -> String {
+        if fight.phase == .resting { return "Recover your stamina. Next round is coming." }
+        switch fight.opponent.state {
+        case .telling: return fight.opponent.currentMove == .feint ? "Wait for the real punch." : "Counter now, or prepare to dodge."
+        case .attacking: return "Dodge or guard!"
+        case .blocking: return "Swipe up. Uppercut breaks the guard."
+        case .recovering: return "He missed his chance. Take yours."
+        default: return "Watch the gloves. Find your rhythm."
+        }
+    }
+    private func tellColor(_ fight: FightEngine) -> Color {
+        if colorblindCues { return .white }
+        return fight.opponent.state == .attacking ? RingStyle.red : fight.opponent.state == .recovering ? RingStyle.green : RingStyle.gold
+    }
+    private func outcomeDescription(_ outcome: FightOutcome?) -> String {
+        switch outcome {
+        case .playerWinByKO: return "Baxter goes down. You own the ring."
+        case .playerWinByDecision: return "You take it on the judges’ scorecards."
+        case .playerLossByKO: return "Baxter lands the knockout. Come back swinging."
+        case .playerLossByDecision: return "Baxter takes the decision. Find his rhythm."
+        default: return "Even on the scorecards. Settle it in a rematch."
         }
     }
 
     private func startBout() {
         let isUITest = ProcessInfo.processInfo.arguments.contains("-haymakerUITestShortBout")
         session = FightSession(seed: career.seed, book: career.opponent, sparring: career.mode == .sparring, shortUITestBout: isUITest)
-        scene = MatchScene(size: CGSize(width: 390, height: 510))
+        scene = MatchScene()
+        paused = false
         lastEventCount = 0
+        lastFrame = nil
+        tickAccumulator = 0
+        feedback = "FIGHT!"
+        feedbackColor = RingStyle.gold
+        feedbackUntil = 70
         if let session { scene.render(session.engine, reducedMotion: effectiveReducedMotion, highContrast: colorblindCues) }
+    }
+
+    private func sessionReset() {
+        session = nil
+        scene = MatchScene()
+        paused = false
+        lastFrame = nil
+        feedback = ""
+    }
+
+    private func advanceFrame() {
+        let now = ProcessInfo.processInfo.systemUptime
+        guard let session, !showingSettings, !showingRecords, selectedDetail == nil, !paused, !session.engine.isOver, scenePhase == .active else { lastFrame = nil; return }
+        let elapsed = min(0.1, max(0, now - (lastFrame ?? now)))
+        lastFrame = now
+        tickAccumulator += elapsed
+        while tickAccumulator >= 1.0 / 60.0 {
+            session.advance()
+            tickAccumulator -= 1.0 / 60.0
+            if session.engine.isOver {
+                career.save(session)
+                break
+            }
+        }
+        scene.render(session.engine, reducedMotion: effectiveReducedMotion, highContrast: colorblindCues)
+        for event in session.engine.events.dropFirst(lastEventCount) {
+            switch event {
+            case let .landed(_, by, _, _, counter):
+                feedback = by == .player ? (counter ? "COUNTER!" : "CLEAN HIT!") : "HIT!"
+                feedbackColor = by == .player ? RingStyle.gold : RingStyle.red
+                if hapticsEnabled { UIImpactFeedbackGenerator(style: counter ? .heavy : .medium).impactOccurred() }
+            case .dodged: feedback = "DODGED!"; feedbackColor = RingStyle.green
+            case .parried: feedback = "PARRIED!"; feedbackColor = RingStyle.green
+            case .blocked: feedback = "BLOCKED!"; feedbackColor = .white
+            case .knockdown: feedback = "KNOCKDOWN!"; feedbackColor = RingStyle.gold
+            case .roundStart: feedback = "FIGHT!"; feedbackColor = RingStyle.gold
+            default: continue
+            }
+            feedbackUntil = session.engine.totalTicks + 38
+        }
+        lastEventCount = session.engine.events.count
+    }
+}
+
+private struct SlantedPanel: Shape {
+    func path(in rect: CGRect) -> Path {
+        Path { path in
+            path.move(to: CGPoint(x: 9, y: 0))
+            path.addLine(to: CGPoint(x: rect.maxX, y: 0))
+            path.addLine(to: CGPoint(x: rect.maxX - 9, y: rect.maxY))
+            path.addLine(to: CGPoint(x: 0, y: rect.maxY))
+            path.closeSubpath()
+        }
     }
 }

@@ -2,11 +2,21 @@
 
 **Haymaker is a local-first iPhone boss-rush arcade boxing game: read telegraphed opponent patterns, throw one-thumb combos, and climb an original fighter career — with a dual-screen battle layout as the design target — no accounts, no cloud.**
 
-Public repo under the Auto Tool Lab program (`auto-tool-lab`). M1 (skeleton + CI contract gates) and M2 (pure-Swift match engine in `Packages/HaymakerKit`) have landed; gameplay, persistence, and release automation land in later milestones. The pinned Apple CI lane verifies a simulator app build, not a store artifact or physical-device run.
+Public repo under the Auto Tool Lab program (`auto-tool-lab`). M1 (skeleton + CI contract gates), M2 (pure-Swift match engine in `Packages/HaymakerKit`), and the playable Metal arena have landed; career persistence and release automation remain later milestones. The pinned Apple CI lane verifies a simulator app build, not a store artifact or physical-device run.
+
+## Playable Metal arena
+
+The app now opens on a full-screen boxing main event and runs a native 3D bout against Bruiser Baxter. The arena and articulated fighters are real meshes rendered through an explicitly selected Metal renderer, with physically based leather, satin and gold materials, HDR lighting, shadows, bloom, ambient occlusion, and impact particles. The match supports portrait and landscape, one-thumb gesture combos or individual move buttons, pause/resume, reduced motion, haptics, health/stamina HUDs, results and a local personal best.
+
+The existing deterministic engine remains authoritative. Baxter has a new heavyweight pattern book with readable windups, feints, guard windows and counter opportunities. Old opponent books and engine snapshots are unchanged. The short-bout UI test still uses Twitch.
+
+Character sculpt assets are bundled in `Haymaker/Models`. Rebuild them with the installed Blender by running `scripts/build_fighter_meshes.py` in background mode. Blender is an offline art tool and is not a runtime dependency. Generated images in `ArtDirection` are visual references; they are not fighter sprites or the rendered arena. See `ArtDirection/README.md` for asset provenance and prompts.
+
+Validation for this rebuild: 54 domain tests, 2 store tests, and simulator UI playthroughs covering settings, punches, results, both orientations and paused timing. Native-only and zero-network gates pass. Local verification uses Xcode 27 / iOS 27 simulator; the repository's separate pinned CI toolchain remains unchanged. Physical-device frame rate has not been measured.
 
 ## Overview
 
-Haymaker is a single-player arcade boxing game for iPhone built in native Swift with SpriteKit for match gameplay and SwiftUI for everything around it. Every fight is a *boss fight*: an original opponent with a readable tell-driven move book (jabs, hooks, guards, feints), an exposure meter, and a rhythm the player learns. The core loop is short, one-handed, and score-attack friendly: pick a bout, read the telegraphs, land combos through the guard, dodge on the bell, and beat your own record.
+Haymaker is a single-player arcade boxing game for iPhone built in native Swift with a Metal-backed SceneKit 3D renderer for match gameplay and SwiftUI for everything around it. Every fight is a *boss fight*: an original opponent with a readable tell-driven move book (jabs, hooks, guards, feints), an exposure meter, and a rhythm the player learns. The core loop is short, one-handed, and score-attack friendly: pick a bout, read the telegraphs, land combos through the guard, dodge on the bell, and beat your own record.
 
 The pitch: **a pocket arcade boxing cabinet** — every opponent is a distinct pattern puzzle, every session ends in a personal record, and all of it lives on your phone.
 
@@ -43,7 +53,7 @@ The concept also maps naturally to the **iPhone Duo dual-screen** design target:
 - Career boss-rush: 6 original opponents, each a distinct telegraph pattern book (v0 roster).
 - Deterministic match engine in pure Swift (HaymakerKit package): pattern scheduler, tell windows, damage/stamina state machine — same input seed, same fight.
 - One-thumb control scheme (tap combos + swipe guard/dodge) with a secondary two-handed scheme.
-- SpriteKit match scene with modern vector/sprite art direction, hit feedback, and round flow.
+- Metal-backed 3D match scene with articulated fighters, cinematic lighting, hit feedback, and round flow.
 - Endless Sparring mode (single-opponent loop with seeded patterns).
 - Local records: per-opponent bests and career stats, append-only ledger, unknown-safe display (never invents missing history).
 - Versioned JSON backup + CSV stats export via the Files app; restore with preview.
@@ -83,11 +93,11 @@ Full dual-screen/foldable SDK support does not exist yet. Haymaker therefore sca
 
 ## Current status and milestones
 
-Early build-out: the repository now carries the native Swift project skeleton — `Haymaker.xcodeproj` (app target `Haymaker`), the pure-domain match-engine package `Packages/HaymakerKit` (pattern books, fixed-tick fight engine, damage state machine, deterministic scoring), and the persistence package `HaymakerStore` — plus the pinned CI contract gates (iOS 26 toolchain pin, iPhone-only pre/post-build, zero-network allowlist, native-only framework scan). No SpriteKit scene, store artifact, icon, archive, or TestFlight binary exists yet.
+Early build-out: the repository now carries the native Swift project skeleton — `Haymaker.xcodeproj` (app target `Haymaker`), the pure-domain match-engine package `Packages/HaymakerKit` (pattern books, fixed-tick fight engine, damage state machine, deterministic scoring), and the persistence package `HaymakerStore` — plus the pinned CI contract gates (iOS 26 toolchain pin, iPhone-only pre/post-build, zero-network allowlist, native-only framework scan). A playable Metal-backed 3D scene now exists. No store archive or TestFlight binary has been verified.
 
 1. ✅ **M1** — Xcode project + pure-Swift HaymakerKit package + CI (iOS 26 pin, iPhone-only gate, zero-network gate). (issue #1)
 2. ✅ **M2** — Match engine core: data-driven pattern books (first two opponents), fixed-tick FightEngine with tell-window resolution, stamina/damage state machine with KO/three-count rules, deterministic scoring + personal-best model, 51 swift-testing cases (golden-seed fixtures, replay determinism, state tables). (issue #2)
-3. 🔜 **M3** — SpriteKit fight scene + one-thumb controls + first opponent playable.
+3. ✅ **M3 gameplay** — Metal-backed 3D fight scene + one-thumb controls + Bruiser Baxter playable.
 4. 🔜 **M4** — Career ladder (6 opponents), records ledger, stats derivations.
 5. 🔜 **M5** — Backup/restore, CSV export, accessibility pass, `FightWorkspaceLayout` dual-screen seam (design target).
 6. 🔜 **M6** — App Store copy finalization, generated icon wired into the asset catalog, TestFlight publish Action.

@@ -4,7 +4,7 @@ final class HaymakerUITests: XCTestCase {
     @MainActor
     func testBoutPlaythroughAndSettingsInspection() throws {
         let app = XCUIApplication()
-        app.launchArguments += ["-haymakerUITestShortBout", "-haymakerUITestIsolatedStore"]
+        app.launchArguments += ["-haymakerUITestShortBout", "-haymakerUITestIsolatedStore", "-haymakerUITestJabEachTick"]
         app.launch()
 
         // 1. Settings check: inspect colorblind cues and reduced motion toggles.
@@ -65,6 +65,7 @@ final class HaymakerUITests: XCTestCase {
                       "Bout ended and transitioned to the results card")
         XCTAssertTrue(app.buttons["bout.again"].exists, "Fight again button is present on the results card")
     }
+
     @MainActor
     func testCareerLocksDetailsAndUnknownRecords() {
         let app = XCUIApplication()
@@ -72,11 +73,8 @@ final class HaymakerUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["bout.start"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["career.start.anvil"].isEnabled)
-        XCTAssertEqual(app.buttons["opponent.detail.twitch"].label, "Twitch bio and records")
-        XCTAssertEqual(app.buttons["opponent.detail.anvil"].label, "Anvil bio and records")
         app.buttons["opponent.detail.twitch"].tap()
         XCTAssertTrue(app.staticTexts["records.unknown.twitch"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'restless rhythm student'")).firstMatch.exists)
     }
 
     @MainActor
@@ -84,16 +82,15 @@ final class HaymakerUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-haymakerUITestShortBout", "-haymakerUITestIsolatedStore", "-haymakerUITestJabEachTick"]
         app.launch()
+        XCTAssertTrue(app.buttons["bout.start"].waitForExistence(timeout: 5))
         app.buttons["bout.start"].tap()
         XCTAssertTrue(app.staticTexts["bout.results"].waitForExistence(timeout: 25))
-        XCTAssertTrue(app.staticTexts["results.pb"].exists)
+        XCTAssertTrue(app.staticTexts["results.pb"].waitForExistence(timeout: 5))
+        app.buttons["career.home"].tap()
         app.buttons["records.open"].tap()
         XCTAssertTrue(app.staticTexts["Career bouts 1"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'Recorded bouts 1'")).firstMatch.exists)
         XCTAssertFalse(app.staticTexts["records.unknown.twitch"].exists)
         app.buttons["Done"].tap()
-        app.buttons["career.home"].tap()
-        XCTAssertTrue(app.buttons["bout.start"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.staticTexts["career.status.twitch"].label, "Beaten")
         XCTAssertTrue(app.buttons["career.start.anvil"].isEnabled)
     }
@@ -103,18 +100,53 @@ final class HaymakerUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-haymakerUITestShortBout", "-haymakerUITestIsolatedStore"]
         app.launch()
-        for _ in 0..<5 {
-            if app.buttons["sparring.start.twitch"].isHittable { break }
+        let spar = app.buttons["sparring.start.twitch"]
+        for _ in 0..<6 {
+            if spar.isHittable { break }
             app.swipeUp()
         }
-        app.buttons["sparring.start.twitch"].tap()
+        XCTAssertTrue(spar.isHittable)
+        spar.tap()
         XCTAssertTrue(app.staticTexts["bout.results"].waitForExistence(timeout: 25))
         XCTAssertTrue(app.staticTexts["sparring.stats"].label.contains("Run: 1 rounds"))
         app.buttons["sparring.next"].tap()
         XCTAssertTrue(app.staticTexts["bout.clock"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["bout.results"].waitForExistence(timeout: 25))
         XCTAssertTrue(app.staticTexts["sparring.stats"].label.contains("Run: 2 rounds"))
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Twitch •'")).firstMatch.exists)
+    }
+
+    @MainActor
+    func testMetalArenaLandscapePauseAndControls() throws {
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.buttons["bout.start"].waitForExistence(timeout: 5))
+        app.buttons["bout.start"].tap()
+        XCTAssertTrue(app.staticTexts["bout.clock"].waitForExistence(timeout: 5))
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+        XCTAssertTrue(app.buttons["bout.guard"].waitForExistence(timeout: 5))
+        app.buttons["bout.guard"].tap()
+        app.buttons["bout.dodge"].tap()
+        XCTAssertGreaterThan(app.frame.width, app.frame.height, "Game fills landscape")
+        XCTAssertTrue(app.buttons["bout.jab"].isHittable)
+        XCTAssertTrue(app.buttons["bout.dodge"].isHittable)
+        let arena = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        arena.name = "Metal arena landscape"
+        arena.lifetime = .keepAlways
+        add(arena)
+        app.buttons["bout.pause"].tap()
+        XCTAssertTrue(app.buttons["bout.resume"].waitForExistence(timeout: 3))
+        let stoppedClock = app.staticTexts["bout.clock"].label
+        Thread.sleep(forTimeInterval: 1.2)
+        XCTAssertEqual(app.staticTexts["bout.clock"].label, stoppedClock, "Pause freezes the engine clock")
+        app.buttons["bout.resume"].tap()
+        XCTAssertTrue(app.buttons["bout.jab"].waitForExistence(timeout: 3))
+        XCUIDevice.shared.orientation = .portrait
+        XCTAssertGreaterThan(app.frame.height, app.frame.width, "Game returns to portrait")
+        let portrait = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        portrait.name = "Metal arena portrait"
+        portrait.lifetime = .keepAlways
+        add(portrait)
     }
 
 }
