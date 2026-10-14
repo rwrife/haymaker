@@ -562,7 +562,7 @@ struct ContentView: View {
     private func startBout() {
         let isUITest = ProcessInfo.processInfo.arguments.contains("-haymakerUITestShortBout")
         session = FightSession(seed: career.seed, book: career.opponent, sparring: career.mode == .sparring, shortUITestBout: isUITest)
-        scene = MatchScene()
+        scene.resetForNextBout()
         paused = false
         lastEventCount = 0
         lastFrame = nil
