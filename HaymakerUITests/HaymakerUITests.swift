@@ -101,11 +101,13 @@ final class HaymakerUITests: XCTestCase {
         app.launchArguments = ["-haymakerUITestShortBout", "-haymakerUITestIsolatedStore"]
         app.launch()
         let spar = app.buttons["sparring.start.twitch"]
-        for _ in 0..<6 {
-            if spar.isHittable { break }
-            app.swipeUp()
+        let ladder = app.scrollViews["career.scroll"]
+        XCTAssertTrue(ladder.waitForExistence(timeout: 5))
+        for _ in 0..<8 {
+            if spar.exists && spar.isHittable { break }
+            ladder.swipeUp()
         }
-        XCTAssertTrue(spar.isHittable)
+        XCTAssertTrue(spar.waitForExistence(timeout: 5))
         spar.tap()
         XCTAssertTrue(app.staticTexts["bout.results"].waitForExistence(timeout: 25))
         XCTAssertTrue(app.staticTexts["sparring.stats"].label.contains("Run: 1 rounds"))

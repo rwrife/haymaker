@@ -131,6 +131,7 @@ struct ContentView: View {
                     }
                 }
             }
+            .accessibilityIdentifier("career.scroll")
             .frame(maxHeight: portrait ? 320 : 160)
             Button { showingRecords = true } label: {
                 Text("RECORDS").frame(maxWidth: .infinity).frame(height: 44)
