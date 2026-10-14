@@ -7,6 +7,7 @@ let package = Package(
     name: "HaymakerStore",
     platforms: [
         .iOS("26.0"),
+        .macOS("10.15"),
     ],
     products: [
         .library(name: "HaymakerStore", targets: ["HaymakerStore"]),
