@@ -40,5 +40,7 @@ struct MetalArenaView: UIViewRepresentable {
         }
         view.isPlaying = !paused
         view.rendersContinuously = !paused
+        // Idle screens must not keep the Metal renderer spinning. The arena
+        // stays bound, so the next active frame resumes on the same scene.
     }
 }

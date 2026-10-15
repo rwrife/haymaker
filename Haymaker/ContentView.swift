@@ -38,13 +38,16 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     private var effectiveReducedMotion: Bool { reducedMotion || systemReduceMotion }
+    private var rendererIdle: Bool {
+        session?.engine.isOver != false || paused || showingSettings || showingRecords || selectedDetail != nil || scenePhase != .active
+    }
     private let clock = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
         GeometryReader { geometry in
             let portrait = geometry.size.height > geometry.size.width
             ZStack {
-                MetalArenaView(arena: scene, portrait: portrait, paused: paused || showingSettings || scenePhase != .active)
+                MetalArenaView(arena: scene, portrait: portrait, paused: rendererIdle)
                     .ignoresSafeArea()
                     .accessibilityHidden(true)
                 LinearGradient(colors: [.black.opacity(0.8), .clear, .clear, RingStyle.ink.opacity(0.95)], startPoint: .top, endPoint: .bottom)
