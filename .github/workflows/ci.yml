@@ -221,6 +221,22 @@ jobs:
             trap 'xcrun simctl delete "$UDID" >/dev/null 2>&1 || true' EXIT
           fi
           echo "Testing exact head: $(git rev-parse HEAD) on simulator $UDID"
+          # Freshly downloaded iOS runtimes need a bounded first boot before
+          # xcodebuild; otherwise simulator startup can consume the whole job.
+          boot_wait() {
+            python3 -c 'import subprocess, sys
+          try:
+              sys.exit(subprocess.run(sys.argv[2:], timeout=int(sys.argv[1])).returncode)
+          except subprocess.TimeoutExpired:
+              print("simctl command timed out", file=sys.stderr)
+              sys.exit(124)' "$@"
+          }
+          if ! boot_wait 300 xcrun simctl bootstatus "$UDID" -b; then
+            echo "First bootstatus failed; retry after bounded shutdown."
+            boot_wait 60 xcrun simctl shutdown "$UDID" || true
+            boot_wait 180 xcrun simctl bootstatus "$UDID" -b
+          fi
+          # ponytail: one reboot retry; extend only with runner log evidence.
           xcodebuild -project Haymaker.xcodeproj \
             -scheme Haymaker \
             -configuration Debug \
