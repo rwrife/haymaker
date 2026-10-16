@@ -81,12 +81,16 @@ final class HaymakerUITests: XCTestCase {
     func testSavedCareerResultAppearsInRecords() {
         let app = XCUIApplication()
         app.launchArguments = ["-haymakerUITestShortBout", "-haymakerUITestIsolatedStore", "-haymakerUITestJabEachTick"]
+        XCUIDevice.shared.orientation = .portrait
         app.launch()
         XCTAssertTrue(app.buttons["bout.start"].waitForExistence(timeout: 5))
         app.buttons["bout.start"].tap()
         XCTAssertTrue(app.staticTexts["bout.results"].waitForExistence(timeout: 25))
         XCTAssertTrue(app.staticTexts["results.pb"].waitForExistence(timeout: 5))
-        app.buttons["career.home"].tap()
+        let home = app.buttons["career.home"]
+        for _ in 0..<4 where !home.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        XCTAssertTrue(home.isHittable, "Career return remains reachable on compact screens")
+        home.tap()
         app.buttons["records.open"].tap()
         XCTAssertTrue(app.staticTexts["Career bouts 1"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["records.unknown.twitch"].exists)
@@ -99,6 +103,7 @@ final class HaymakerUITests: XCTestCase {
     func testEndlessSparringKeepsOpponentAndCountsRounds() {
         let app = XCUIApplication()
         app.launchArguments = ["-haymakerUITestShortBout", "-haymakerUITestIsolatedStore"]
+        XCUIDevice.shared.orientation = .portrait
         app.launch()
         let spar = app.buttons["sparring.start.twitch"]
         let ladder = app.scrollViews["career.scroll"]
@@ -132,12 +137,14 @@ final class HaymakerUITests: XCTestCase {
         XCTAssertGreaterThan(app.frame.width, app.frame.height, "Game fills landscape")
         XCTAssertTrue(app.buttons["bout.jab"].isHittable)
         XCTAssertTrue(app.buttons["bout.dodge"].isHittable)
+        // Pause before screenshot capture; capture can stall rendering long enough
+        // for a live bout to end before the pause action reaches the app.
+        app.buttons["bout.pause"].tap()
+        XCTAssertTrue(app.buttons["bout.resume"].waitForExistence(timeout: 5))
         let arena = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        arena.name = "Metal arena landscape"
+        arena.name = "Metal arena landscape paused"
         arena.lifetime = .keepAlways
         add(arena)
-        app.buttons["bout.pause"].tap()
-        XCTAssertTrue(app.buttons["bout.resume"].waitForExistence(timeout: 3))
         let stoppedClock = app.staticTexts["bout.clock"].label
         Thread.sleep(forTimeInterval: 1.2)
         XCTAssertEqual(app.staticTexts["bout.clock"].label, stoppedClock, "Pause freezes the engine clock")

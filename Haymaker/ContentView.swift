@@ -409,6 +409,7 @@ struct ContentView: View {
         let draw = session.engine.outcome == .draw
         return ZStack {
             RingStyle.ink.opacity(0.85).ignoresSafeArea()
+            ScrollView {
             VStack(spacing: portrait ? 19 : 10) {
                 Text("BOUT RESULTS").font(.system(size: 11, weight: .heavy)).tracking(4).foregroundStyle(RingStyle.gold)
                     .accessibilityIdentifier("bout.results")
@@ -459,6 +460,7 @@ struct ContentView: View {
                     .disabled(!career.saved).accessibilityIdentifier("career.home")
             }
             .frame(maxWidth: 400).padding(28)
+            }
         }
     }
 
