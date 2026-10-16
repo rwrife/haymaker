@@ -102,7 +102,7 @@ final class HaymakerUITests: XCTestCase {
     @MainActor
     func testEndlessSparringKeepsOpponentAndCountsRounds() {
         let app = XCUIApplication()
-        app.launchArguments = ["-haymakerUITestShortBout", "-haymakerUITestIsolatedStore", "-haymakerUITestJabEachTick"]
+        app.launchArguments = ["-haymakerUITestShortBout", "-haymakerUITestIsolatedStore"]
         XCUIDevice.shared.orientation = .portrait
         app.launch()
         let spar = app.buttons["sparring.start.twitch"]
