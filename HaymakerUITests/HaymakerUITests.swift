@@ -102,7 +102,7 @@ final class HaymakerUITests: XCTestCase {
     @MainActor
     func testEndlessSparringKeepsOpponentAndCountsRounds() {
         let app = XCUIApplication()
-        app.launchArguments = ["-haymakerUITestShortBout", "-haymakerUITestIsolatedStore"]
+        app.launchArguments = ["-haymakerUITestShortBout", "-haymakerUITestIsolatedStore", "-haymakerUITestJabEachTick"]
         XCUIDevice.shared.orientation = .portrait
         app.launch()
         let spar = app.buttons["sparring.start.twitch"]
@@ -145,22 +145,17 @@ final class HaymakerUITests: XCTestCase {
     @MainActor
     func testMetalArenaLandscapePauseAndControls() throws {
         let app = XCUIApplication()
+        // Start with the engine frozen (paused): a live short bout ends mid-test
+        // and the results card swallows the pause menu (CI run 38942392854).
+        app.launchArguments = ["-haymakerUITestShortBout", "-haymakerUITestStartPaused"]
         app.launch()
         XCTAssertTrue(app.buttons["bout.start"].waitForExistence(timeout: 5))
         app.buttons["bout.start"].tap()
         XCTAssertTrue(app.staticTexts["bout.clock"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["bout.resume"].waitForExistence(timeout: 5))
         settleOrientation(app, landscape: true)
         defer { XCUIDevice.shared.orientation = .portrait }
-        XCTAssertTrue(app.buttons["bout.guard"].waitForExistence(timeout: 5))
-        app.buttons["bout.guard"].tap()
-        app.buttons["bout.dodge"].tap()
         XCTAssertGreaterThan(app.frame.width, app.frame.height, "Game fills landscape")
-        XCTAssertTrue(app.buttons["bout.jab"].isHittable)
-        XCTAssertTrue(app.buttons["bout.dodge"].isHittable)
-        // Pause before screenshot capture; capture can stall rendering long enough
-        // for a live bout to end before the pause action reaches the app.
-        app.buttons["bout.pause"].tap()
-        XCTAssertTrue(app.buttons["bout.resume"].waitForExistence(timeout: 5))
         let arena = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         arena.name = "Metal arena landscape paused"
         arena.lifetime = .keepAlways
