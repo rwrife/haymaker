@@ -567,11 +567,9 @@ struct ContentView: View {
     private func startBout() {
         let isUITest = ProcessInfo.processInfo.arguments.contains("-haymakerUITestShortBout")
         session = FightSession(seed: career.seed, book: career.opponent, sparring: career.mode == .sparring, shortUITestBout: isUITest)
-        // Fresh arena per bout: rebinding the renderer to a reused scene raced
-        // with self-removing SCNAction effects and killed the app between
-        // sparring rounds (CI run 38942392854).
-        scene = MatchScene()
+        scene.resetForNextBout()
         paused = ProcessInfo.processInfo.arguments.contains("-haymakerUITestStartPaused")
+        // ponytail: test-only launch flag freezes UI controls; live fights always run.
         lastEventCount = 0
         lastFrame = nil
         tickAccumulator = 0
