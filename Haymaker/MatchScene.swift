@@ -18,7 +18,10 @@ import HaymakerKit
     private var portrait = true
     private var lastTick = 0
 
-    init() {
+    private var titleScreen: Bool
+
+    init(titleScreen: Bool = false) {
+        self.titleScreen = titleScreen
         scene.background.contents = UIColor(red: 0.014, green: 0.023, blue: 0.047, alpha: 1)
         scene.fogColor = UIColor(red: 0.015, green: 0.027, blue: 0.055, alpha: 1)
         scene.fogStartDistance = 15
@@ -52,10 +55,15 @@ import HaymakerKit
         rival.pose(FighterStatus(), time: 0, recoil: 0, reducedMotion: true)
         hero.pose(FighterStatus(), time: 0, recoil: 0, reducedMotion: true)
         layout(portrait: true)
+        if titleScreen { renderTitle(time: 0, reducedMotion: true) }
     }
 
     func resetForNextBout() {
         // Effects self-remove via SCNAction; reuse arena and renderer between rounds.
+        titleScreen = false
+        rival.root.isHidden = false
+        hero.root.eulerAngles.y = .pi - 0.16
+        layout(portrait: portrait)
         lastEventCount = 0
         lastTick = 0
         shake = 0
@@ -67,9 +75,41 @@ import HaymakerKit
 
     func layout(portrait: Bool) {
         self.portrait = portrait
+        if titleScreen {
+            camera.position = portrait ? SCNVector3(0, 2.9, 8.8) : SCNVector3(0, 2.7, 7.5)
+            camera.look(at: SCNVector3(0, 1.55, 0))
+            camera.camera?.fieldOfView = portrait ? 43 : 38
+            return
+        }
         camera.position = portrait ? SCNVector3(0, 2.95, 7.9) : SCNVector3(0, 2.55, 4.8)
         camera.look(at: SCNVector3(0, portrait ? 1.5 : 2.1, 0))
         camera.camera?.fieldOfView = portrait ? 43 : 38
+    }
+
+    /// Presentation-only shadowboxing: no bout, opponent, or career progress.
+    func renderTitle(time: TimeInterval, reducedMotion: Bool) {
+        guard titleScreen else { return }
+        let t = reducedMotion ? Float(0) : Float(time.truncatingRemainder(dividingBy: 120))
+        let tick = Int(t * 60)
+        let phase = tick % 144
+        let move: Move = [.jab, .hook, .uppercut][(tick / 144) % 3]
+        var status = FighterStatus()
+        if !reducedMotion {
+            if phase < 24 {
+                status = FighterStatus(state: .telling, ticksInCurrentState: phase, stateDuration: 24, currentMove: move)
+            } else if phase < 42 {
+                status = FighterStatus(state: .attacking, ticksInCurrentState: phase - 24, stateDuration: 18, currentMove: move)
+            } else if phase < 66 {
+                status = FighterStatus(state: .recovering, ticksInCurrentState: phase - 42, stateDuration: 24, currentMove: move)
+            }
+        }
+        SCNTransaction.begin()
+        SCNTransaction.animationDuration = 0
+        rival.root.isHidden = true
+        hero.pose(status, time: t, recoil: 0, reducedMotion: reducedMotion)
+        hero.root.position = SCNVector3(sin(t * 0.7) * (portrait ? 0.65 : 1.8), 0, sin(t * 0.45) * 0.35)
+        hero.root.eulerAngles.y = .pi / 8 + sin(t * 0.7) * 0.18
+        SCNTransaction.commit()
     }
 
     func render(_ fight: FightEngine, reducedMotion: Bool, highContrast: Bool) {

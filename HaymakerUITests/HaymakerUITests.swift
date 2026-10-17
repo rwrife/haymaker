@@ -67,11 +67,40 @@ final class HaymakerUITests: XCTestCase {
     }
 
     @MainActor
+    func testTitleAndSeparateCareerScreenInBothOrientations() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-haymakerUITestIsolatedStore"]
+        app.launch()
+        defer { XCUIDevice.shared.orientation = .portrait }
+        for landscape in [false, true] {
+            settleOrientation(app, landscape: landscape)
+            let start = app.buttons["bout.start"]
+            XCTAssertTrue(start.waitForExistence(timeout: 5))
+            XCTAssertTrue(start.isHittable)
+            XCTAssertLessThanOrEqual(start.frame.width, 401)
+            XCTAssertFalse(app.scrollViews["career.scroll"].exists)
+            XCTAssertTrue(app.staticTexts["HAYMAKER"].exists)
+            app.buttons["career.open"].tap()
+            XCTAssertTrue(app.scrollViews["career.scroll"].waitForExistence(timeout: 5))
+            XCTAssertFalse(start.exists)
+            XCTAssertTrue(app.buttons["settings.open"].isHittable)
+            app.buttons["career.back"].tap()
+            XCTAssertTrue(start.waitForExistence(timeout: 5))
+            let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            screenshot.name = landscape ? "Shadowboxing title landscape" : "Shadowboxing title portrait"
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+        }
+    }
+
+    @MainActor
     func testCareerLocksDetailsAndUnknownRecords() {
         let app = XCUIApplication()
         app.launchArguments = ["-haymakerUITestIsolatedStore"]
         app.launch()
         XCTAssertTrue(app.buttons["bout.start"].waitForExistence(timeout: 5))
+        app.buttons["career.open"].tap()
+        XCTAssertTrue(app.scrollViews["career.scroll"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["career.start.anvil"].isEnabled)
         app.buttons["opponent.detail.twitch"].tap()
         XCTAssertTrue(app.staticTexts["records.unknown.twitch"].waitForExistence(timeout: 5))
@@ -105,6 +134,7 @@ final class HaymakerUITests: XCTestCase {
         app.launchArguments = ["-haymakerUITestShortBout", "-haymakerUITestIsolatedStore"]
         XCUIDevice.shared.orientation = .portrait
         app.launch()
+        app.buttons["career.open"].tap()
         let spar = app.buttons["sparring.start.twitch"]
         let ladder = app.scrollViews["career.scroll"]
         XCTAssertTrue(ladder.waitForExistence(timeout: 5))
