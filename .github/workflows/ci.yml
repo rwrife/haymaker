@@ -23,8 +23,15 @@ jobs:
         run: swift --version
       - name: Run HaymakerKit package tests
         run: swift test --package-path Packages/HaymakerKit
+      - name: Install SQLite development headers
+        run: apt-get update -qq && apt-get install -y libsqlite3-dev
       - name: Run HaymakerStore package tests
-        run: swift test --package-path Packages/HaymakerStore
+        # Ubuntu's SQLite omits the optional snapshot API; DatabaseQueue does not use it.
+        run: swift test --package-path Packages/HaymakerStore -Xswiftc -DGRDBCUSTOMSQLITE
+      - name: Run app session host adapter probe
+        env:
+          HAYMAKER_PROBE_SCRATCH: /var/local/haymaker-probes
+        run: bash scripts/test_host_sessions.sh
       - name: Zero-network gate
         run: bash scripts/check_zero_network.sh
       - name: Native-only framework gate
@@ -116,6 +123,12 @@ jobs:
 
       - name: Run HaymakerKit package tests on pinned macOS toolchain
         run: swift test --package-path Packages/HaymakerKit
+      - name: Run HaymakerStore package tests and migrations on pinned macOS toolchain
+        run: swift test --package-path Packages/HaymakerStore
+      - name: Run app session host adapter probe on pinned macOS toolchain
+        env:
+          HAYMAKER_PROBE_SCRATCH: ${{ runner.temp }}/haymaker-probes
+        run: bash scripts/test_host_sessions.sh
 
       - name: Ensure iOS simulator platform runtime
         timeout-minutes: 40
@@ -208,6 +221,46 @@ jobs:
             trap 'xcrun simctl delete "$UDID" >/dev/null 2>&1 || true' EXIT
           fi
           echo "Testing exact head: $(git rev-parse HEAD) on simulator $UDID"
+          # Freshly downloaded iOS runtimes need a bounded first boot before
+          # xcodebuild; otherwise simulator startup can consume the whole job.
+          boot_wait() {
+            python3 -c 'import subprocess, sys
+          try:
+              sys.exit(subprocess.run(sys.argv[2:], timeout=int(sys.argv[1])).returncode)
+          except subprocess.TimeoutExpired:
+              print("simctl command timed out", file=sys.stderr)
+              sys.exit(124)' "$@"
+          }
+          if ! boot_wait 300 xcrun simctl bootstatus "$UDID" -b; then
+            echo "First bootstatus failed; retry after bounded shutdown."
+            boot_wait 60 xcrun simctl shutdown "$UDID" || true
+            boot_wait 180 xcrun simctl bootstatus "$UDID" -b
+          fi
+          # ponytail: one reboot retry; extend only with runner log evidence.
+          # Preserve device crash evidence when XCTest loses its app connection.
+          capture_failure() {
+            status=$?
+            if [ "$status" -ne 0 ]; then
+              mkdir -p SimulatorDiagnostics
+              for reports in "$HOME/Library/Logs/DiagnosticReports" "$HOME/Library/Developer/CoreSimulator/Devices/$UDID/data/Library/Logs/DiagnosticReports"; do
+                if [ -d "$reports" ]; then
+                  python3 - "$reports" <<'PY'
+          import pathlib, shutil, sys
+          for pattern in ('Haymaker*.ips', 'Haymaker*.crash', 'JetsamEvent*.ips'):
+              for report in pathlib.Path(sys.argv[1]).glob(pattern):
+                  target = pathlib.Path('SimulatorDiagnostics') / (pathlib.Path(sys.argv[1]).parent.name + '-' + report.name)
+                  shutil.copy2(report, target)
+                  print('Crash report:', target)
+          PY
+                fi
+              done
+              xcrun simctl spawn "$UDID" log show --last 12m --style compact \
+                --predicate 'process == "Haymaker" OR eventMessage CONTAINS "com.infinityball.haymaker"' \
+                > SimulatorDiagnostics/console.log 2>&1 || true
+            fi
+            exit "$status"
+          }
+          trap capture_failure EXIT
           xcodebuild -project Haymaker.xcodeproj \
             -scheme Haymaker \
             -configuration Debug \
@@ -225,3 +278,13 @@ jobs:
           name: haymaker-uitests-xcresult
           path: HaymakerUITests.xcresult
           if-no-files-found: ignore
+
+      - name: Upload simulator failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: haymaker-simulator-diagnostics
+          path: SimulatorDiagnostics/
+          if-no-files-found: ignore
+          retention-days: 7
+          include-hidden-files: false

@@ -22,7 +22,9 @@ struct ContentView: View {
     @AppStorage("colorblindCues") private var colorblindCues = true
     @AppStorage("reducedMotion") private var reducedMotion = false
     @AppStorage("hapticsEnabled") private var hapticsEnabled = true
-    @AppStorage("bestArcadeScore") private var bestScore = 0
+    @State private var career = CareerSession()
+    @State private var showingRecords = false
+    @State private var selectedDetail: OpponentBook?
     @State private var session: FightSession?
     @State private var scene = MatchScene()
     @State private var lastEventCount = 0
@@ -36,13 +38,16 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     private var effectiveReducedMotion: Bool { reducedMotion || systemReduceMotion }
+    private var rendererIdle: Bool {
+        session?.engine.isOver != false || paused || showingSettings || showingRecords || selectedDetail != nil || scenePhase != .active
+    }
     private let clock = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
         GeometryReader { geometry in
             let portrait = geometry.size.height > geometry.size.width
             ZStack {
-                MetalArenaView(arena: scene, portrait: portrait, paused: paused || showingSettings || scenePhase != .active)
+                MetalArenaView(arena: scene, portrait: portrait, paused: rendererIdle)
                     .ignoresSafeArea()
                     .accessibilityHidden(true)
                 LinearGradient(colors: [.black.opacity(0.8), .clear, .clear, RingStyle.ink.opacity(0.95)], startPoint: .top, endPoint: .bottom)
@@ -57,6 +62,8 @@ struct ContentView: View {
             .foregroundStyle(.white)
             .preferredColorScheme(.dark)
             .sheet(isPresented: $showingSettings) { settings }
+            .sheet(isPresented: $showingRecords) { recordsWall }
+            .sheet(item: $selectedDetail) { book in opponentDetail(book) }
             .statusBarHidden()
         }
         .onReceive(clock) { _ in advanceFrame() }
@@ -65,6 +72,8 @@ struct ContentView: View {
             if phase != .active, session != nil, session?.engine.isOver == false { paused = true }
         }
         .onChange(of: showingSettings) { _, _ in lastFrame = nil }
+        .onChange(of: showingRecords) { _, _ in lastFrame = nil }
+        .onChange(of: selectedDetail?.id) { _, _ in lastFrame = nil }
         .onChange(of: paused) { _, _ in lastFrame = nil }
     }
 
@@ -91,23 +100,48 @@ struct ContentView: View {
                 Spacer(minLength: 0)
             }
             Spacer()
-            HStack(alignment: .bottom) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("BOUT 01  /  THE HEAVY HITTER").font(.system(size: 10, weight: .bold)).tracking(2).foregroundStyle(RingStyle.gold)
-                    Text("BRUISER BAXTER").font(RingStyle.type(portrait ? 33 : 38)).italic()
-                    Text("Big swings. Bigger openings. Make him miss.")
-                        .font(.system(size: 12, weight: .medium)).foregroundStyle(.white.opacity(0.7))
-                }
-                Spacer()
-                if bestScore > 0 {
-                    VStack(alignment: .trailing) {
-                        Text("PERSONAL BEST").font(.system(size: 9, weight: .bold)).tracking(1)
-                        Text(bestScore.formatted()).font(RingStyle.type(26)).foregroundStyle(RingStyle.gold)
+            if let error = career.error { Text(error).foregroundStyle(.red) }
+            Text("CAREER LADDER").font(RingStyle.type(23)).foregroundStyle(RingStyle.gold)
+            ScrollView {
+                // Non-lazy: all ladder + sparring rows must exist in the AX hierarchy so
+                // XCUITest can scroll to them (LazyVStack never realizes offscreen rows here).
+                VStack(alignment: .leading, spacing: 8) {
+                    if career.historyLoaded && OpponentBook.v0Roster.allSatisfy({ career.records.wins($0.id, careerOnly: true) > 0 }) {
+                        Text("Career complete — all six opponents beaten")
+                    }
+                    ForEach(OpponentBook.v0Roster) { book in
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(book.name).font(RingStyle.type(20))
+                                Text(!career.historyLoaded ? "History unavailable" : career.records.wins(book.id, careerOnly: true) > 0 ? "Beaten" :
+                                     (career.records.isUnlocked(book.id) ? "Ready" : "Locked — beat previous opponents"))
+                                    .font(.caption).accessibilityIdentifier("career.status.\(book.id)")
+                                Button("\(book.name) bio and records") { selectedDetail = book }
+                                    .font(.caption).accessibilityIdentifier("opponent.detail.\(book.id)")
+                            }
+                            Spacer()
+                            Button(book.id == "twitch" ? "Start bout" : "Fight \(book.name)") {
+                                if career.begin(book, mode: .career) { startBout() }
+                            }
+                            .disabled(!career.historyLoaded || !career.records.isUnlocked(book.id))
+                            .accessibilityIdentifier("career.start.\(book.id)")
+                        }
+                        .padding(8).background(RingStyle.ink.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
+                    }
+                    Text("ENDLESS SPARRING").font(RingStyle.type(20)).foregroundStyle(RingStyle.gold)
+                    Text("Practice one opponent in seeded one-round bouts.").font(.caption)
+                    ForEach(OpponentBook.v0Roster) { book in
+                        Button("Spar with \(book.name)") { if career.begin(book, mode: .sparring) { startBout() } }
+                            .accessibilityIdentifier("sparring.start.\(book.id)")
                     }
                 }
             }
-            .padding(.bottom, 20)
-            Button(action: startBout) {
+            .accessibilityIdentifier("career.scroll")
+            .frame(maxHeight: portrait ? 320 : 160)
+            Button { showingRecords = true } label: {
+                Text("RECORDS").frame(maxWidth: .infinity).frame(height: 44)
+            }.accessibilityIdentifier("records.open")
+            Button { if career.begin(.twitch, mode: .career) { startBout() } } label: {
                 HStack {
                     Image(systemName: "bolt.fill")
                     Text("STEP INTO THE RING").font(RingStyle.type(22)).italic().tracking(1)
@@ -129,6 +163,59 @@ struct ContentView: View {
             .foregroundStyle(.white.opacity(0.5)).padding(.top, 15).padding(.bottom, 12)
         }
         .padding(.horizontal, portrait ? 25 : 36)
+    }
+
+    @ViewBuilder private func opponentDetail(_ book: OpponentBook) -> some View {
+        NavigationStack {
+            List {
+                Text(book.bio)
+                Text("Pattern: " + book.sequence.map { $0.move.rawValue }.joined(separator: " → "))
+                recordSummary(book)
+            }
+            .navigationTitle(book.name)
+            .toolbar { Button("Done") { selectedDetail = nil } }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    @ViewBuilder private func recordSummary(_ book: OpponentBook) -> some View {
+        let history = career.records.history(book.id)
+        if !career.historyLoaded {
+            Text("History unavailable — personal best unknown")
+                .accessibilityIdentifier("records.unavailable.\(book.id)")
+        } else if let best = career.records.ledger.best(for: book.id) {
+            Text("Best score \(best.score) • round \(best.roundsCompleted) • \(best.ticksElapsed) ticks")
+            Text("Recorded bouts \(history.count) • wins \(career.records.wins(book.id))")
+            if let knockout = career.records.fastestKO(book.id) {
+                Text("Fastest winning KO: round \(knockout.roundsCompleted) • \(knockout.ticksElapsed) ticks")
+            } else { Text("Fastest winning KO unknown — none recorded") }
+            let thrown = history.reduce(0) { $0 + $1.result.playerStats.thrown }
+            let landed = history.reduce(0) { $0 + $1.result.playerStats.landed }
+            Text(thrown > 0 ? "Hit ratio \(landed * 100 / thrown)%" : "Hit ratio unknown — no punches thrown")
+        } else {
+            Text("No recorded bouts — personal best unknown")
+                .accessibilityIdentifier("records.unknown.\(book.id)")
+        }
+    }
+
+    private var recordsWall: some View {
+        NavigationStack {
+            List {
+                if career.historyLoaded {
+                    Text("Career bouts \(career.records.bouts.filter { $0.mode == .career }.count)")
+                } else {
+                    Text(career.error ?? "Local records unavailable").foregroundStyle(.red)
+                    Button("Retry loading records") { career.reloadHistory() }
+                }
+                ForEach(OpponentBook.v0Roster) { book in
+                    Section(book.name) { recordSummary(book) }
+                }
+            }
+            .navigationTitle("Records")
+            .accessibilityIdentifier("records.wall")
+            .toolbar { Button("Done") { showingRecords = false } }
+        }
+        .preferredColorScheme(.dark)
     }
 
     private func match(_ session: FightSession, portrait: Bool) -> some View {
@@ -194,7 +281,7 @@ struct ContentView: View {
 
     private func hud(_ fight: FightEngine, portrait: Bool) -> some View {
         HStack(alignment: .top, spacing: portrait ? 10 : 22) {
-            fighterHUD(name: "BRUISER BAXTER", hp: fight.opponent.hp, maxHP: fight.config.damage.maxHP, knockdowns: fight.playerStats.knockdownsScored, color: RingStyle.red, rival: true, compact: portrait)
+            fighterHUD(name: fight.book.name.uppercased(), hp: fight.opponent.hp, maxHP: fight.config.damage.maxHP, knockdowns: fight.playerStats.knockdownsScored, color: RingStyle.red, rival: true, compact: portrait)
             VStack(spacing: 0) {
                 Text("ROUND \(fight.round)").font(RingStyle.type(portrait ? 15 : 18)).foregroundStyle(RingStyle.gold)
                 Text(clockText(fight)).font(RingStyle.type(portrait ? 31 : 36)).monospacedDigit()
@@ -322,29 +409,59 @@ struct ContentView: View {
         let draw = session.engine.outcome == .draw
         return ZStack {
             RingStyle.ink.opacity(0.85).ignoresSafeArea()
+            ScrollView {
             VStack(spacing: portrait ? 19 : 10) {
                 Text("BOUT RESULTS").font(.system(size: 11, weight: .heavy)).tracking(4).foregroundStyle(RingStyle.gold)
                     .accessibilityIdentifier("bout.results")
                 Text(draw ? "DRAW" : win ? "VICTORY" : "DEFEAT")
                     .font(RingStyle.type(portrait ? 64 : 50)).italic().foregroundStyle(win ? RingStyle.gold : .white)
+                Text(session.engine.book.name).font(.headline).foregroundStyle(.white.opacity(0.65))
                 Text(outcomeDescription(session.engine.outcome)).font(.system(size: 13, weight: .medium)).foregroundStyle(.white.opacity(0.65))
+                Text(session.replayMatches ? "Seeded replay verified" : "Replay mismatch").font(.caption)
+                if career.saved, let comparison = career.comparison {
+                    Text(comparison.shouldStore ? "Personal best recorded" : "Previous personal best stands")
+                        .accessibilityIdentifier("results.pb")
+                }
+                if let error = career.error {
+                    Text(error).foregroundStyle(.red)
+                    Button("Retry saving") { career.save(session) }
+                }
                 HStack(spacing: 25) {
                     resultStat("SCORE", value: session.engine.playerScore().points.formatted())
                     resultStat("LANDED", value: "\(session.engine.playerStats.landed)/\(session.engine.playerStats.thrown)")
                     resultStat("COUNTERS", value: "\(session.engine.playerStats.counters)")
                 }
                 .padding(.vertical, 10)
-                Button(action: startBout) {
+                if career.mode == .sparring {
+                    Text("Run: \(career.runBouts.count) rounds • score \(career.runBouts.reduce(0) { $0 + $1.result.score.points }) • landed \(career.runBouts.reduce(0) { $0 + $1.result.playerStats.landed })")
+                        .accessibilityIdentifier("sparring.stats")
+                    Button { if career.nextRound() { startBout() } } label: {
+                        Text("NEXT SPARRING ROUND").font(RingStyle.type(19)).frame(maxWidth: .infinity).frame(height: 48)
+                            .background(RingStyle.gold.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))
+                    }
+                    .disabled(!career.saved).accessibilityIdentifier("sparring.next")
+                } else if let next = OpponentBook.v0Roster.first(where: {
+                    career.records.isUnlocked($0.id) && career.records.wins($0.id, careerOnly: true) == 0
+                }), next.id != career.opponent.id {
+                    Button { if career.begin(next, mode: .career) { startBout() } } label: {
+                        Text("NEXT CAREER BOUT: \(next.name.uppercased())").font(RingStyle.type(17)).frame(maxWidth: .infinity).frame(height: 48)
+                            .background(RingStyle.gold.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))
+                    }
+                    .disabled(!career.saved).accessibilityIdentifier("career.next")
+                }
+                Button { if career.begin(career.opponent, mode: career.mode) { startBout() } } label: {
                     Text("REMATCH").font(RingStyle.type(23)).italic().frame(maxWidth: .infinity).frame(height: 52)
                         .foregroundStyle(RingStyle.ink).background(RingStyle.gold, in: RoundedRectangle(cornerRadius: 8))
                 }
+                .disabled(!career.saved)
                 .accessibilityIdentifier("bout.again")
-                Button("BACK TO MAIN EVENT") { sessionReset() }
+                Button("CAREER LADDER") { if career.saved { sessionReset() } }
                     .font(.system(size: 11, weight: .heavy)).tracking(1.4).padding(8)
+                    .disabled(!career.saved).accessibilityIdentifier("career.home")
             }
             .frame(maxWidth: 400).padding(28)
+            }
         }
-        .onAppear { bestScore = max(bestScore, session.engine.playerScore().points) }
     }
 
     private func resultStat(_ title: String, value: String) -> some View {
@@ -448,9 +565,11 @@ struct ContentView: View {
     }
 
     private func startBout() {
-        session = FightSession(shortUITestBout: ProcessInfo.processInfo.arguments.contains("-haymakerUITestShortBout"))
-        scene = MatchScene()
-        paused = false
+        let isUITest = ProcessInfo.processInfo.arguments.contains("-haymakerUITestShortBout")
+        session = FightSession(seed: career.seed, book: career.opponent, sparring: career.mode == .sparring, shortUITestBout: isUITest)
+        scene.resetForNextBout()
+        paused = ProcessInfo.processInfo.arguments.contains("-haymakerUITestStartPaused")
+        // ponytail: test-only launch flag freezes UI controls; live fights always run.
         lastEventCount = 0
         lastFrame = nil
         tickAccumulator = 0
@@ -470,14 +589,17 @@ struct ContentView: View {
 
     private func advanceFrame() {
         let now = ProcessInfo.processInfo.systemUptime
-        guard let session, !showingSettings, !paused, !session.engine.isOver, scenePhase == .active else { lastFrame = nil; return }
+        guard let session, !showingSettings, !showingRecords, selectedDetail == nil, !paused, !session.engine.isOver, scenePhase == .active else { lastFrame = nil; return }
         let elapsed = min(0.1, max(0, now - (lastFrame ?? now)))
         lastFrame = now
         tickAccumulator += elapsed
         while tickAccumulator >= 1.0 / 60.0 {
             session.advance()
             tickAccumulator -= 1.0 / 60.0
-            if session.engine.isOver { break }
+            if session.engine.isOver {
+                career.save(session)
+                break
+            }
         }
         scene.render(session.engine, reducedMotion: effectiveReducedMotion, highContrast: colorblindCues)
         for event in session.engine.events.dropFirst(lastEventCount) {

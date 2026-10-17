@@ -36,3 +36,5 @@ __pycache__/
 *.sqlite-shm
 *.sqlite-wal
 exports/
+
+!Packages/HaymakerStore/Tests/HaymakerStoreTests/Fixtures/*.sqlite
