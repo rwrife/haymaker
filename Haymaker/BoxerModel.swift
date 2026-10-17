@@ -3,7 +3,7 @@ import HaymakerKit
 
 /// All supplied sculpts share the same named, 16-bone T-pose skeleton.
 enum FighterModelAsset: String, CaseIterable {
-    case mack, bruiser, goldie, nico, atlas, duke, sylvie, cassian
+    case mack, bruiser, goldie, nico, atlas, duke, sylvie, cassian, vera
 }
 
 @MainActor final class BoxerModel {
