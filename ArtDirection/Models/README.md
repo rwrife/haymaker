@@ -1,6 +1,6 @@
 # Character model source assets
 
-These nine OBJ files were supplied by the user for character integration. All nine exports have been visually verified in T-pose. They are stored here as art source assets, outside the app's synchronized resource directory.
+These nine OBJ files were supplied by the user for character integration. All nine exports have been visually verified in T-pose. They are stored here as art source assets, outside the app's synchronized resource directory. The ZIP archives for Atlas, Duke, Goldie, Mack, and Vera contain additional supplied OBJ/material/texture exports and are preserved alongside the vertex-colored sources. The rig builder uses the named `.obj` files listed below so its verified exports remain reproducible.
 
 | File | Character | Vertices | Faces |
 | --- | --- | ---: | ---: |

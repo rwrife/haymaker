@@ -54,6 +54,17 @@ import HaymakerKit
         layout(portrait: true)
     }
 
+    func resetForNextBout() {
+        // Effects self-remove via SCNAction; reuse arena and renderer between rounds.
+        lastEventCount = 0
+        lastTick = 0
+        shake = 0
+        recoilHero = 0
+        recoilRival = 0
+        rival.pose(FighterStatus(), time: 0, recoil: 0, reducedMotion: true)
+        hero.pose(FighterStatus(), time: 0, recoil: 0, reducedMotion: true)
+    }
+
     func layout(portrait: Bool) {
         self.portrait = portrait
         camera.position = portrait ? SCNVector3(0, 2.95, 7.9) : SCNVector3(0, 2.55, 4.8)
