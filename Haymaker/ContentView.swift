@@ -24,9 +24,10 @@ struct ContentView: View {
     @AppStorage("hapticsEnabled") private var hapticsEnabled = true
     @State private var career = CareerSession()
     @State private var showingRecords = false
+    @State private var showingCareer = false
     @State private var selectedDetail: OpponentBook?
     @State private var session: FightSession?
-    @State private var scene = MatchScene()
+    @State private var scene = MatchScene(titleScreen: true)
     @State private var lastEventCount = 0
     @State private var showingSettings = false
     @State private var paused = false
@@ -39,7 +40,7 @@ struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     private var effectiveReducedMotion: Bool { reducedMotion || systemReduceMotion }
     private var rendererIdle: Bool {
-        session?.engine.isOver != false || paused || showingSettings || showingRecords || selectedDetail != nil || scenePhase != .active
+        (session == nil ? showingCareer || effectiveReducedMotion : session?.engine.isOver != false) || paused || showingSettings || showingRecords || selectedDetail != nil || scenePhase != .active
     }
     private let clock = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
 
@@ -57,7 +58,8 @@ struct ContentView: View {
                     match(session, portrait: portrait)
                     if session.engine.isOver { results(session, portrait: portrait) }
                     else if paused { pauseMenu }
-                } else { home(portrait: portrait) }
+                } else if showingCareer { careerScreen(portrait: portrait) }
+                else { home(portrait: portrait) }
             }
             .foregroundStyle(.white)
             .preferredColorScheme(.dark)
@@ -101,6 +103,50 @@ struct ContentView: View {
             }
             Spacer()
             if let error = career.error { Text(error).foregroundStyle(.red) }
+            Button { if career.begin(.twitch, mode: .career) { startBout() } } label: {
+                HStack {
+                    Image(systemName: "bolt.fill")
+                    Text("STEP INTO THE RING").font(RingStyle.type(22)).italic().tracking(1)
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                }
+                .padding(.horizontal, 22).frame(height: 62)
+                .foregroundStyle(RingStyle.ink)
+                .background(LinearGradient(colors: [Color(red: 1, green: 0.83, blue: 0.42), RingStyle.gold], startPoint: .top, endPoint: .bottom), in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(.white.opacity(0.45)))
+            }
+            .frame(maxWidth: 400)
+            .accessibilityIdentifier("bout.start")
+            Button { showingCareer = true } label: {
+                Text("CAREER").font(RingStyle.type(20)).tracking(1)
+                    .frame(maxWidth: .infinity).frame(height: 48)
+                    .background(RingStyle.ink.opacity(0.8), in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(RingStyle.gold.opacity(0.5)))
+            }
+            .frame(maxWidth: 400).padding(.top, 10)
+            .accessibilityIdentifier("career.open")
+            HStack(spacing: 16) {
+                Label("3 ROUNDS", systemImage: "timer")
+                Label("ALL SKILL", systemImage: "target")
+                Label("OFFLINE", systemImage: "bolt.shield")
+            }
+            .font(.system(size: 9, weight: .heavy)).tracking(1)
+            .foregroundStyle(.white.opacity(0.5)).padding(.top, 15).padding(.bottom, 12)
+        }
+        .padding(.horizontal, portrait ? 25 : 36)
+    }
+
+    private func careerScreen(portrait: Bool) -> some View {
+        VStack(spacing: 12) {
+            HStack {
+                Button { showingCareer = false } label: {
+                    Label("HOME", systemImage: "chevron.left").frame(minHeight: 44)
+                }
+                .accessibilityIdentifier("career.back")
+                Spacer()
+                settingsButton
+            }
+            if let error = career.error { Text(error).foregroundStyle(.red) }
             Text("CAREER LADDER").font(RingStyle.type(23)).foregroundStyle(RingStyle.gold)
             ScrollView {
                 // Non-lazy: all ladder + sparring rows must exist in the AX hierarchy so
@@ -137,32 +183,13 @@ struct ContentView: View {
                 }
             }
             .accessibilityIdentifier("career.scroll")
-            .frame(maxHeight: portrait ? 320 : 160)
             Button { showingRecords = true } label: {
                 Text("RECORDS").frame(maxWidth: .infinity).frame(height: 44)
             }.accessibilityIdentifier("records.open")
-            Button { if career.begin(.twitch, mode: .career) { startBout() } } label: {
-                HStack {
-                    Image(systemName: "bolt.fill")
-                    Text("STEP INTO THE RING").font(RingStyle.type(22)).italic().tracking(1)
-                    Spacer()
-                    Image(systemName: "arrow.right")
-                }
-                .padding(.horizontal, 22).frame(height: 62)
-                .foregroundStyle(RingStyle.ink)
-                .background(LinearGradient(colors: [Color(red: 1, green: 0.83, blue: 0.42), RingStyle.gold], startPoint: .top, endPoint: .bottom), in: RoundedRectangle(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(.white.opacity(0.45)))
-            }
-            .accessibilityIdentifier("bout.start")
-            HStack(spacing: 16) {
-                Label("3 ROUNDS", systemImage: "timer")
-                Label("ALL SKILL", systemImage: "target")
-                Label("OFFLINE", systemImage: "bolt.shield")
-            }
-            .font(.system(size: 9, weight: .heavy)).tracking(1)
-            .foregroundStyle(.white.opacity(0.5)).padding(.top, 15).padding(.bottom, 12)
         }
         .padding(.horizontal, portrait ? 25 : 36)
+        .padding(.top, 10)
+        .background(RingStyle.ink.opacity(0.92).ignoresSafeArea())
     }
 
     @ViewBuilder private func opponentDetail(_ book: OpponentBook) -> some View {
@@ -455,7 +482,7 @@ struct ContentView: View {
                 }
                 .disabled(!career.saved)
                 .accessibilityIdentifier("bout.again")
-                Button("CAREER LADDER") { if career.saved { sessionReset() } }
+                Button("CAREER LADDER") { if career.saved { sessionReset(); showingCareer = true } }
                     .font(.system(size: 11, weight: .heavy)).tracking(1.4).padding(8)
                     .disabled(!career.saved).accessibilityIdentifier("career.home")
             }
@@ -581,7 +608,7 @@ struct ContentView: View {
 
     private func sessionReset() {
         session = nil
-        scene = MatchScene()
+        scene = MatchScene(titleScreen: true)
         paused = false
         lastFrame = nil
         feedback = ""
@@ -589,6 +616,12 @@ struct ContentView: View {
 
     private func advanceFrame() {
         let now = ProcessInfo.processInfo.systemUptime
+        if session == nil {
+            lastFrame = nil
+            guard !showingCareer, !showingSettings, !showingRecords, selectedDetail == nil, scenePhase == .active else { return }
+            scene.renderTitle(time: now, reducedMotion: effectiveReducedMotion)
+            return
+        }
         guard let session, !showingSettings, !showingRecords, selectedDetail == nil, !paused, !session.engine.isOver, scenePhase == .active else { lastFrame = nil; return }
         let elapsed = min(0.1, max(0, now - (lastFrame ?? now)))
         lastFrame = now
