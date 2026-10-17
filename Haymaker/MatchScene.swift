@@ -44,10 +44,10 @@ import HaymakerKit
         camera.camera?.zNear = 0.1
         camera.camera?.zFar = 60
         camera.camera?.wantsHDR = true
-        camera.camera?.exposureOffset = -0.45
-        camera.camera?.bloomIntensity = 0.3
-        camera.camera?.bloomThreshold = 1.6
-        camera.camera?.bloomBlurRadius = 7
+        camera.camera?.exposureOffset = -0.65
+        camera.camera?.bloomIntensity = 0.12
+        camera.camera?.bloomThreshold = 2.2
+        camera.camera?.bloomBlurRadius = 5
         camera.camera?.vignettingIntensity = 0.65
         camera.camera?.vignettingPower = 0.7
         camera.camera?.screenSpaceAmbientOcclusionIntensity = 0.9
@@ -288,7 +288,7 @@ import HaymakerKit
                 let glow = material(.white)
                 glow.emission.contents = UIColor(red: 0.65, green: 0.8, blue: 1, alpha: 1)
                 glow.lightingModel = .constant
-                glow.emission.intensity = 8
+                glow.emission.intensity = 3
                 fixture.materials = [glow]
                 stage.addChildNode(node(fixture, at: SCNVector3(x, 4.75, z)))
             }
@@ -302,15 +302,15 @@ import HaymakerKit
         ambient.light?.color = UIColor(red: 0.3, green: 0.36, blue: 0.52, alpha: 1)
         ambient.light?.intensity = 330
         scene.rootNode.addChildNode(ambient)
-        spotlight(at: SCNVector3(-3, 6, 4), color: .init(red: 1, green: 0.87, blue: 0.68, alpha: 1), intensity: 1000, shadows: true)
-        spotlight(at: SCNVector3(4, 5, -3), color: .init(red: 0.38, green: 0.62, blue: 1, alpha: 1), intensity: 950, shadows: false)
-        spotlight(at: SCNVector3(0, 7, 1), color: .init(white: 0.92, alpha: 1), intensity: 650, shadows: false)
+        spotlight(at: SCNVector3(-3, 6, 4), color: .init(red: 1, green: 0.87, blue: 0.68, alpha: 1), intensity: 780, shadows: true)
+        spotlight(at: SCNVector3(4, 5, -3), color: .init(red: 0.38, green: 0.62, blue: 1, alpha: 1), intensity: 620, shadows: false)
+        spotlight(at: SCNVector3(0, 7, 1), color: .init(white: 0.85, alpha: 1), intensity: 180, shadows: false)
         for x: Float in [-6, 6] {
-            spotlight(at: SCNVector3(x, 7, -5), color: .init(red: 0.5, green: 0.7, blue: 1, alpha: 1), intensity: 700, shadows: false)
+            spotlight(at: SCNVector3(x, 7, -5), color: .init(red: 0.5, green: 0.7, blue: 1, alpha: 1), intensity: 300, shadows: false)
             let beam = SCNCone(topRadius: 0.06, bottomRadius: 1.6, height: 6.7)
             let haze = SCNMaterial()
             haze.lightingModel = .constant
-            haze.diffuse.contents = UIColor(red: 0.43, green: 0.66, blue: 1, alpha: 0.06)
+            haze.diffuse.contents = UIColor(red: 0.43, green: 0.66, blue: 1, alpha: 0.035)
             haze.isDoubleSided = true
             haze.writesToDepthBuffer = false
             haze.blendMode = .add
