@@ -440,12 +440,18 @@ public struct FightEngine: Sendable {
                 opponent.state = .blocking
                 opponent.ticksInCurrentState = 0
                 opponent.stateDuration = oppActive?.impact ?? 12
+            } else if opponent.currentMove == .dodge {
+                opponent.state = .dodging
+                opponent.ticksInCurrentState = 0
+                opponent.stateDuration = oppActive?.impact ?? 20
             } else {
                 opponent.state = .attacking
                 opponent.ticksInCurrentState = 0
                 opponent.stateDuration = oppActive?.impact ?? 4
                 opponentStats.thrown += 1
             }
+        case .dodging where opponent.ticksInCurrentState >= opponent.stateDuration:
+            enterOpponentRecovering(oppActive?.recover ?? 8)
         case .blocking where opponent.ticksInCurrentState >= opponent.stateDuration:
             enterOpponentRecovering(oppActive?.recover ?? 8)
         case .attacking where opponent.ticksInCurrentState >= opponent.stateDuration:
@@ -558,6 +564,13 @@ public struct FightEngine: Sendable {
             // still counts as thrown (it was) and whiffed (it missed).
             playerStats.whiffed += 1
             events.append(.whiffed(tick: totalTicks, by: .player, move: move))
+            return
+        }
+
+        if opponent.state == .dodging {
+            opponentStats.dodgesMade += 1
+            playerStats.whiffed += 1
+            events.append(.dodged(tick: totalTicks, attacker: .player, move: move))
             return
         }
 

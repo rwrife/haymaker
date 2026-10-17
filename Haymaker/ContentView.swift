@@ -31,6 +31,7 @@ struct ContentView: View {
     @State private var lastEventCount = 0
     @State private var showingSettings = false
     @State private var paused = false
+    @State private var showingVersus = false
     @State private var feedback = ""
     @State private var feedbackUntil = 0
     @State private var feedbackColor = RingStyle.gold
@@ -40,7 +41,7 @@ struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     private var effectiveReducedMotion: Bool { reducedMotion || systemReduceMotion }
     private var rendererIdle: Bool {
-        (session == nil ? showingCareer || effectiveReducedMotion : session?.engine.isOver != false) || paused || showingSettings || showingRecords || selectedDetail != nil || scenePhase != .active
+        (session == nil ? showingCareer || effectiveReducedMotion : session?.engine.isOver != false) || showingVersus || paused || showingSettings || showingRecords || selectedDetail != nil || scenePhase != .active
     }
     private let clock = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
 
@@ -55,9 +56,13 @@ struct ContentView: View {
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
                 if let session {
-                    match(session, portrait: portrait)
-                    if session.engine.isOver { results(session, portrait: portrait) }
-                    else if paused { pauseMenu }
+                    if showingVersus {
+                        VersusDialog(book: career.opponent, portrait: portrait, fight: beginFight, cancel: sessionReset)
+                    } else {
+                        match(session, portrait: portrait)
+                        if session.engine.isOver { results(session, portrait: portrait) }
+                        else if paused { pauseMenu }
+                    }
                 } else if showingCareer { careerScreen(portrait: portrait) }
                 else { home(portrait: portrait) }
             }
@@ -103,7 +108,7 @@ struct ContentView: View {
             }
             Spacer()
             if let error = career.error { Text(error).foregroundStyle(.red) }
-            Button { if career.begin(.twitch, mode: .career) { startBout() } } label: {
+            Button { if career.begin(.goldie, mode: .career) { startBout() } } label: {
                 HStack {
                     Image(systemName: "bolt.fill")
                     Text("STEP INTO THE RING").font(RingStyle.type(22)).italic().tracking(1)
@@ -152,10 +157,10 @@ struct ContentView: View {
                 // Non-lazy: all ladder + sparring rows must exist in the AX hierarchy so
                 // XCUITest can scroll to them (LazyVStack never realizes offscreen rows here).
                 VStack(alignment: .leading, spacing: 8) {
-                    if career.historyLoaded && OpponentBook.v0Roster.allSatisfy({ career.records.wins($0.id, careerOnly: true) > 0 }) {
-                        Text("Career complete — all six opponents beaten")
+                    if career.historyLoaded && OpponentBook.careerRoster.allSatisfy({ career.records.wins($0.id, careerOnly: true) > 0 }) {
+                        Text("Career complete — all eight opponents beaten")
                     }
-                    ForEach(OpponentBook.v0Roster) { book in
+                    ForEach(OpponentBook.careerRoster) { book in
                         HStack {
                             VStack(alignment: .leading) {
                                 Text(book.name).font(RingStyle.type(20))
@@ -166,7 +171,7 @@ struct ContentView: View {
                                     .font(.caption).accessibilityIdentifier("opponent.detail.\(book.id)")
                             }
                             Spacer()
-                            Button(book.id == "twitch" ? "Start bout" : "Fight \(book.name)") {
+                            Button(book.id == "goldie" ? "Start bout" : "Fight \(book.name)") {
                                 if career.begin(book, mode: .career) { startBout() }
                             }
                             .disabled(!career.historyLoaded || !career.records.isUnlocked(book.id))
@@ -176,7 +181,7 @@ struct ContentView: View {
                     }
                     Text("ENDLESS SPARRING").font(RingStyle.type(20)).foregroundStyle(RingStyle.gold)
                     Text("Practice one opponent in seeded one-round bouts.").font(.caption)
-                    ForEach(OpponentBook.v0Roster) { book in
+                    ForEach(OpponentBook.careerRoster) { book in
                         Button("Spar with \(book.name)") { if career.begin(book, mode: .sparring) { startBout() } }
                             .accessibilityIdentifier("sparring.start.\(book.id)")
                     }
@@ -234,7 +239,7 @@ struct ContentView: View {
                     Text(career.error ?? "Local records unavailable").foregroundStyle(.red)
                     Button("Retry loading records") { career.reloadHistory() }
                 }
-                ForEach(OpponentBook.v0Roster) { book in
+                ForEach(OpponentBook.careerRoster + OpponentBook.v0Roster.filter { !career.records.history($0.id).isEmpty }) { book in
                     Section(book.name) { recordSummary(book) }
                 }
             }
@@ -316,7 +321,7 @@ struct ContentView: View {
                 Text("OF \(fight.config.rounds)").font(.system(size: 8, weight: .heavy)).tracking(2).foregroundStyle(.white.opacity(0.5))
             }
             .frame(width: portrait ? 65 : 80)
-            fighterHUD(name: "ROOK", hp: fight.player.hp, maxHP: fight.config.damage.maxHP, knockdowns: fight.opponentStats.knockdownsScored, color: RingStyle.green, rival: false, compact: portrait)
+            fighterHUD(name: "MACK", hp: fight.player.hp, maxHP: fight.config.damage.maxHP, knockdowns: fight.opponentStats.knockdownsScored, color: RingStyle.green, rival: false, compact: portrait)
         }
     }
 
@@ -467,7 +472,7 @@ struct ContentView: View {
                             .background(RingStyle.gold.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))
                     }
                     .disabled(!career.saved).accessibilityIdentifier("sparring.next")
-                } else if let next = OpponentBook.v0Roster.first(where: {
+                } else if let next = OpponentBook.careerRoster.first(where: {
                     career.records.isUnlocked($0.id) && career.records.wins($0.id, careerOnly: true) == 0
                 }), next.id != career.opponent.id {
                     Button { if career.begin(next, mode: .career) { startBout() } } label: {
@@ -536,7 +541,7 @@ struct ContentView: View {
                 }
                 Section("Learn the rhythm") {
                     Text("Tap PUNCH for a jab. Swipe left for a hook, up for an uppercut, right to dodge, and down to guard. Two hands gives every move its own button.")
-                    Text("Counter during Baxter’s windup for double damage. Dodge just before his glove lands. An uppercut breaks his guard. Feints are a trap—wait for the opening.")
+                    Text("Counter during an opponent’s windup for double damage. Dodge just before the glove lands. An uppercut breaks the guard. Feints are a trap—wait for the opening.")
                 }
                 Section {
                     Text("3D arena rendered with Metal. All fights and records stay on your device.")
@@ -562,9 +567,10 @@ struct ContentView: View {
         case .telling: return fight.opponent.currentMove == .feint ? "FEINT — DON’T BITE" : "\(fight.opponent.currentMove.rawValue.uppercased()) — WINDING UP"
         case .attacking: return "INCOMING!"
         case .blocking: return "GUARD UP"
+        case .dodging: return "SLIPPING — WAIT FOR THE EXIT"
         case .recovering: return "OPENING — GO!"
-        case .knockedDown, .ko: return "BAXTER IS DOWN!"
-        default: return "READ HIS NEXT MOVE"
+        case .knockedDown, .ko: return "\(fight.book.name.uppercased()) IS DOWN!"
+        default: return "READ THE NEXT MOVE"
         }
     }
     private func tellHint(_ fight: FightEngine) -> String {
@@ -573,7 +579,8 @@ struct ContentView: View {
         case .telling: return fight.opponent.currentMove == .feint ? "Wait for the real punch." : "Counter now, or prepare to dodge."
         case .attacking: return "Dodge or guard!"
         case .blocking: return "Swipe up. Uppercut breaks the guard."
-        case .recovering: return "He missed his chance. Take yours."
+        case .dodging: return "Save your punch. Catch the recovery."
+        case .recovering: return "They missed their chance. Take yours."
         default: return "Watch the gloves. Find your rhythm."
         }
     }
@@ -583,10 +590,10 @@ struct ContentView: View {
     }
     private func outcomeDescription(_ outcome: FightOutcome?) -> String {
         switch outcome {
-        case .playerWinByKO: return "Baxter goes down. You own the ring."
+        case .playerWinByKO: return "\(career.opponent.name) goes down. You own the ring."
         case .playerWinByDecision: return "You take it on the judges’ scorecards."
-        case .playerLossByKO: return "Baxter lands the knockout. Come back swinging."
-        case .playerLossByDecision: return "Baxter takes the decision. Find his rhythm."
+        case .playerLossByKO: return "\(career.opponent.name) lands the knockout. Come back swinging."
+        case .playerLossByDecision: return "\(career.opponent.name) takes the decision. Find their rhythm."
         default: return "Even on the scorecards. Settle it in a rematch."
         }
     }
@@ -594,7 +601,8 @@ struct ContentView: View {
     private func startBout() {
         let isUITest = ProcessInfo.processInfo.arguments.contains("-haymakerUITestShortBout")
         session = FightSession(seed: career.seed, book: career.opponent, sparring: career.mode == .sparring, shortUITestBout: isUITest)
-        scene.resetForNextBout()
+        scene.resetForNextBout(book: career.opponent)
+        showingVersus = true
         paused = ProcessInfo.processInfo.arguments.contains("-haymakerUITestStartPaused")
         // ponytail: test-only launch flag freezes UI controls; live fights always run.
         lastEventCount = 0
@@ -606,7 +614,14 @@ struct ContentView: View {
         if let session { scene.render(session.engine, reducedMotion: effectiveReducedMotion, highContrast: colorblindCues) }
     }
 
+    private func beginFight() {
+        showingVersus = false
+        lastFrame = nil
+        tickAccumulator = 0
+    }
+
     private func sessionReset() {
+        showingVersus = false
         session = nil
         scene = MatchScene(titleScreen: true)
         paused = false
@@ -622,7 +637,7 @@ struct ContentView: View {
             scene.renderTitle(time: now, reducedMotion: effectiveReducedMotion)
             return
         }
-        guard let session, !showingSettings, !showingRecords, selectedDetail == nil, !paused, !session.engine.isOver, scenePhase == .active else { lastFrame = nil; return }
+        guard let session, !showingSettings, !showingRecords, selectedDetail == nil, !showingVersus, !paused, !session.engine.isOver, scenePhase == .active else { lastFrame = nil; return }
         let elapsed = min(0.1, max(0, now - (lastFrame ?? now)))
         lastFrame = now
         tickAccumulator += elapsed
@@ -641,7 +656,9 @@ struct ContentView: View {
                 feedback = by == .player ? (counter ? "COUNTER!" : "CLEAN HIT!") : "HIT!"
                 feedbackColor = by == .player ? RingStyle.gold : RingStyle.red
                 if hapticsEnabled { UIImpactFeedbackGenerator(style: counter ? .heavy : .medium).impactOccurred() }
-            case .dodged: feedback = "DODGED!"; feedbackColor = RingStyle.green
+            case let .dodged(_, attacker, _):
+                feedback = attacker == .player ? "MISSED!" : "DODGED!"
+                feedbackColor = attacker == .player ? RingStyle.red : RingStyle.green
             case .parried: feedback = "PARRIED!"; feedbackColor = RingStyle.green
             case .blocked: feedback = "BLOCKED!"; feedbackColor = .white
             case .knockdown: feedback = "KNOCKDOWN!"; feedbackColor = RingStyle.gold

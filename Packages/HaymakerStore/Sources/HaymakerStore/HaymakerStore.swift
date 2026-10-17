@@ -31,8 +31,10 @@ public struct Records: Sendable {
             && $0.result.outcome.isPlayerWin }.count
     }
     public func isUnlocked(_ opponentID: String) -> Bool {
-        guard let index = OpponentBook.v0Roster.firstIndex(where: { $0.id == opponentID }) else { return false }
-        return OpponentBook.v0Roster.prefix(index).allSatisfy { wins($0.id, careerOnly: true) > 0 }
+        let roster = OpponentBook.careerRoster.contains { $0.id == opponentID }
+            ? OpponentBook.careerRoster : OpponentBook.v0Roster
+        guard let index = roster.firstIndex(where: { $0.id == opponentID }) else { return false }
+        return roster.prefix(index).allSatisfy { wins($0.id, careerOnly: true) > 0 }
     }
     public func fastestKO(_ opponentID: String) -> BoutResult? {
         history(opponentID).map(\.result).filter { $0.outcome == .playerWinByKO }

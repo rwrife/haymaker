@@ -1,6 +1,6 @@
 # Character introduction portraits
 
-Eight user-supplied PNG graphics are archived here for future intro scenes, dialogue panels, and roster presentations. They are source art outside the app's synchronized resource directory; no intro-scene behavior is implemented by this addition.
+Eight user-supplied PNG graphics are archived here as source art. Byte-for-byte copies are bundled in the app's `*-intro` image assets and shown as face close-ups in the pre-fight versus dialog. Every career bout, sparring round and rematch waits for the player to ring the bell.
 
 | Character | Portrait | Supplied filename |
 | --- | --- | --- |

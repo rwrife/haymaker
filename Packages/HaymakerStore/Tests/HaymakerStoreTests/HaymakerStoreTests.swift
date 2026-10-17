@@ -81,6 +81,24 @@ struct HaymakerStoreTests {
         #expect(!career.isUnlocked("lattice"))
         #expect(career.ledger.comparison(for: win) == .noImprovement)
     }
+    @Test func storyLadderRequiresCareerWinsAndEndsWithBaxter() throws {
+        let store = try BoutStore()
+        let roster = OpponentBook.careerRoster
+        for (index, book) in roster.enumerated() {
+            #expect(try store.records().isUnlocked(book.id))
+            for locked in roster.dropFirst(index + 1) {
+                #expect(try !store.records().isUnlocked(locked.id))
+            }
+            let win = FightEngine.simulate(config: EngineConfig(rounds: 1, roundTicks: 600, restTicks: 0),
+                                          seed: 42, book: book, inputs: Array(repeating: .jab, count: 600))
+            #expect(win.outcome.isPlayerWin)
+            try store.append(SavedBout(mode: .sparring, result: win))
+            if index + 1 < roster.count { #expect(try !store.records().isUnlocked(roster[index + 1].id)) }
+            try store.append(SavedBout(mode: .career, result: win))
+        }
+        #expect(try store.records().wins("baxter", careerOnly: true) == 1)
+    }
+
     @Test func fullLadderUnlocksOnlyInOrderAndSparringRunsStaySeparate() throws {
         let store = try BoutStore()
         let config = EngineConfig.standard

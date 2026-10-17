@@ -10,7 +10,7 @@ import HaymakerStore
     private(set) var error: String?
     private(set) var comparison: BestComparison?
     private(set) var saved = false
-    var opponent = OpponentBook.twitch
+    var opponent = OpponentBook.goldie
     var mode = BoutMode.career
     private(set) var runID: String?
     private(set) var runRound = 1
