@@ -114,6 +114,9 @@ jobs:
           count=$(grep -c "TARGETED_DEVICE_FAMILY = 1;" Haymaker.xcodeproj/project.pbxproj)
           echo "TARGETED_DEVICE_FAMILY = 1 asserted in $count places"
 
+      - name: Verify fighter asset topology, weights, and reproducible exports
+        run: python3 scripts/test_rig_fighters.py
+
       - name: Run HaymakerKit package tests on pinned macOS toolchain
         run: swift test --package-path Packages/HaymakerKit
 
