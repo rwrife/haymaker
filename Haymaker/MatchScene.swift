@@ -20,19 +20,23 @@ import HaymakerKit
     private var effects: [(node: SCNNode, expires: Int)] = []
 
     private var titleScreen: Bool
+    private let mist = SCNNode()
+    private var ringCenter = SIMD3<Float>(0, 0, 0.2)
 
     init(titleScreen: Bool = false) {
         self.titleScreen = titleScreen
         scene.background.contents = UIColor(red: 0.014, green: 0.023, blue: 0.047, alpha: 1)
-        scene.fogColor = UIColor(red: 0.015, green: 0.027, blue: 0.055, alpha: 1)
-        scene.fogStartDistance = 15
-        scene.fogEndDistance = 34
+        scene.fogColor = UIColor(red: 0.05, green: 0.07, blue: 0.11, alpha: 1)
+        scene.fogStartDistance = 9
+        scene.fogEndDistance = 30
+        scene.fogDensityExponent = 1.4
         scene.lightingEnvironment.contents = reflectionEnvironment()
-        scene.lightingEnvironment.intensity = 0.65
+        scene.lightingEnvironment.intensity = 0.38
         scene.rootNode.addChildNode(stage)
         buildRing()
         buildStadium()
         buildLighting()
+        buildMist()
         stage.addChildNode(rival.root)
         stage.addChildNode(hero.root)
         camera.camera = SCNCamera()
@@ -40,13 +44,13 @@ import HaymakerKit
         camera.camera?.zNear = 0.1
         camera.camera?.zFar = 60
         camera.camera?.wantsHDR = true
-        camera.camera?.exposureOffset = 0.1
-        camera.camera?.bloomIntensity = 0.55
-        camera.camera?.bloomThreshold = 1.1
+        camera.camera?.exposureOffset = -0.45
+        camera.camera?.bloomIntensity = 0.3
+        camera.camera?.bloomThreshold = 1.6
         camera.camera?.bloomBlurRadius = 7
         camera.camera?.vignettingIntensity = 0.65
         camera.camera?.vignettingPower = 0.7
-        camera.camera?.screenSpaceAmbientOcclusionIntensity = 0.7
+        camera.camera?.screenSpaceAmbientOcclusionIntensity = 0.9
         camera.camera?.screenSpaceAmbientOcclusionRadius = 0.25
         scene.rootNode.addChildNode(camera)
         rival.resetMotion()
@@ -125,6 +129,7 @@ import HaymakerKit
 
     func render(_ fight: FightEngine, reducedMotion: Bool, highContrast: Bool) {
         self.reducedMotion = reducedMotion
+        mist.isPaused = reducedMotion
         for effect in effects where effect.expires <= fight.totalTicks {
             effect.node.removeFromParentNode()
         }
@@ -159,8 +164,10 @@ import HaymakerKit
         hero.pose(fight.player, time: t + 0.8, recoil: recoilHero, reducedMotion: reducedMotion)
         positionFighters(time: t, reducedMotion: reducedMotion)
         if !reducedMotion {
-            camera.position.x = sin(t * 91) * shake
+            // The camera drifts a little with the action instead of staring at a fixed frame.
+            camera.position.x = ringCenter.x * 0.55 + sin(t * 91) * shake
             camera.position.y = (portrait ? 2.95 : 2.55) + cos(t * 77) * shake * 0.5
+            camera.look(at: SCNVector3(ringCenter.x * 0.8, portrait ? 1.5 : 2.1, ringCenter.z * 0.5))
         } else { camera.position.x = 0; camera.position.y = portrait ? 2.95 : 2.55 }
         SCNTransaction.commit()
     }
@@ -168,10 +175,14 @@ import HaymakerKit
     private func positionFighters(time: Float, reducedMotion: Bool) {
         // Both fighters circle the same center and keep facing one another.
         // Root travel follows the same strike/recovery curve as the gloves.
-        let orbit: Float = reducedMotion ? 0 : sin(time * 0.55) * 0.10
-        let drift: Float = reducedMotion ? 0 : sin(time * 0.8) * 0.065
+        // They slowly circle and shuffle around the canvas (a few steps, never
+        // near the ropes) so the ropes and crowd slide past behind them.
+        let orbit: Float = reducedMotion ? 0 : sin(time * 0.32) * 0.34 + sin(time * 0.9) * 0.04
+        let drift: Float = reducedMotion ? 0 : sin(time * 0.21) * 0.55 + sin(time * 0.8) * 0.065
+        let depth: Float = reducedMotion ? 0 : sin(time * 0.27 + 1.1) * 0.32
         let axis = SIMD3<Float>(sin(0.64 + orbit), 0, -cos(0.64 + orbit))
-        let center = SIMD3<Float>(drift, 0, 0.20)
+        let center = SIMD3<Float>(drift, 0, 0.20 + depth)
+        ringCenter = center
         hero.root.simdPosition = center - axis * (1.06 - hero.forwardDrive * 0.25)
         rival.root.simdPosition = center + axis * (1.06 - rival.forwardDrive * 0.25)
         hero.root.simdPosition.x -= hero.slip * 0.24
@@ -182,7 +193,7 @@ import HaymakerKit
     }
 
     private func buildRing() {
-        let ivory = material(UIColor(red: 0.79, green: 0.75, blue: 0.61, alpha: 1), roughness: 0.95)
+        let ivory = material(UIColor(red: 0.6, green: 0.56, blue: 0.45, alpha: 1), roughness: 0.95)
         let mat = SCNBox(width: 9.5, height: 0.16, length: 9.5, chamferRadius: 0.05)
         mat.materials = [ivory]
         stage.addChildNode(node(mat, at: SCNVector3(0, -0.08, 0)))
@@ -219,7 +230,7 @@ import HaymakerKit
             }
         }
         for (index, y) in [Float(0.58), 1.08, 1.58, 2.08].enumerated() {
-            let color: UIColor = [.init(red: 0.045, green: 0.16, blue: 0.43, alpha: 1), .white, .init(red: 0.64, green: 0.02, blue: 0.03, alpha: 1), .white][index]
+            let color: UIColor = [.init(red: 0.045, green: 0.16, blue: 0.43, alpha: 1), .init(white: 0.78, alpha: 1), .init(red: 0.64, green: 0.02, blue: 0.03, alpha: 1), .init(white: 0.78, alpha: 1)][index]
             let ropeMaterial = material(color, roughness: 0.6)
             for x: Float in [-4.5, 4.5] {
                 stage.addChildNode(segment(from: SCNVector3(x, y, -4.5), to: SCNVector3(x, y, 4.5), radius: 0.038, material: ropeMaterial))
@@ -240,8 +251,8 @@ import HaymakerKit
         let headGeometry = SCNSphere(radius: 0.13)
         headGeometry.segmentCount = 8
         let shirtColors: [UIColor] = [.init(red: 0.2, green: 0.3, blue: 0.4, alpha: 1), .init(red: 0.4, green: 0.09, blue: 0.08, alpha: 1), .init(red: 0.5, green: 0.39, blue: 0.1, alpha: 1), .init(red: 0.08, green: 0.2, blue: 0.16, alpha: 1)]
-        let heads = skinTones.map { color -> SCNGeometry in let g = headGeometry.copy() as! SCNGeometry; let m = material(color); m.emission.contents = color; m.emission.intensity = 0.3; g.materials = [m]; return g }
-        let bodies = shirtColors.map { color -> SCNGeometry in let g = SCNCapsule(capRadius: 0.15, height: 0.43); g.radialSegmentCount = 6; let m = material(color); m.emission.contents = color; m.emission.intensity = 0.3; g.materials = [m]; return g }
+        let heads = skinTones.map { color -> SCNGeometry in let g = headGeometry.copy() as! SCNGeometry; let m = material(color); m.emission.contents = color; m.emission.intensity = 0.1; g.materials = [m]; return g }
+        let bodies = shirtColors.map { color -> SCNGeometry in let g = SCNCapsule(capRadius: 0.15, height: 0.43); g.radialSegmentCount = 6; let m = material(color); m.emission.contents = color; m.emission.intensity = 0.1; g.materials = [m]; return g }
         for row in 0..<6 {
             let z = -6.3 - Float(row) * 1.18
             let y = Float(row) * 0.62
@@ -288,18 +299,18 @@ import HaymakerKit
         let ambient = SCNNode()
         ambient.light = SCNLight()
         ambient.light?.type = .ambient
-        ambient.light?.color = UIColor(red: 0.36, green: 0.43, blue: 0.6, alpha: 1)
-        ambient.light?.intensity = 650
+        ambient.light?.color = UIColor(red: 0.3, green: 0.36, blue: 0.52, alpha: 1)
+        ambient.light?.intensity = 330
         scene.rootNode.addChildNode(ambient)
-        spotlight(at: SCNVector3(-3, 6, 4), color: .init(red: 1, green: 0.87, blue: 0.68, alpha: 1), intensity: 1700, shadows: true)
-        spotlight(at: SCNVector3(4, 5, -3), color: .init(red: 0.38, green: 0.62, blue: 1, alpha: 1), intensity: 2200, shadows: false)
-        spotlight(at: SCNVector3(0, 7, 1), color: .white, intensity: 1300, shadows: false)
+        spotlight(at: SCNVector3(-3, 6, 4), color: .init(red: 1, green: 0.87, blue: 0.68, alpha: 1), intensity: 1000, shadows: true)
+        spotlight(at: SCNVector3(4, 5, -3), color: .init(red: 0.38, green: 0.62, blue: 1, alpha: 1), intensity: 950, shadows: false)
+        spotlight(at: SCNVector3(0, 7, 1), color: .init(white: 0.92, alpha: 1), intensity: 650, shadows: false)
         for x: Float in [-6, 6] {
-            spotlight(at: SCNVector3(x, 7, -5), color: .init(red: 0.5, green: 0.7, blue: 1, alpha: 1), intensity: 1400, shadows: false)
+            spotlight(at: SCNVector3(x, 7, -5), color: .init(red: 0.5, green: 0.7, blue: 1, alpha: 1), intensity: 700, shadows: false)
             let beam = SCNCone(topRadius: 0.06, bottomRadius: 1.6, height: 6.7)
             let haze = SCNMaterial()
             haze.lightingModel = .constant
-            haze.diffuse.contents = UIColor(red: 0.43, green: 0.66, blue: 1, alpha: 0.085)
+            haze.diffuse.contents = UIColor(red: 0.43, green: 0.66, blue: 1, alpha: 0.06)
             haze.isDoubleSided = true
             haze.writesToDepthBuffer = false
             haze.blendMode = .add
@@ -310,6 +321,74 @@ import HaymakerKit
         }
     }
 
+    /// Slow, drifting smoke: a low ground bank around the ring plus a deeper
+    /// haze layer through the rafters, so the lights read as cutting through a
+    /// smoky arena. Pre-warmed so it is already in place on the first frame.
+    private func buildMist() {
+        let puff = Self.mistPuff()
+        let fade = CAKeyframeAnimation()
+        fade.values = [0.0, 1.0, 1.0, 0.0]
+        fade.keyTimes = [0.0, 0.25, 0.7, 1.0]
+        let grow = CAKeyframeAnimation()
+        grow.values = [0.8, 1.0, 1.35]
+        grow.keyTimes = [0.0, 0.5, 1.0]
+
+        func system(_ shape: SCNBox, rate: CGFloat, life: CGFloat, size: CGFloat, alpha: CGFloat, tint: UIColor, drift: SCNVector3) -> SCNParticleSystem {
+            let s = SCNParticleSystem()
+            s.particleImage = puff
+            s.emitterShape = shape
+            s.birthLocation = .volume
+            s.birthRate = rate
+            s.particleLifeSpan = life
+            s.particleLifeSpanVariation = life * 0.3
+            s.warmupDuration = TimeInterval(life)
+            s.particleSize = size
+            s.particleSizeVariation = size * 0.4
+            s.particleVelocity = 0.25
+            s.particleVelocityVariation = 0.15
+            s.emittingDirection = drift
+            s.spreadingAngle = 25
+            s.particleAngularVelocity = 4
+            s.particleAngularVelocityVariation = 6
+            s.particleColor = tint.withAlphaComponent(alpha)
+            s.blendMode = .alpha
+            s.isLightingEnabled = false
+            s.isLocal = false
+            s.sortingMode = .distance
+            s.propertyControllers = [
+                .opacity: SCNParticlePropertyController(animation: fade),
+                .size: SCNParticlePropertyController(animation: grow)
+            ]
+            return s
+        }
+
+        // Ground bank: hugs the canvas and the apron, keeps the fighters clear.
+        let ground = SCNNode()
+        ground.position = SCNVector3(0, 0.45, -1.5)
+        ground.addParticleSystem(system(SCNBox(width: 20, height: 0.5, length: 16, chamferRadius: 0), rate: 3.2, life: 16, size: 4.2, alpha: 0.075,
+                                        tint: UIColor(red: 0.62, green: 0.7, blue: 0.82, alpha: 1), drift: SCNVector3(1, 0, 0.25)))
+        mist.addChildNode(ground)
+
+        // Rafter haze: lit by the truss fixtures, thickest behind the ring.
+        let rafters = SCNNode()
+        rafters.position = SCNVector3(0, 3.6, -7)
+        rafters.addParticleSystem(system(SCNBox(width: 24, height: 4, length: 8, chamferRadius: 0), rate: 2.4, life: 20, size: 7, alpha: 0.06,
+                                         tint: UIColor(red: 0.5, green: 0.62, blue: 0.82, alpha: 1), drift: SCNVector3(-1, 0.05, 0.1)))
+        mist.addChildNode(rafters)
+        stage.addChildNode(mist)
+    }
+
+    /// A soft radial puff used for every smoke particle.
+    private static func mistPuff() -> UIImage {
+        let size = CGSize(width: 128, height: 128)
+        return UIGraphicsImageRenderer(size: size).image { context in
+            let colors = [UIColor(white: 1, alpha: 1).cgColor, UIColor(white: 1, alpha: 0.35).cgColor, UIColor(white: 1, alpha: 0).cgColor] as CFArray
+            guard let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 0.45, 1]) else { return }
+            let center = CGPoint(x: size.width / 2, y: size.height / 2)
+            context.cgContext.drawRadialGradient(gradient, startCenter: center, startRadius: 0, endCenter: center, endRadius: size.width / 2, options: [])
+        }
+    }
+
     private func spotlight(at position: SCNVector3, color: UIColor, intensity: CGFloat, shadows: Bool) {
         let light = SCNNode()
         light.position = position
@@ -317,8 +396,8 @@ import HaymakerKit
         light.light?.type = .spot
         light.light?.color = color
         light.light?.intensity = intensity
-        light.light?.spotInnerAngle = 35
-        light.light?.spotOuterAngle = 80
+        light.light?.spotInnerAngle = 28
+        light.light?.spotOuterAngle = 68
         light.light?.attenuationStartDistance = 2
         light.light?.attenuationEndDistance = 24
         light.light?.castsShadow = shadows
