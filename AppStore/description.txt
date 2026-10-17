@@ -1,27 +1,20 @@
-Haymaker — Pocket Arcade Boxing. No accounts. No cloud. No ads.
+Haymaker — Offline Arcade Boxing for iPhone
 
-Haymaker is a boss-rush arcade boxing game that fits in one hand. Every fight is a boss fight: an original opponent with his own rhythm, telegraphs, and tells. Learn the pattern, slip the punch, answer with a combo, and beat your own record before the bell.
+Step into a boss-rush boxing game built for one-handed play. Each original opponent has a distinct rhythm and visible tells. Watch the windup, dodge or guard, and time your counter.
 
 WHAT YOU DO
-- Climb a career ladder of six original fighters, each a distinct pattern puzzle — jab flurries, shoulder-fake artists, counter-punchers, and one very patient champion.
-- Throw one-thumb combos and slip, block, or parry with quick swipes. Every control is reachable with a thumb.
-- Chase personal bests. Every bout is scored on landed punches, defense, damage, and round time, and your records are kept per opponent.
-- Endless Sparring lets you drill a single opponent on seeded patterns — the same seed always produces the same fight, so improvement is on you.
+- Work through a career ladder of eight original opponents, from Goldie Voltage to final boss Bruiser Baxter. Each opponent has an authored move pattern.
+- Tap to jab and swipe for a hook, uppercut, dodge, or guard. Prefer buttons? Switch to the two-handed control layout.
+- Chase personal bests. Bout scores use landed punches, defense, damage, rounds, and time; records are derived from locally saved bouts.
+- Play Endless Sparring against a chosen opponent and track the rounds in your run.
 
-WHY IT'S DIFFERENT
-- Deterministic fights: no dice, no energy timers, no pay-to-progress. Read the tell, land the counter.
-- Two-minute sessions designed for one thumb, anytime, anywhere.
-- 100% offline. Haymaker never contacts a server. No account, no sign-in, no ads, no in-app purchases, no loot boxes, no data collection.
+BUILT AROUND THE FIGHT
+- Seeded fights follow the same pattern when given the same inputs. There are no random fight outcomes, energy timers, or pay-to-progress mechanics.
+- Original 3D fighters face off in an arena rendered on your iPhone.
+- No account, cloud save, multiplayer, ads, in-app purchases, loot boxes, or network connection is needed for play.
 
-YOUR DATA STAYS YOURS
-- Everything lives on your iPhone: records, career stats, and settings.
-- Export or back up whenever you want with a standard file export, and restore it with a clear preview before anything changes.
+YOUR CORNER
+- Career progress, bout records, and control settings stay on your iPhone.
+- Settings include high-contrast tell cues, reduced motion, and a haptics toggle. Match controls and menus have accessibility labels.
 
-DESIGNED FOR IPHONE
-- Built natively for iPhone with modern, original vector-boxing art and punchy haptic feedback.
-- Accessibility options include large controls, colorblind-safe tell cues, reduced motion, haptics toggle, and full VoiceOver labels throughout the menus.
-- Haymaker is designed for the iPhone screen size; it is not built as an iPad app.
-
-A note on dual-screen devices: Haymaker's battle layout is designed so a future dual-screen iPhone could show the opponent on one screen and a big control deck on the other. Until that hardware and its APIs exist, the game plays as a standard one-screen iPhone game.
-
-Haymaker features entirely original fighters and artwork. No real boxers, gyms, or boxing-game franchises are depicted or referenced.
+Haymaker is a game, not a fitness or medical program. Its fighters and artwork are original; it does not depict real boxers or boxing franchises.
