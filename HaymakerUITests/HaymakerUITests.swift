@@ -3,6 +3,7 @@ import XCTest
 final class HaymakerUITests: XCTestCase {
     @MainActor
     func testBoutPlaythroughAndSettingsInspection() throws {
+        XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
         app.launchArguments += ["-haymakerUITestShortBout", "-haymakerUITestIsolatedStore", "-haymakerUITestJabEachTick"]
         app.launch()
@@ -26,6 +27,7 @@ final class HaymakerUITests: XCTestCase {
         let startButton = app.buttons["bout.start"]
         XCTAssertTrue(startButton.waitForExistence(timeout: 5), "Start bout button exists")
         startButton.tap()
+        dismissVersus(app)
 
         // 3. Verify arena HUD elements.
         let clock = app.staticTexts["bout.clock"]
@@ -101,9 +103,9 @@ final class HaymakerUITests: XCTestCase {
         XCTAssertTrue(app.buttons["bout.start"].waitForExistence(timeout: 5))
         app.buttons["career.open"].tap()
         XCTAssertTrue(app.scrollViews["career.scroll"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["career.start.anvil"].isEnabled)
-        app.buttons["opponent.detail.twitch"].tap()
-        XCTAssertTrue(app.staticTexts["records.unknown.twitch"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["career.start.nico"].isEnabled)
+        app.buttons["opponent.detail.goldie"].tap()
+        XCTAssertTrue(app.staticTexts["records.unknown.goldie"].waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -114,6 +116,7 @@ final class HaymakerUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["bout.start"].waitForExistence(timeout: 5))
         app.buttons["bout.start"].tap()
+        dismissVersus(app)
         XCTAssertTrue(app.staticTexts["bout.results"].waitForExistence(timeout: 25))
         XCTAssertTrue(app.staticTexts["results.pb"].waitForExistence(timeout: 5))
         let home = app.buttons["career.home"]
@@ -122,10 +125,10 @@ final class HaymakerUITests: XCTestCase {
         home.tap()
         app.buttons["records.open"].tap()
         XCTAssertTrue(app.staticTexts["Career bouts 1"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.staticTexts["records.unknown.twitch"].exists)
+        XCTAssertFalse(app.staticTexts["records.unknown.goldie"].exists)
         app.buttons["Done"].tap()
-        XCTAssertEqual(app.staticTexts["career.status.twitch"].label, "Beaten")
-        XCTAssertTrue(app.buttons["career.start.anvil"].isEnabled)
+        XCTAssertEqual(app.staticTexts["career.status.goldie"].label, "Beaten")
+        XCTAssertTrue(app.buttons["career.start.nico"].isEnabled)
     }
 
     @MainActor
@@ -135,7 +138,7 @@ final class HaymakerUITests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
         app.launch()
         app.buttons["career.open"].tap()
-        let spar = app.buttons["sparring.start.twitch"]
+        let spar = app.buttons["sparring.start.goldie"]
         let ladder = app.scrollViews["career.scroll"]
         XCTAssertTrue(ladder.waitForExistence(timeout: 5))
         for _ in 0..<8 {
@@ -144,12 +147,84 @@ final class HaymakerUITests: XCTestCase {
         }
         XCTAssertTrue(spar.isHittable, "Sparring action must become visible in ladder scroller")
         spar.tap()
+        dismissVersus(app)
         XCTAssertTrue(app.staticTexts["bout.results"].waitForExistence(timeout: 25))
         XCTAssertTrue(app.staticTexts["sparring.stats"].label.contains("Run: 1 rounds"))
         app.buttons["sparring.next"].tap()
+        dismissVersus(app)
         XCTAssertTrue(app.staticTexts["bout.clock"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["bout.results"].waitForExistence(timeout: 25))
         XCTAssertTrue(app.staticTexts["sparring.stats"].label.contains("Run: 2 rounds"))
+    }
+
+    @MainActor
+    private func dismissVersus(_ app: XCUIApplication) {
+        let bell = app.buttons["versus.fight"]
+        XCTAssertTrue(bell.waitForExistence(timeout: 5))
+        bell.tap()
+    }
+
+    @MainActor
+    func testVersusWaitsForBellAndReturnsOnRematch() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-haymakerUITestShortBout", "-haymakerUITestIsolatedStore"]
+        app.launch()
+        app.buttons["bout.start"].tap()
+        XCTAssertTrue(app.staticTexts["versus.opponent"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["versus.opponent"].label, "GOLDIE VOLTAGE")
+        XCTAssertTrue(app.staticTexts["versus.taunt"].label.contains("spare change"))
+        XCTAssertFalse(app.buttons["bout.jab"].exists)
+        let portraitShot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        portraitShot.name = "Versus portrait close-up portrait"
+        portraitShot.lifetime = .keepAlways
+        add(portraitShot)
+        Thread.sleep(forTimeInterval: 11)
+        XCTAssertFalse(app.staticTexts["bout.results"].exists)
+        XCTAssertTrue(app.buttons["versus.fight"].isHittable)
+        settleOrientation(app, landscape: true)
+        defer { XCUIDevice.shared.orientation = .portrait }
+        XCTAssertTrue(app.buttons["versus.fight"].isHittable)
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot.name = "Versus portrait close-up landscape"
+        shot.lifetime = .keepAlways
+        add(shot)
+        dismissVersus(app)
+        XCTAssertTrue(app.staticTexts["bout.clock"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["bout.results"].exists, "Waiting at the versus screen must not consume the bout")
+        XCTAssertTrue(app.staticTexts["bout.results"].waitForExistence(timeout: 25))
+        let again = app.buttons["bout.again"]
+        for _ in 0..<4 where !again.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        again.tap()
+        XCTAssertTrue(app.staticTexts["versus.opponent"].waitForExistence(timeout: 5))
+        app.buttons["versus.cancel"].tap()
+        XCTAssertTrue(app.buttons["bout.start"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testEveryStoryOpponentHasAnIntroduction() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-haymakerUITestIsolatedStore"]
+        app.launch()
+        app.buttons["career.open"].tap()
+        let ladder = app.scrollViews["career.scroll"]
+        for id in ["goldie", "nico", "atlas", "vera", "duke", "sylvie", "cassian", "baxter"] {
+            let spar = app.buttons["sparring.start.\(id)"]
+            for _ in 0..<15 {
+                if spar.exists && spar.isHittable { break }
+                ladder.swipeUp()
+            }
+            XCTAssertTrue(spar.isHittable)
+            spar.tap()
+            XCTAssertTrue(app.staticTexts["versus.opponent"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.images["versus.portrait.\(id)"].exists)
+            XCTAssertTrue(app.staticTexts["versus.taunt"].exists)
+            let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            shot.name = "Versus \(id)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            app.buttons["versus.cancel"].tap()
+            XCTAssertTrue(ladder.waitForExistence(timeout: 5))
+        }
     }
 
     // Rotation re-creates the SwiftUI controls (the portrait flag flips with the
@@ -181,6 +256,7 @@ final class HaymakerUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["bout.start"].waitForExistence(timeout: 5))
         app.buttons["bout.start"].tap()
+        dismissVersus(app)
         XCTAssertTrue(app.staticTexts["bout.clock"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["bout.resume"].waitForExistence(timeout: 5))
         settleOrientation(app, landscape: true)

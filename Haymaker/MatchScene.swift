@@ -8,7 +8,7 @@ import HaymakerKit
     let scene = SCNScene()
     let camera = SCNNode()
     private let stage = SCNNode()
-    private let rival = BoxerModel(isRival: true)
+    private var rival = BoxerModel(isRival: true)
     private let hero = BoxerModel(isRival: false)
     private var lastEventCount = 0
     private var reducedMotion = false
@@ -17,6 +17,7 @@ import HaymakerKit
     private var recoilHero: Float = 0
     private var portrait = true
     private var lastTick = 0
+    private var effects: [(node: SCNNode, expires: Int)] = []
 
     private var titleScreen: Bool
 
@@ -57,8 +58,16 @@ import HaymakerKit
         if titleScreen { renderTitle(time: 0, reducedMotion: true) }
     }
 
-    func resetForNextBout() {
-        // Effects self-remove via SCNAction; reuse arena and renderer between rounds.
+    func resetForNextBout(book: OpponentBook) {
+        if let key = book.character?.asset, let asset = FighterModelAsset(rawValue: key), rival.root.name != key {
+            rival.root.removeFromParentNode()
+            rival = BoxerModel(asset: asset, isRival: true)
+            stage.addChildNode(rival.root)
+        }
+        // All child-list changes stay on the main actor, including effect cleanup.
+        for effect in effects { effect.node.removeFromParentNode() }
+        effects.removeAll()
+        // Reuse the arena and renderer between rounds.
         titleScreen = false
         rival.root.isHidden = false
         hero.root.eulerAngles.y = .pi - 0.16
@@ -116,6 +125,10 @@ import HaymakerKit
 
     func render(_ fight: FightEngine, reducedMotion: Bool, highContrast: Bool) {
         self.reducedMotion = reducedMotion
+        for effect in effects where effect.expires <= fight.totalTicks {
+            effect.node.removeFromParentNode()
+        }
+        effects.removeAll { $0.expires <= fight.totalTicks }
         let elapsed = max(0, fight.totalTicks - lastTick)
         lastTick = fight.totalTicks
         let decay = pow(Float(0.86), Float(elapsed))
@@ -131,8 +144,10 @@ import HaymakerKit
                     shake = counter ? 0.085 : 0.045
                     impact(at: by == .player ? SCNVector3(0.4, 2.15, -0.15) : SCNVector3(-0.5, 1.9, 1.3), strong: damage > 15)
                 }
-            case .parried, .dodged:
-                if !reducedMotion { trail() }
+            case let .dodged(_, attacker, _):
+                if !reducedMotion { trail(rivalDodged: attacker == .player) }
+            case .parried:
+                if !reducedMotion { trail(rivalDodged: false) }
             default: break
             }
         }
@@ -333,19 +348,20 @@ import HaymakerKit
         emitter.position = position
         emitter.addParticleSystem(sparks)
         stage.addChildNode(emitter)
-        emitter.runAction(.sequence([.wait(duration: 0.7), .removeFromParentNode()]))
+        effects.append((emitter, lastTick + 42))
     }
 
-    private func trail() {
+    private func trail(rivalDodged: Bool) {
         let arc = SCNTorus(ringRadius: 0.62, pipeRadius: 0.015)
         let glow = material(.white)
         glow.lightingModel = .constant
         glow.emission.contents = UIColor.white
         arc.materials = [glow]
-        let streak = node(arc, at: SCNVector3(-0.8, 1.45, 1.2))
+        let streak = node(arc, at: rivalDodged ? SCNVector3(0.4, 1.8, -0.15) : SCNVector3(-0.8, 1.45, 1.2))
         streak.scale = SCNVector3(1.3, 0.35, 1)
         stage.addChildNode(streak)
-        streak.runAction(.sequence([.group([.scale(to: 1.9, duration: 0.22), .fadeOut(duration: 0.22)]), .removeFromParentNode()]))
+        streak.runAction(.group([.scale(to: 1.9, duration: 0.22), .fadeOut(duration: 0.22)]))
+        effects.append((streak, lastTick + 14))
     }
 }
 

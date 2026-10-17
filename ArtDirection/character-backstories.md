@@ -1,6 +1,6 @@
 # Haymaker character backstories
 
-Story reference for the supplied character models, intro portraits, and defeated cut-scene portraits. These stories guide future career scenes, dialogue, and animation; they do not change the current playable roster. Goldie and Nico retain their established concept backgrounds. Atlas, Vera, Duke, Sylvie, and Cassian's stories expand their existing concept backgrounds. Mack and Bruiser's histories are story proposals for the player and final boss. Bruiser remains the final boss as requested; Cassian is a championship contender rather than a replacement final boss. Bout order for the other opponents remains to be decided.
+Story reference for the supplied character models, intro portraits, and defeated cut-scene portraits. These stories guide the playable roster, pre-fight dialogue, and future career scenes. Goldie and Nico retain their established concept backgrounds. Atlas, Vera, Duke, Sylvie, and Cassian's stories expand their existing concept backgrounds. Mack and Bruiser's histories are story proposals for the player and final boss. Bruiser remains the final boss as requested; Cassian is a championship contender rather than a replacement final boss. The playable ladder is Goldie, Nico, Atlas, Vera, Duke, Sylvie, Cassian, then Bruiser Baxter.
 
 | Character | Career role | Model | Intro portrait | Defeated portrait |
 | --- | --- | --- | --- | --- |

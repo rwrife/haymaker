@@ -38,7 +38,7 @@ public struct PatternEntry: Sendable, Codable, Hashable {
         precondition(tell > 0 && impact >= 0 && recover > 0, "pattern windows must be positive (impact may be 0 for feints)")
         precondition(staminaCost >= 0, "stamina cost must be non-negative")
         precondition(move == .feint || impact > 0, "only feints may have zero impact")
-        precondition(move == .feint || move == .block || damage > 0, "only feints/blocks may have zero damage")
+        precondition(move == .feint || move == .block || move == .dodge || damage > 0, "only defensive moves/feints may have zero damage")
         self.move = move
         self.tell = tell
         self.impact = impact
@@ -195,7 +195,8 @@ public extension OpponentBook {
     ], minGap: 1, gapSpread: 3)
 
     var bio: String {
-        switch id {
+        if let character { return character.bio }
+        return switch id {
         case "twitch": "A restless rhythm student. Read the repeated jabs and punish the long hook recovery."
         case "anvil": "A patient workshop bruiser. Let the feint pass, then counter the heavy uppercut."
         case "lattice": "A meticulous guard specialist. Break the shield with an uppercut before the reply."
