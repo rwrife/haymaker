@@ -97,11 +97,12 @@ import HaymakerKit
         if fight.events.count < lastEventCount { lastEventCount = 0 }
         for event in fight.events.dropFirst(lastEventCount) {
             switch event {
-            case let .landed(_, by, _, damage, counter):
+            case let .landed(_, by, _, _, counter):
                 if by == .player { recoilRival = 0.35 } else { recoilHero = 0.3 }
                 if !reducedMotion {
                     shake = counter ? 0.085 : 0.045
-                    impact(at: by == .player ? SCNVector3(0.4, 2.15, -0.15) : SCNVector3(-0.5, 1.9, 1.3), strong: damage > 15)
+                    // ponytail: HUD, recoil, camera shake and haptics carry hit feedback.
+                    // Reintroduce particles only with a renderer-safe, pooled effect path.
                 }
             case .parried, .dodged:
                 if !reducedMotion { trail() }
@@ -258,27 +259,6 @@ import HaymakerKit
         light.light?.shadowColor = UIColor(white: 0, alpha: 0.6)
         light.look(at: SCNVector3(0, 1, 0))
         scene.rootNode.addChildNode(light)
-    }
-
-    private func impact(at position: SCNVector3, strong: Bool) {
-        let sparks = SCNParticleSystem()
-        sparks.birthRate = strong ? 700 : 420
-        sparks.emissionDuration = 0.025
-        sparks.loops = false
-        sparks.particleLifeSpan = 0.22
-        sparks.particleLifeSpanVariation = 0.1
-        sparks.particleSize = 0.025
-        sparks.particleVelocity = 3.3
-        sparks.particleVelocityVariation = 1.8
-        sparks.spreadingAngle = 180
-        sparks.particleColor = UIColor(red: 1, green: 0.76, blue: 0.24, alpha: 1)
-        sparks.blendMode = .additive
-        sparks.isLightingEnabled = false
-        let emitter = SCNNode()
-        emitter.position = position
-        emitter.addParticleSystem(sparks)
-        stage.addChildNode(emitter)
-        emitter.runAction(.sequence([.wait(duration: 0.7), .removeFromParentNode()]))
     }
 
     private func trail() {
