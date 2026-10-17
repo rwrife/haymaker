@@ -29,10 +29,6 @@ import HaymakerKit
         buildRing()
         buildStadium()
         buildLighting()
-        rival.root.position = SCNVector3(0.62, 0, -0.65)
-        hero.root.position = SCNVector3(-0.65, 0, 1.05)
-        hero.root.eulerAngles.y = .pi - 0.16
-        rival.root.eulerAngles.y = 0.08
         stage.addChildNode(rival.root)
         stage.addChildNode(hero.root)
         camera.camera = SCNCamera()
@@ -49,8 +45,11 @@ import HaymakerKit
         camera.camera?.screenSpaceAmbientOcclusionIntensity = 0.7
         camera.camera?.screenSpaceAmbientOcclusionRadius = 0.25
         scene.rootNode.addChildNode(camera)
+        rival.resetMotion()
+        hero.resetMotion()
         rival.pose(FighterStatus(), time: 0, recoil: 0, reducedMotion: true)
         hero.pose(FighterStatus(), time: 0, recoil: 0, reducedMotion: true)
+        positionFighters(time: 0, reducedMotion: true)
         layout(portrait: true)
     }
 
@@ -61,8 +60,11 @@ import HaymakerKit
         shake = 0
         recoilHero = 0
         recoilRival = 0
+        rival.resetMotion()
+        hero.resetMotion()
         rival.pose(FighterStatus(), time: 0, recoil: 0, reducedMotion: true)
         hero.pose(FighterStatus(), time: 0, recoil: 0, reducedMotion: true)
+        positionFighters(time: 0, reducedMotion: true)
     }
 
     func layout(portrait: Bool) {
@@ -80,20 +82,6 @@ import HaymakerKit
         recoilHero *= decay
         recoilRival *= decay
         shake *= decay
-        let t = Float(fight.totalTicks) / 60
-        SCNTransaction.begin()
-        SCNTransaction.animationDuration = 0
-        rival.pose(fight.opponent, time: t, recoil: recoilRival, reducedMotion: reducedMotion)
-        hero.pose(fight.player, time: t + 0.8, recoil: recoilHero, reducedMotion: reducedMotion)
-        rival.root.position.x = 0.62
-        hero.root.position.x = -0.65 + (fight.player.state == .dodging ? -0.62 : 0)
-        hero.root.position.z = fight.player.state == .attacking ? 0.72 : 1.05
-        rival.root.position.z = fight.opponent.state == .attacking ? -0.15 : -0.65
-        if !reducedMotion {
-            camera.position.x = sin(t * 91) * shake
-            camera.position.y = (portrait ? 2.95 : 2.55) + cos(t * 77) * shake * 0.5
-        } else { camera.position.x = 0; camera.position.y = portrait ? 2.95 : 2.55 }
-        SCNTransaction.commit()
         if fight.events.count < lastEventCount { lastEventCount = 0 }
         for event in fight.events.dropFirst(lastEventCount) {
             switch event {
@@ -109,6 +97,33 @@ import HaymakerKit
             }
         }
         lastEventCount = fight.events.count
+        let t = Float(fight.totalTicks) / 60
+        SCNTransaction.begin()
+        SCNTransaction.animationDuration = 0
+        rival.pose(fight.opponent, time: t, recoil: recoilRival, reducedMotion: reducedMotion)
+        hero.pose(fight.player, time: t + 0.8, recoil: recoilHero, reducedMotion: reducedMotion)
+        positionFighters(time: t, reducedMotion: reducedMotion)
+        if !reducedMotion {
+            camera.position.x = sin(t * 91) * shake
+            camera.position.y = (portrait ? 2.95 : 2.55) + cos(t * 77) * shake * 0.5
+        } else { camera.position.x = 0; camera.position.y = portrait ? 2.95 : 2.55 }
+        SCNTransaction.commit()
+    }
+
+    private func positionFighters(time: Float, reducedMotion: Bool) {
+        // Both fighters circle the same center and keep facing one another.
+        // Root travel follows the same strike/recovery curve as the gloves.
+        let orbit: Float = reducedMotion ? 0 : sin(time * 0.55) * 0.10
+        let drift: Float = reducedMotion ? 0 : sin(time * 0.8) * 0.065
+        let axis = SIMD3<Float>(sin(0.64 + orbit), 0, -cos(0.64 + orbit))
+        let center = SIMD3<Float>(drift, 0, 0.20)
+        hero.root.simdPosition = center - axis * (1.06 - hero.forwardDrive * 0.25)
+        rival.root.simdPosition = center + axis * (1.06 - rival.forwardDrive * 0.25)
+        hero.root.simdPosition.x -= hero.slip * 0.24
+        rival.root.simdPosition.x += rival.slip * 0.24
+        let facing = rival.root.simdPosition - hero.root.simdPosition
+        hero.root.eulerAngles.y = atan2(facing.x, facing.z)
+        rival.root.eulerAngles.y = atan2(-facing.x, -facing.z)
     }
 
     private func buildRing() {

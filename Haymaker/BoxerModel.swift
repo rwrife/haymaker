@@ -28,51 +28,152 @@ enum FighterModelAsset: String, CaseIterable {
         root.scale = isRival ? SCNVector3(1.13, 1.13, 1.13) : SCNVector3(0.96, 0.96, 0.96)
     }
 
+    private var previousState: FighterState = .idle
+    private var punchMove: Move = .idle
+    private var hasWindup = false
+    private(set) var forwardDrive: Float = 0
+    private(set) var slip: Float = 0
+
+    func resetMotion() {
+        previousState = .idle
+        punchMove = .idle
+        hasWindup = false
+        forwardDrive = 0
+        slip = 0
+    }
+
+    private func ease(_ value: Float) -> Float {
+        let t = min(1, max(0, value))
+        return t * t * (3 - 2 * t)
+    }
+
     func pose(_ status: FighterStatus, time: Float, recoil: Float, reducedMotion: Bool) {
-        // Reset every joint so no rotation leaks from a previous state.
-        for bone in bones { bone.simdOrientation = simd_quatf(angle: 0, axis: [0, 1, 0]) }
+        for bone in bones {
+            bone.simdOrientation = simd_quatf(angle: 0, axis: [0, 1, 0])
+            bone.simdScale = SIMD3<Float>(repeating: 1)
+        }
         bones[0].simdPosition = bindPositions[0]
         root.simdEulerAngles.z = 0
-        let bob: Float = reducedMotion ? 0 : sin(time * 6) * 0.018
-        bones[0].simdPosition.y += bob
-        bones[1].simdEulerAngles.x = -min(max(recoil, 0), 0.12)
-        // Chin stays rigid with the skull. Recoil is carried by the torso; the
-        // head never translates or counter-twists against the broad neck.
-        bones[3].simdEulerAngles.y = min(Self.maximumHeadYaw, max(-Self.maximumHeadYaw, isRival ? -0.025 : 0.025))
-        var targets = [SIMD3<Float>(-0.17, 0.74, 0.14), SIMD3<Float>(0.17, 0.74, 0.14)]
         let progress = min(1, max(0, Float(status.ticksInCurrentState) / Float(max(1, status.stateDuration))))
-        let arm = status.currentMove == .hook ? 1 : 0
-        switch status.state {
-        case .telling:
-            targets[arm].z -= 0.055 * progress
-            targets[arm].x *= 1 + 0.3 * progress
-            bones[1].simdEulerAngles.y = status.currentMove == .feint ? sin(time * 18) * 0.06 : -0.07 * progress
-        case .attacking:
-            let extend = sin(progress * .pi / 2)
-            if status.currentMove == .hook {
-                targets[arm] = SIMD3<Float>(0.20 - extend * 0.24, 0.76, 0.14 + extend * 0.10)
-            } else if status.currentMove == .uppercut {
-                targets[arm] = SIMD3<Float>(-0.12, 0.65 + extend * 0.16, 0.13 + extend * 0.09)
-            } else {
-                targets[arm] = SIMD3<Float>(-0.11, 0.76, 0.14 + extend * 0.14)
+        let down = status.state == .knockedDown || status.state == .ko
+        let rhythm: Float = reducedMotion || down ? 0 : 1
+        // A slower respiratory cycle gently expands the chest and raises the
+        // shoulders independently of the quicker boxing weight shift.
+        let breath = (sin(time * 2.1) + 1) * 0.5 * rhythm
+        bones[1].simdScale = SIMD3<Float>(1 + breath * 0.008, 1 + breath * 0.005, 1 + breath * 0.012)
+        let beat = time * 4.6
+        let sway = sin(beat) * rhythm
+        let bounce = (1 - cos(beat * 2)) * 0.012 * rhythm
+        var targets = [SIMD3<Float>(-0.17, 0.75, 0.15), SIMD3<Float>(0.17, 0.75, 0.13)]
+        let guardTargets = targets
+        var reachAmount: Float = 0
+        var chamber: Float = 0
+        var twist: Float = 0
+        forwardDrive = 0
+        slip = 0
+
+        if status.state == .telling || status.state == .attacking {
+            if status.state != previousState {
+                hasWindup = status.state == .telling || previousState == .telling
             }
-            bones[1].simdEulerAngles.y = extend * 0.08
+            punchMove = status.currentMove
+        } else if status.state != .recovering || (previousState != .attacking && previousState != .telling && previousState != .recovering) {
+            punchMove = .idle
+        }
+        let offensive = punchMove == .jab || punchMove == .hook || punchMove == .uppercut || punchMove == .feint
+        if offensive {
+            switch status.state {
+            case .telling:
+                chamber = ease(progress)
+            case .attacking:
+                // The player's windup is inside attacking; opponents already
+                // chambered during their authored, readable tell window.
+                chamber = hasWindup ? 1 : ease(progress / 0.22)
+                reachAmount = ease((progress - (hasWindup ? 0 : 0.22)) / (hasWindup ? 1 : 0.78))
+            case .recovering:
+                reachAmount = punchMove == .feint ? 0 : 1 - ease(progress)
+                chamber = punchMove == .feint ? 1 - ease(progress) : reachAmount
+            default: break
+            }
+            let arm = punchMove == .hook ? 1 : 0
+            let sign: Float = arm == 0 ? -1 : 1
+            var loaded = guardTargets[arm]
+            loaded.x += sign * 0.045
+            loaded.z -= 0.055
+            if punchMove == .uppercut { loaded.y -= 0.11 }
+            let start = simd_mix(guardTargets[arm], loaded, SIMD3<Float>(repeating: chamber))
+            let contact: SIMD3<Float>
+            switch punchMove {
+            case .hook: contact = SIMD3<Float>(-0.08, 0.79, 0.32)
+            case .uppercut: contact = SIMD3<Float>(-0.10, 0.83, 0.32)
+            default: contact = SIMD3<Float>(-0.10, 0.77, 0.39)
+            }
+            targets[arm] = simd_mix(start, contact, SIMD3<Float>(repeating: reachAmount))
+            // A hook travels around the guard rather than along a straight jab.
+            if punchMove == .hook { targets[arm].x += sin(reachAmount * .pi) * 0.12 }
+            twist = sign * (0.10 * chamber * (1 - reachAmount) - 0.18 * reachAmount)
+            forwardDrive = reachAmount
+        }
+        switch status.state {
         case .blocking, .parrying:
-            targets = [SIMD3<Float>(-0.105, 0.80, 0.15), SIMD3<Float>(0.105, 0.80, 0.15)]
+            let raised = ease(Float(status.ticksInCurrentState) / 4)
+            for side in 0..<2 {
+                let high = SIMD3<Float>(side == 0 ? -0.105 : 0.105, 0.80, 0.15)
+                targets[side] = simd_mix(targets[side], high, SIMD3<Float>(repeating: raised))
+            }
         case .dodging:
-            bones[1].simdEulerAngles.z = reducedMotion ? 0 : 0.16
-            bones[0].simdPosition.y -= 0.12
+            slip = sin(progress * .pi)
         case .knockedDown, .ko:
             root.simdEulerAngles.z = reducedMotion ? 0.2 : 1.05
-        default:
-            bones[1].simdEulerAngles.y = reducedMotion ? 0 : sin(time * 2.5) * 0.025
+        default: break
         }
-        for side in 0..<2 { poseArm(side, target: targets[side] * 2.7) }
+        bones[0].simdPosition += SIMD3<Float>(sway * 0.026 - slip * 0.12, -0.085 - bounce - slip * 0.12, 0)
+        bones[0].simdEulerAngles.y = twist * 0.35
+        bones[1].simdEulerAngles = SIMD3<Float>(-min(max(recoil, 0), 0.3) + reachAmount * 0.035,
+                                               twist + sway * 0.025, sway * 0.025 + slip * 0.16)
+        // The jaw stays rigid with the skull, with only a bounded head yaw.
+        bones[3].simdEulerAngles.y = isRival ? -0.025 : 0.025
+        for side in 0..<2 {
+            targets[side].y += sway * (side == 0 ? 0.004 : -0.004)
+            poseArm(side, target: targets[side] * 2.7, reachAmount: reachAmount, punching: offensive && side == (punchMove == .hook ? 1 : 0))
+            let phase = beat + (side == 0 ? 0 : Float.pi)
+            // Alternating short shuffles: lift only the advancing foot. The
+            // support leg is solved against the mat, not dragged by hip bob.
+            let lift = pow(max(0, sin(phase)), 2) * 0.045 * rhythm
+            let foot = bindPositions[12 + side * 3] + SIMD3<Float>(side == 0 ? -0.045 : 0.045,
+                lift, (side == 0 ? 0.14 : -0.14) + cos(phase) * 0.045 * rhythm + reachAmount * 0.035)
+            poseLeg(side, target: foot)
+        }
+        previousState = status.state
+    }
+
+    /// Solve in hip-local space so the feet counteract pelvis weight shifts.
+    private func poseLeg(_ side: Int, target: SIMD3<Float>) {
+        let hip = 10 + side * 3
+        let knee = hip + 1
+        let foot = hip + 2
+        let targetInHips = bones[0].simdOrientation.inverse.act(target - bones[0].simdPosition)
+        let origin = bindPositions[hip] - bindPositions[0]
+        let upperAxis = bindPositions[knee] - bindPositions[hip]
+        let lowerAxis = bindPositions[foot] - bindPositions[knee]
+        let delta = targetInHips - origin
+        let direction = simd_normalize(delta)
+        let upper = simd_length(upperAxis), lower = simd_length(lowerAxis)
+        let reach = min(upper + lower - 0.001, max(abs(upper - lower) + 0.001, simd_length(delta)))
+        let along = (upper * upper - lower * lower + reach * reach) / (2 * reach)
+        let pole = SIMD3<Float>(0, 0, 1)
+        let bend = simd_normalize(pole - direction * simd_dot(pole, direction))
+        let joint = direction * along + bend * sqrt(max(0, upper * upper - along * along))
+        let upperRotation = simd_quatf(from: simd_normalize(upperAxis), to: simd_normalize(joint))
+        let lowerRotation = simd_quatf(from: simd_normalize(lowerAxis), to: simd_normalize(direction * reach - joint))
+        bones[hip].simdOrientation = upperRotation
+        bones[knee].simdOrientation = upperRotation.inverse * lowerRotation
+        bones[foot].simdOrientation = (bones[0].simdOrientation * lowerRotation).inverse
     }
 
     /// Two-bone IK preserves upper/lower arm lengths and keeps elbows away from
     /// the ribcage. Targets are in the spine's undeformed coordinate system.
-    private func poseArm(_ side: Int, target: SIMD3<Float>) {
+    private func poseArm(_ side: Int, target: SIMD3<Float>, reachAmount: Float, punching: Bool) {
         let shoulder = 4 + side * 3
         let elbow = shoulder + 1
         let hand = shoulder + 2
@@ -92,6 +193,11 @@ enum FighterModelAsset: String, CaseIterable {
         let lowerRotation = simd_quatf(from: restAxis, to: simd_normalize(end - joint))
         bones[shoulder].simdOrientation = upperRotation
         bones[elbow].simdOrientation = upperRotation.inverse * lowerRotation
+        // T-pose glove thumbs point down when the forearm is simply aimed at
+        // the guard. Roll each wrist half a turn around its outward bind axis
+        // so thumbs sit inward/up; gradually turn the fist over on a punch.
+        let roll = simd_quatf(angle: .pi + (punching ? reachAmount * .pi / 3 : 0), axis: restAxis)
+        bones[hand].simdOrientation = roll
     }
 }
 
