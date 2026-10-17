@@ -21,6 +21,7 @@ import HaymakerKit
 
     private var titleScreen: Bool
     private let mist = SCNNode()
+    private var ringCenter = SIMD3<Float>(0, 0, 0.2)
 
     init(titleScreen: Bool = false) {
         self.titleScreen = titleScreen
@@ -163,8 +164,10 @@ import HaymakerKit
         hero.pose(fight.player, time: t + 0.8, recoil: recoilHero, reducedMotion: reducedMotion)
         positionFighters(time: t, reducedMotion: reducedMotion)
         if !reducedMotion {
-            camera.position.x = sin(t * 91) * shake
+            // The camera drifts a little with the action instead of staring at a fixed frame.
+            camera.position.x = ringCenter.x * 0.55 + sin(t * 91) * shake
             camera.position.y = (portrait ? 2.95 : 2.55) + cos(t * 77) * shake * 0.5
+            camera.look(at: SCNVector3(ringCenter.x * 0.8, portrait ? 1.5 : 2.1, ringCenter.z * 0.5))
         } else { camera.position.x = 0; camera.position.y = portrait ? 2.95 : 2.55 }
         SCNTransaction.commit()
     }
@@ -172,10 +175,14 @@ import HaymakerKit
     private func positionFighters(time: Float, reducedMotion: Bool) {
         // Both fighters circle the same center and keep facing one another.
         // Root travel follows the same strike/recovery curve as the gloves.
-        let orbit: Float = reducedMotion ? 0 : sin(time * 0.55) * 0.10
-        let drift: Float = reducedMotion ? 0 : sin(time * 0.8) * 0.065
+        // They slowly circle and shuffle around the canvas (a few steps, never
+        // near the ropes) so the ropes and crowd slide past behind them.
+        let orbit: Float = reducedMotion ? 0 : sin(time * 0.32) * 0.34 + sin(time * 0.9) * 0.04
+        let drift: Float = reducedMotion ? 0 : sin(time * 0.21) * 0.55 + sin(time * 0.8) * 0.065
+        let depth: Float = reducedMotion ? 0 : sin(time * 0.27 + 1.1) * 0.32
         let axis = SIMD3<Float>(sin(0.64 + orbit), 0, -cos(0.64 + orbit))
-        let center = SIMD3<Float>(drift, 0, 0.20)
+        let center = SIMD3<Float>(drift, 0, 0.20 + depth)
+        ringCenter = center
         hero.root.simdPosition = center - axis * (1.06 - hero.forwardDrive * 0.25)
         rival.root.simdPosition = center + axis * (1.06 - rival.forwardDrive * 0.25)
         hero.root.simdPosition.x -= hero.slip * 0.24
