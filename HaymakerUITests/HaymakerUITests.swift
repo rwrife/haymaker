@@ -183,7 +183,9 @@ final class HaymakerUITests: XCTestCase {
         XCTAssertTrue(app.buttons["versus.fight"].isHittable)
         settleOrientation(app, landscape: true)
         defer { XCUIDevice.shared.orientation = .portrait }
+        XCTAssertFalse(app.scrollViews.firstMatch.exists, "Landscape versus screen should fit without a scroll view")
         XCTAssertTrue(app.buttons["versus.fight"].isHittable)
+        XCTAssertTrue(app.buttons["versus.cancel"].isHittable)
         let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         shot.name = "Versus portrait close-up landscape"
         shot.lifetime = .keepAlways
@@ -193,7 +195,9 @@ final class HaymakerUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["bout.results"].exists, "Waiting at the versus screen must not consume the bout")
         XCTAssertTrue(app.staticTexts["bout.results"].waitForExistence(timeout: 25))
         let again = app.buttons["bout.again"]
-        for _ in 0..<4 where !again.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        XCTAssertFalse(app.scrollViews.firstMatch.exists, "Landscape results should fit without a scroll view")
+        XCTAssertTrue(again.isHittable, "Rematch button fits on screen in landscape without scrolling")
+        XCTAssertTrue(app.buttons["career.home"].isHittable, "Career ladder button fits on screen in landscape without scrolling")
         again.tap()
         XCTAssertTrue(app.staticTexts["versus.opponent"].waitForExistence(timeout: 5))
         app.buttons["versus.cancel"].tap()

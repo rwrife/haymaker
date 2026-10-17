@@ -15,45 +15,36 @@ struct VersusDialog: View {
         ZStack {
             ink.opacity(0.98).ignoresSafeArea()
             GeometryReader { geometry in
-                ScrollView {
-                    VStack(spacing: portrait ? 18 : 10) {
-                        HStack {
-                            Text("THE CHALLENGER APPROACHES")
-                                .font(.system(size: 10, weight: .black)).tracking(2)
-                                .foregroundStyle(gold)
-                            Spacer()
-                            Button(action: cancel) {
-                                Image(systemName: "xmark").frame(width: 44, height: 44)
-                            }
-                            .accessibilityLabel("Return without starting bout")
-                            .accessibilityIdentifier("versus.cancel")
-                        }
-                        if portrait {
+                if portrait {
+                    ScrollView {
+                        VStack(spacing: 18) {
+                            header
                             face(height: min(geometry.size.height * 0.38, 310))
                             introduction
-                        } else {
-                            HStack(spacing: 24) {
-                                face(height: max(160, geometry.size.height - 130))
-                                    .frame(maxWidth: geometry.size.width * 0.43)
-                                introduction
-                            }
+                            fightButton
                         }
-                        Button(action: fight) {
-                            HStack {
-                                Text("RING THE BELL")
-                                Image(systemName: "arrow.right")
-                            }
-                            .font(.system(size: 19, weight: .black, design: .rounded))
-                            .frame(maxWidth: .infinity, minHeight: 54)
-                            .foregroundStyle(ink)
-                            .background(gold, in: RoundedRectangle(cornerRadius: 8))
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: 850)
+                        .frame(maxWidth: .infinity, minHeight: geometry.size.height)
+                    }
+                } else {
+                    HStack(alignment: .center, spacing: 24) {
+                        face()
+                            .frame(width: min(geometry.size.width * 0.43, 360))
+                        VStack(alignment: .leading, spacing: 10) {
+                            header
+                            Spacer(minLength: 0)
+                            introduction
+                            Spacer(minLength: 0)
+                            fightButton
                         }
-                        .accessibilityIdentifier("versus.fight")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                     .padding(.horizontal, 24)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 14)
                     .frame(maxWidth: 850)
-                    .frame(maxWidth: .infinity, minHeight: geometry.size.height)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }
@@ -62,25 +53,53 @@ struct VersusDialog: View {
         .accessibilityIdentifier("versus.dialog")
     }
 
+    private var header: some View {
+        HStack {
+            Text("THE CHALLENGER APPROACHES")
+                .font(.system(size: 10, weight: .black)).tracking(2)
+                .foregroundStyle(gold)
+            Spacer()
+            Button(action: cancel) {
+                Image(systemName: "xmark").frame(width: 44, height: 44)
+            }
+            .accessibilityLabel("Return without starting bout")
+            .accessibilityIdentifier("versus.cancel")
+        }
+    }
+
+    private var fightButton: some View {
+        Button(action: fight) {
+            HStack {
+                Text("RING THE BELL")
+                Image(systemName: "arrow.right")
+            }
+            .font(.system(size: 19, weight: .black, design: .rounded))
+            .frame(maxWidth: .infinity, minHeight: portrait ? 54 : 48)
+            .foregroundStyle(ink)
+            .background(gold, in: RoundedRectangle(cornerRadius: 8))
+        }
+        .accessibilityIdentifier("versus.fight")
+    }
+
     private var introduction: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: portrait ? 12 : 8) {
             Text("VS")
-                .font(.custom("AvenirNextCondensed-Heavy", size: 42)).italic().foregroundStyle(gold)
+                .font(.custom("AvenirNextCondensed-Heavy", size: portrait ? 42 : 34)).italic().foregroundStyle(gold)
             Text(book.name.uppercased())
-                .font(.custom("AvenirNextCondensed-Heavy", size: portrait ? 34 : 30))
+                .font(.custom("AvenirNextCondensed-Heavy", size: portrait ? 34 : 28))
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("versus.opponent")
             Text(book.character?.style ?? "CHALLENGER")
                 .font(.system(size: 10, weight: .heavy)).tracking(1.5).foregroundStyle(gold)
             Text("“\(book.character?.taunt ?? "Meet me in the ring.")”")
-                .font(.system(size: portrait ? 19 : 17, weight: .semibold, design: .rounded))
+                .font(.system(size: portrait ? 19 : 16, weight: .semibold, design: .rounded))
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("versus.taunt")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func face(height: CGFloat) -> some View {
+    private func face(height: CGFloat? = nil) -> some View {
         GeometryReader { geometry in
             // The source PNGs are 1024 × 1536. Fill the panel using only
             // their top 30%, keeping the crop pinned to the top edge.

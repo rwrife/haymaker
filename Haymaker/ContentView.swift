@@ -441,58 +441,87 @@ struct ContentView: View {
         let draw = session.engine.outcome == .draw
         return ZStack {
             RingStyle.ink.opacity(0.85).ignoresSafeArea()
-            ScrollView {
-            VStack(spacing: portrait ? 19 : 10) {
-                Text("BOUT RESULTS").font(.system(size: 11, weight: .heavy)).tracking(4).foregroundStyle(RingStyle.gold)
-                    .accessibilityIdentifier("bout.results")
-                Text(draw ? "DRAW" : win ? "VICTORY" : "DEFEAT")
-                    .font(RingStyle.type(portrait ? 64 : 50)).italic().foregroundStyle(win ? RingStyle.gold : .white)
-                Text(session.engine.book.name).font(.headline).foregroundStyle(.white.opacity(0.65))
-                Text(outcomeDescription(session.engine.outcome)).font(.system(size: 13, weight: .medium)).foregroundStyle(.white.opacity(0.65))
-                Text(session.replayMatches ? "Seeded replay verified" : "Replay mismatch").font(.caption)
-                if career.saved, let comparison = career.comparison {
-                    Text(comparison.shouldStore ? "Personal best recorded" : "Previous personal best stands")
-                        .accessibilityIdentifier("results.pb")
-                }
-                if let error = career.error {
-                    Text(error).foregroundStyle(.red)
-                    Button("Retry saving") { career.save(session) }
-                }
-                HStack(spacing: 25) {
-                    resultStat("SCORE", value: session.engine.playerScore().points.formatted())
-                    resultStat("LANDED", value: "\(session.engine.playerStats.landed)/\(session.engine.playerStats.thrown)")
-                    resultStat("COUNTERS", value: "\(session.engine.playerStats.counters)")
-                }
-                .padding(.vertical, 10)
-                if career.mode == .sparring {
-                    Text("Run: \(career.runBouts.count) rounds • score \(career.runBouts.reduce(0) { $0 + $1.result.score.points }) • landed \(career.runBouts.reduce(0) { $0 + $1.result.playerStats.landed })")
-                        .accessibilityIdentifier("sparring.stats")
-                    Button { if career.nextRound() { startBout() } } label: {
-                        Text("NEXT SPARRING ROUND").font(RingStyle.type(19)).frame(maxWidth: .infinity).frame(height: 48)
-                            .background(RingStyle.gold.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))
+            if portrait {
+                ScrollView {
+                    VStack(spacing: 19) {
+                        resultsSummary(session, win: win, draw: draw, portrait: true)
+                        resultsActions(session, portrait: true)
                     }
-                    .disabled(!career.saved).accessibilityIdentifier("sparring.next")
-                } else if let next = OpponentBook.careerRoster.first(where: {
-                    career.records.isUnlocked($0.id) && career.records.wins($0.id, careerOnly: true) == 0
-                }), next.id != career.opponent.id {
-                    Button { if career.begin(next, mode: .career) { startBout() } } label: {
-                        Text("NEXT CAREER BOUT: \(next.name.uppercased())").font(RingStyle.type(17)).frame(maxWidth: .infinity).frame(height: 48)
-                            .background(RingStyle.gold.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))
-                    }
-                    .disabled(!career.saved).accessibilityIdentifier("career.next")
+                    .frame(maxWidth: 400).padding(28)
                 }
-                Button { if career.begin(career.opponent, mode: career.mode) { startBout() } } label: {
-                    Text("REMATCH").font(RingStyle.type(23)).italic().frame(maxWidth: .infinity).frame(height: 52)
-                        .foregroundStyle(RingStyle.ink).background(RingStyle.gold, in: RoundedRectangle(cornerRadius: 8))
+            } else {
+                HStack(alignment: .center, spacing: 32) {
+                    resultsSummary(session, win: win, draw: draw, portrait: false)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    resultsActions(session, portrait: false)
+                        .frame(maxWidth: 360)
                 }
-                .disabled(!career.saved)
-                .accessibilityIdentifier("bout.again")
-                Button("CAREER LADDER") { if career.saved { sessionReset(); showingCareer = true } }
-                    .font(.system(size: 11, weight: .heavy)).tracking(1.4).padding(8)
-                    .disabled(!career.saved).accessibilityIdentifier("career.home")
+                .frame(maxWidth: 780)
+                .padding(.horizontal, 32)
+                .padding(.vertical, 16)
             }
-            .frame(maxWidth: 400).padding(28)
+        }
+    }
+
+    private func resultsSummary(_ session: FightSession, win: Bool, draw: Bool, portrait: Bool) -> some View {
+        VStack(alignment: portrait ? .center : .leading, spacing: portrait ? 19 : 8) {
+            Text("BOUT RESULTS").font(.system(size: 11, weight: .heavy)).tracking(4).foregroundStyle(RingStyle.gold)
+                .accessibilityIdentifier("bout.results")
+            Text(draw ? "DRAW" : win ? "VICTORY" : "DEFEAT")
+                .font(RingStyle.type(portrait ? 64 : 52)).italic().foregroundStyle(win ? RingStyle.gold : .white)
+            Text(session.engine.book.name).font(.headline).foregroundStyle(.white.opacity(0.65))
+            Text(outcomeDescription(session.engine.outcome))
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.white.opacity(0.65))
+                .multilineTextAlignment(portrait ? .center : .leading)
+            Text(session.replayMatches ? "Seeded replay verified" : "Replay mismatch").font(.caption)
+            if career.saved, let comparison = career.comparison {
+                Text(comparison.shouldStore ? "Personal best recorded" : "Previous personal best stands")
+                    .font(portrait ? .body : .subheadline)
+                    .accessibilityIdentifier("results.pb")
             }
+            if let error = career.error {
+                Text(error).foregroundStyle(.red)
+                Button("Retry saving") { career.save(session) }
+            }
+        }
+    }
+
+    private func resultsActions(_ session: FightSession, portrait: Bool) -> some View {
+        VStack(spacing: portrait ? 19 : 10) {
+            HStack(spacing: 25) {
+                resultStat("SCORE", value: session.engine.playerScore().points.formatted())
+                resultStat("LANDED", value: "\(session.engine.playerStats.landed)/\(session.engine.playerStats.thrown)")
+                resultStat("COUNTERS", value: "\(session.engine.playerStats.counters)")
+            }
+            .padding(.vertical, portrait ? 10 : 4)
+            if career.mode == .sparring {
+                Text("Run: \(career.runBouts.count) rounds • score \(career.runBouts.reduce(0) { $0 + $1.result.score.points }) • landed \(career.runBouts.reduce(0) { $0 + $1.result.playerStats.landed })")
+                    .font(portrait ? .body : .caption)
+                    .accessibilityIdentifier("sparring.stats")
+                Button { if career.nextRound() { startBout() } } label: {
+                    Text("NEXT SPARRING ROUND").font(RingStyle.type(19)).frame(maxWidth: .infinity).frame(height: portrait ? 48 : 44)
+                        .background(RingStyle.gold.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))
+                }
+                .disabled(!career.saved).accessibilityIdentifier("sparring.next")
+            } else if let next = OpponentBook.careerRoster.first(where: {
+                career.records.isUnlocked($0.id) && career.records.wins($0.id, careerOnly: true) == 0
+            }), next.id != career.opponent.id {
+                Button { if career.begin(next, mode: .career) { startBout() } } label: {
+                    Text("NEXT CAREER BOUT: \(next.name.uppercased())").font(RingStyle.type(17)).frame(maxWidth: .infinity).frame(height: portrait ? 48 : 44)
+                        .background(RingStyle.gold.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))
+                }
+                .disabled(!career.saved).accessibilityIdentifier("career.next")
+            }
+            Button { if career.begin(career.opponent, mode: career.mode) { startBout() } } label: {
+                Text("REMATCH").font(RingStyle.type(23)).italic().frame(maxWidth: .infinity).frame(height: portrait ? 52 : 46)
+                    .foregroundStyle(RingStyle.ink).background(RingStyle.gold, in: RoundedRectangle(cornerRadius: 8))
+            }
+            .disabled(!career.saved)
+            .accessibilityIdentifier("bout.again")
+            Button("CAREER LADDER") { if career.saved { sessionReset(); showingCareer = true } }
+                .font(.system(size: 11, weight: .heavy)).tracking(1.4).padding(portrait ? 8 : 4)
+                .disabled(!career.saved).accessibilityIdentifier("career.home")
         }
     }
 
