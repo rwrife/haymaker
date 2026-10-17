@@ -8,7 +8,7 @@ Story reference for the supplied character models, intro portraits, and defeated
 | Goldie Voltage | Opponent | [goldie.obj](Models/goldie.obj) | [goldie.png](IntroScenes/goldie.png) | [`goldie-defeated.png`](DefeatedPortraits/goldie-defeated.png) |
 | Nico “Nightshift” Navarro | Opponent | [nico.obj](Models/nico.obj) | [nico.png](IntroScenes/nico.png) | [`nico-defeated.png`](DefeatedPortraits/nico-defeated.png) |
 | Atlas “Undertow” Reed | Opponent | [atlas.obj](Models/atlas.obj) | [atlas.png](IntroScenes/atlas.png) | [`atlas-defeated.png`](DefeatedPortraits/atlas-defeated.png) |
-| Vera Velvet | Opponent | Not supplied | [vera.png](IntroScenes/vera.png) | [`vera-defeated.png`](DefeatedPortraits/vera-defeated.png) |
+| Vera Velvet | Opponent | [vera.obj](Models/vera.obj) | [vera.png](IntroScenes/vera.png) | [`vera-defeated.png`](DefeatedPortraits/vera-defeated.png) |
 | Duke Doubletake | Opponent | [duke.obj](Models/duke.obj) | [duke.png](IntroScenes/duke.png) | [`duke-defeated.png`](DefeatedPortraits/duke-defeated.png) |
 | Sylvie “Slipstream” Sloane | Opponent | [sylvie.obj](Models/sylvie.obj) | [sylvie.png](IntroScenes/sylvie.png) | [`sylvie-defeated.png`](DefeatedPortraits/sylvie-defeated.png) |
 | Cassian “Saint” Sterling | Championship contender | [cassian.obj](Models/cassian.obj) | [cassian.png](IntroScenes/cassian.png) | [`cassian-defeated.png`](DefeatedPortraits/cassian-defeated.png) |
