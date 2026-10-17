@@ -105,25 +105,12 @@ import HaymakerKit
     func renderTitle(time: TimeInterval, reducedMotion: Bool) {
         guard titleScreen else { return }
         let t = reducedMotion ? Float(0) : Float(time.truncatingRemainder(dividingBy: 120))
-        let tick = Int(t * 60)
-        let phase = tick % 144
-        let move: Move = [.jab, .hook, .uppercut][(tick / 144) % 3]
-        var status = FighterStatus()
-        if !reducedMotion {
-            if phase < 24 {
-                status = FighterStatus(state: .telling, ticksInCurrentState: phase, stateDuration: 24, currentMove: move)
-            } else if phase < 42 {
-                status = FighterStatus(state: .attacking, ticksInCurrentState: phase - 24, stateDuration: 18, currentMove: move)
-            } else if phase < 66 {
-                status = FighterStatus(state: .recovering, ticksInCurrentState: phase - 42, stateDuration: 24, currentMove: move)
-            }
-        }
         SCNTransaction.begin()
         SCNTransaction.animationDuration = 0
         rival.root.isHidden = true
-        hero.pose(status, time: t, recoil: 0, reducedMotion: reducedMotion)
-        hero.root.position = SCNVector3(sin(t * 0.7) * (portrait ? 0.65 : 1.8), 0, sin(t * 0.45) * 0.35)
-        hero.root.eulerAngles.y = .pi / 8 + sin(t * 0.7) * 0.18
+        hero.poseWarmup(time: t, reducedMotion: reducedMotion)
+        hero.root.position = SCNVector3(0, 0, portrait ? 0.85 : 0.55)
+        hero.root.eulerAngles.y = .pi / 9
         SCNTransaction.commit()
     }
 

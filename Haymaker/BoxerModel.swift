@@ -199,6 +199,125 @@ enum FighterModelAsset: String, CaseIterable {
         let roll = simd_quatf(angle: .pi + (punching ? reachAmount * .pi / 3 : 0), axis: restAxis)
         bones[hand].simdOrientation = roll
     }
+
+    private struct WarmupFrame {
+        let hips: SIMD3<Float>
+        let orientations: [simd_quatf]
+    }
+
+    /// Retargeted 152-frame (24 fps) shadowboxing warm-up loop (arm swings, step-in,
+    /// jab/cross/hook combinations, weave, and return to center guard).
+    private static let warmupFrames: [WarmupFrame] = {
+        let encoded =
+            "zVdZcx1HFe6emZ79zl20W1EUSbaVYJkKdkKFYMDlVH4BD7wAP443eOEZiqQKg4qEwk4qxJDIVrwIW7KWu80+0wvndF/ZQFUeeHNr7lXfXs/5" +
+            "zjnfOaMUoRallMCjG/RhQHeVxD+pFPT1EH6UovCRUgopcSH0lN5mQbNxhOIiReCPwjbbgiElheAt1ytxseUwx7bMQbMxWCP15eYSsku9uBu5" +
+            "lmrzNG2dqBO5pC3SaSndThJ7VJTZNONO3O0EtmyyaVqToBMHjmqLohI2YzYKqc+SvIW7CXV833UISNw2dSvO7/22Rp0wDhltq7KhIUpCVJNP" +
+            "0jogSkgBMFAbdEBRQUtqNOCcCwUwWKixhAUMujgjhFBqpqaQCrFCwHCf1lgiYgg4mQ3jb2MHyZuqFf8jG8KKR8AefKhlGwPhWUpbDA1CZ329" +
+            "SGEfT6X6Ag3zua3IORh6HD2AzKSh5lgb9BBtAzBqjwBcLcdxXc9ljjGkFKi7nMmjryHmaqVSRbW7AKSe79pKcECDwnYbbIF+AXOybZumQauA" +
+            "aqoGe2ZpXsJMNTqd1JIGi5uXN1cvLM+51dnTR/tPTiqLEWnHc/NziW+1+WQMzuDHSZKEnu97lFdFpltewm5wN8dhzPVRYNfTYsPHMsqTmftr" +
+            "vYiBHbsaJRxHjbA7s4vpGlc1qEoNrdIBYyCExzZ32pTCRAtqwqMASbgZvN/s1WYRQhr7GweBmUUAhoP/2FoEwEjgaQC0jpeZXNTcDaBD3CnR" +
+            "CurgekvrokSZF8J2/cADPS0QoK5q2EzdyGdUgU/VXPFyfPL8LJfh4ualtYVetxMFjOLKsoLVjTEMuq5xFrgzRme3ZkGFF9sY8uDeKKYiegZR" +
+            "ggi3AF3Bpc0c5gUerdJceKFV5TX4gZv0OxYoZSkIzabM8wb186I49hwCHoHBQm3mOqKuGrwGF3LNFRhdFF1I4ihcgLJgMGMMaMsJWIlzgA6A" +
+            "omxXByFIbVDWOCNa4L2OA9DhTbYC64i2LMq6LooC9IczHBemLVE3yu0ub25vb13os2Z6/PTx/jdPDo9HWev0lta3ttbmYwe2oybw1GXdKhPQ" +
+            "YBulxmoWsZb1guektrIhDWrCxcQnfgN0jkMNJeumpGZo7TDEEC8xsY3ci+vB/Pjf0mSDuDFmYchBnHFcLvDLULkis7PomTJyEROw9JwElKER" +
+            "42Hk3M+NS2t8kQx0g3GJkFXg1+juLoQUzNkUmAKggBBnGGSUavqT2kpoOTiBMRRxdjmCJTVVadRsc9kMt3NSOicUZajRjL0gLqVMJKGLGPJD" +
+            "zLSMmmSlxkr7q01UW9fgP+Y2JE+GRAYeI1FMI4fmAZMYyex5ddtoln3aOh8++uxPf77zDyDITEXLWzvvvP+jH767s7EYUyHKk/t/+/h3v9/9" +
+            "8pl47dYvf37z8sp8h0nILcwS2XBckLjrTA8eHrduFIXM762sdEk2KSXV+Utjiz2JoQbh7QFbGBprqyKvOAW6A08k6qXpfjb7weuiVH6vFzNI" +
+            "iS74CGzJ0tOnj54cHByVyetbayuL3SiaW1nuOdnx82FaSDcEzsgaJ/JpdfjFnYdqbWd72W/zLJ2cHqfBG9/Z6AKPzYSapTsgBhhpJ08PTrIW" +
+            "kk0Yd7pJHNgUV+k0ZVLeK2zMCoWzXN93qFQ8e/b1V9+cZDVx/agHmS70XM/3GOVpRpP5XghZLOyETluWWdq4ceRSSbzAkqS89+vf1h/+9NrA" +
+            "xkTGJ0dHfH593imzHGif6oRlYY1kaSaV08f3n2XKTwYLi3P9xLcFZIDG0L6hIUJ/oZDgbTcMo6TXDf3O4lLiUsKrEmKJN8Di2Shjy6uJaqkX" +
+            "0iIjXW+099XB8aT1B/NdT6I6E866m9vk73cOMkgMHmRwZfv9pQHJxlkF5SEEMLHBbKFnYQJPx4dPjjIBROyHnaTfS3yqk4OFuWVWqb66tuyj" +
+            "r1nMR8QWL779zrWrb74+cNvJs0f79z6/e/fL/cNRVgrWW3vr+ns3fnDt0jwdPfjLH27vFd2FUJKw41kuPfz07lFrewAHxyos2fnxa8f3D/M2" +
+            "PRkWEvlJnRcOWBpQS5Y1YVDm0rbh1PXjyKqmadkIRc4rPvj8RqdysCYLktipxlNIdlBlcsjZinrdxQtLg9jm6enpaJoVVV1CEdWQsN/rJKuX" +
+            "N8J0JCJ3fH9/LEwcQeKD0731GzfXhnf/+mDCdV7CKtfUVfhaYNleFHmqgVwBqUJxSJKShYGv+eM8Bb3CBBugeKLJM3j7iJL59Z2rGz0fQtGa" +
+            "HBw8P5sURTrJud/rs3I0bQjElUhPT8Yt4SK+9O5accZW5yZ7j6cCmbChbsDgyEG3M9cl6XA4yaoGa1+udMlOCGRSz4/7g0jBcAUlCTh9lRfc" +
+            "DjRiLxOfIr9C+OAVaXx2NhqP06KExVRXQKKpG277SS9hbYnvRp3AoTatp0W4/uYbg4CMHp76A5ry1bcWSF1BAFqRT4RkXUgVlhuETp2meZFN" +
+            "J2nBKfNcaJ4fhHFvYSHxHJvU0+Eor6p8OCzsOImAsIwpFXlZy+LrS76/+8nz+Ru3Njz9mx9/8tHXZXfnJ9cX4IzHu7uPCsXmLq5Xe/+Kv39r" +
+            "O/zveK4ffLw73vzgvSXn20wDjM85lohYNP0fJqXe0nffv5Ic7370oNID9sL1W1c6YrT36WdHwZUb31sEmj39/PY/2fWbl/m921+0Vz54uw9V" +
+            "Ja+ne3+8M6SduSAb08Eca4OLV6One8+5qyanqYLCBkMRa1QuzNuZaF68bVLKon6f5cMJRsJ/tn8D"
+        guard let compressed = Data(base64Encoded: encoded),
+              let raw = try? (compressed as NSData).decompressed(using: .zlib) as Data else {
+            preconditionFailure("Invalid bundled warmup animation")
+        }
+        let frameCount = 152, channelCount = 26, stride = 2 + (frameCount - 1)
+        precondition(raw.count == channelCount * stride)
+        var channels = Array(repeating: Array(repeating: Float(0), count: frameCount), count: channelCount)
+        raw.withUnsafeBytes { buffer in
+            for ch in 0..<channelCount {
+                let base = ch * stride
+                var value = Int(Int16(littleEndian: buffer.loadUnaligned(fromByteOffset: base, as: Int16.self)))
+                channels[ch][0] = Float(value) / 400
+                for f in 1..<frameCount {
+                    value += Int(buffer.load(fromByteOffset: base + 2 + (f - 1), as: Int8.self))
+                    channels[ch][f] = Float(value) / 400
+                }
+            }
+        }
+        let bones3D = [0, 1, 2, 4, 5, 7, 8]
+        return (0..<frameCount).map { f in
+            let hips = SIMD3<Float>(channels[0][f], channels[1][f], channels[2][f])
+            var quats = Array(repeating: simd_quatf(ix: 0, iy: 0, iz: 0, r: 1), count: 10)
+            for (idx, bone) in bones3D.enumerated() {
+                let c = 3 + idx * 3
+                let x = channels[c][f], y = channels[c + 1][f], z = channels[c + 2][f]
+                let w = sqrt(max(0, 1 - x * x - y * y - z * z))
+                quats[bone] = simd_normalize(simd_quatf(ix: x, iy: y, iz: z, r: w))
+            }
+            for (idx, (bone, sign)) in [(6, Float(-1)), (9, Float(1))].enumerated() {
+                let w = min(1, max(-1, channels[24 + idx][f]))
+                let x = sign * sqrt(max(0, 1 - w * w))
+                quats[bone] = simd_normalize(simd_quatf(ix: x, iy: 0, iz: 0, r: w))
+            }
+            return WarmupFrame(hips: hips, orientations: quats)
+        }
+    }()
+
+    func poseWarmup(time: Float, reducedMotion: Bool) {
+        let frames = Self.warmupFrames
+        let count = frames.count
+        let positiveTime = max(0, time)
+        let framePos = reducedMotion ? 0 : (positiveTime * 24).truncatingRemainder(dividingBy: Float(count))
+        let index0 = max(0, min(count - 1, Int(framePos)))
+        let index1 = (index0 + 1) % count
+        let frac = framePos - Float(index0)
+        let f0 = frames[index0], f1 = frames[index1]
+        let rhythm: Float = reducedMotion ? 0 : 1
+        let breath = (sin(positiveTime * 2.1) + 1) * 0.5 * rhythm
+        root.simdEulerAngles.z = 0
+        bones[0].simdPosition = simd_mix(f0.hips, f1.hips, SIMD3<Float>(repeating: frac))
+        for bone in bones {
+            bone.simdScale = SIMD3<Float>(repeating: 1)
+        }
+        bones[1].simdScale = SIMD3<Float>(1 + breath * 0.008, 1 + breath * 0.005, 1 + breath * 0.012)
+        for i in 0..<10 {
+            var q1 = f1.orientations[i]
+            if simd_dot(f0.orientations[i].vector, q1.vector) < 0 {
+                q1 = simd_quatf(vector: -q1.vector)
+            }
+            bones[i].simdOrientation = simd_normalize(simd_slerp(f0.orientations[i], q1, frac))
+        }
+        bones[3].simdEulerAngles.y = isRival ? -0.025 : 0.025
+        // Solve legs in hip-local space to stationary canvas targets so boots stay
+        // planted on the mat while the pelvis and torso bounce, pivot, and weave.
+        let stepIn = ease((framePos - 48) / 12)
+        let stepOut = ease((framePos - 130) / 12)
+        let stance = stepIn * (1 - stepOut)
+        let stepArc = (4 * stepIn * (1 - stepIn) + 4 * stepOut * (1 - stepOut)) * rhythm
+        for side in 0..<2 {
+            let sign: Float = side == 0 ? -1 : 1
+            let bouncePhase = positiveTime * 7.5 + (side == 0 ? 0 : .pi)
+            let toeBounce = max(0, sin(bouncePhase)) * 0.012 * (1 - stance) * rhythm
+            let lift = toeBounce + stepArc * (side == 0 ? 0.018 : 0.024)
+            let offset = SIMD3<Float>(
+                sign * (0.04 + 0.01 * stance),
+                lift,
+                sign * (0.02 + 0.11 * stance)
+            )
+            poseLeg(side, target: bindPositions[12 + side * 3] + offset)
+        }
+        forwardDrive = 0
+        slip = 0
+    }
 }
 
 /// HMR1 is built offline by scripts/rig_fighters.py. Vertex colors, normals

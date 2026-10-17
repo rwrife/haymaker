@@ -78,6 +78,27 @@ typealias UIColor = NSColor
    for (bone, transform) in zip(skinner.bones, still) {
     for column in 0..<4 { precondition(simd_distance(bone.simdTransform[column], transform[column]) < 0.0001, "Reduced motion must suppress idle movement") }
    }
+   boxer.poseWarmup(time: 0, reducedMotion: false)
+   let warmupStartHand = leftHand.simdWorldPosition
+   for sample in stride(from: Float(0), through: 6.4, by: 0.25) {
+    boxer.poseWarmup(time: sample, reducedMotion: false)
+    precondition(abs(head.simdEulerAngles.y) <= BoxerModel.maximumHeadYaw)
+    precondition(simd_distance(head.simdPosition, bindHead) < 0.00001)
+    let hips = skinner.bones[0].simdPosition
+    precondition(hypot(hips.x, hips.z) < 0.06, "Warmup pelvis must stay stationary over the stance")
+    for bone in skinner.bones {
+     precondition(bone.simdTransform.columns.0.x.isFinite)
+     precondition(abs(simd_length(bone.simdOrientation.vector) - 1) < 0.0001)
+    }
+   }
+   boxer.poseWarmup(time: 0.85, reducedMotion: false)
+   precondition(simd_distance(leftHand.simdWorldPosition, warmupStartHand) > 0.1, "Warmup must animate the arms")
+   boxer.poseWarmup(time: 0.4, reducedMotion: true)
+   let warmupStill = skinner.bones.map { $0.simdTransform }
+   boxer.poseWarmup(time: 4.2, reducedMotion: true)
+   for (bone, transform) in zip(skinner.bones, warmupStill) {
+    for column in 0..<4 { precondition(simd_distance(bone.simdTransform[column], transform[column]) < 0.0001, "Reduced motion must suppress warmup movement") }
+   }
    boxer.pose(FighterStatus(state: .blocking, ticksInCurrentState: 8, stateDuration: 24), time: 0, recoil: 0, reducedMotion: true)
    print("Verified \(asset.rawValue): 16 bones, 216 pose combinations, bounded head rotation")
   }
