@@ -79,7 +79,7 @@ def main():
         f'- Total runtime fighter payload: **{total} bytes** across {len(rows)} bundled rigs.',
         f'- Worst-case single-fighter payload: **{worst[0]} bytes** (`{worst_path.name}`).',
         '- A bout loads exactly two fighters: Mack (hero) and one rival. '
-        'The rig verification harness (`scripts/verify_fighter_rigs.sh`) exercises all nine rigs.',
+        f'The rig verification harness (`scripts/verify_fighter_rigs.sh`) exercises all {len(rows)} rigs.',
         '- On-device frame-time measurement is deferred to Apple hardware. '
         'No FPS or frame-time results are claimed by this offline report.',
         '',

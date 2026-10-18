@@ -102,14 +102,16 @@ typealias UIColor = NSColor
    boxer.pose(FighterStatus(state: .blocking, ticksInCurrentState: 8, stateDuration: 24), time: 0, recoil: 0, reducedMotion: true)
    print("Verified \(asset.rawValue): 16 bones, 216 pose combinations, bounded head rotation")
   }
-  let camera = SCNNode(); camera.camera = SCNCamera();camera.camera!.usesOrthographicProjection = true;camera.camera!.orthographicScale = 5.1
-  camera.position = SCNVector3(2.7, -1.9, 12); scene.rootNode.addChildNode(camera)
+  // Frame every roster row, including the tenth model on the fourth row.
+  let rows = (FighterModelAsset.allCases.count + 2) / 3
+  let camera = SCNNode(); camera.camera = SCNCamera();camera.camera!.usesOrthographicProjection = true;camera.camera!.orthographicScale = Double(rows) * 1.6 + 0.3
+  camera.position = SCNVector3(2.7, 1.35 - Float(rows - 1) * 1.6, 12); scene.rootNode.addChildNode(camera)
   let light = SCNNode();light.light = SCNLight();light.light!.type = .ambient;light.light!.intensity = 450;scene.rootNode.addChildNode(light)
   let key = SCNNode();key.light = SCNLight();key.light!.type = .omni;key.light!.intensity = 550;key.position = SCNVector3(-2,6,8);scene.rootNode.addChildNode(key)
   let renderer = SCNRenderer(device: MTLCreateSystemDefaultDevice(), options: nil);renderer.scene = scene;renderer.pointOfView = camera
   SCNTransaction.commit(); SCNTransaction.flush()
   _ = renderer.snapshot(atTime: 0, with: CGSize(width: 16, height: 16), antialiasingMode: .none)
-  let image = renderer.snapshot(atTime: 1, with: CGSize(width: 1500, height: 1600), antialiasingMode: .multisampling4X)
+  let image = renderer.snapshot(atTime: 1, with: CGSize(width: 1500, height: rows * 550), antialiasingMode: .multisampling4X)
   let png = NSBitmapImageRep(data: image.tiffRepresentation!)!.representation(using: .png, properties: [:])!
   try png.write(to: URL(fileURLWithPath: CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "/tmp/haymaker-rig-guard.png"))
   // A second image makes the full-body strike arc reviewable side by side.
