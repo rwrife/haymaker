@@ -18,6 +18,17 @@ import HaymakerKit
     private var portrait = true
     private var lastTick = 0
     private var effects: [(node: SCNNode, expires: Int)] = []
+    private var cameraFollow = SIMD3<Float>(repeating: 0)
+    private struct Spectator {
+        let torso: SCNNode
+        let head: SCNNode
+        let arms: [SCNNode]
+        let phase: Float
+        let tempo: Float
+        let enthusiastic: Bool
+    }
+    private var spectators: [Spectator] = []
+    private var flashNodes: [SCNNode] = []
 
     private var titleScreen: Bool
     private let mist = SCNNode()
@@ -79,6 +90,8 @@ import HaymakerKit
         lastEventCount = 0
         lastTick = 0
         shake = 0
+        cameraFollow = .zero
+        animateCrowd(time: 0, reducedMotion: true)
         recoilHero = 0
         recoilRival = 0
         rival.resetMotion()
@@ -90,6 +103,7 @@ import HaymakerKit
 
     func layout(portrait: Bool) {
         self.portrait = portrait
+        camera.simdOrientation = simd_quatf(angle: 0, axis: SIMD3<Float>(0, 1, 0))
         if titleScreen {
             camera.position = portrait ? SCNVector3(0, 2.9, 8.8) : SCNVector3(0, 2.7, 7.5)
             camera.look(at: SCNVector3(0, 1.55, 0))
@@ -150,13 +164,66 @@ import HaymakerKit
         rival.pose(fight.opponent, time: t, recoil: recoilRival, reducedMotion: reducedMotion)
         hero.pose(fight.player, time: t + 0.8, recoil: recoilHero, reducedMotion: reducedMotion)
         positionFighters(time: t, reducedMotion: reducedMotion)
-        if !reducedMotion {
-            // The camera drifts a little with the action instead of staring at a fixed frame.
-            camera.position.x = ringCenter.x * 0.55 + sin(t * 91) * shake
-            camera.position.y = (portrait ? 2.95 : 2.55) + cos(t * 77) * shake * 0.5
-            camera.look(at: SCNVector3(ringCenter.x * 0.8, portrait ? 1.5 : 2.1, ringCenter.z * 0.5))
-        } else { camera.position.x = 0; camera.position.y = portrait ? 2.95 : 2.55 }
+        updateCamera(time: t, elapsedTicks: elapsed, reducedMotion: reducedMotion)
+        animateCrowd(time: t, reducedMotion: reducedMotion)
         SCNTransaction.commit()
+    }
+
+    private func updateCamera(time t: Float, elapsedTicks: Int, reducedMotion: Bool) {
+        guard !reducedMotion else {
+            cameraFollow = .zero
+            // Restore position AND aim after toggling Reduced Motion mid-bout.
+            layout(portrait: portrait)
+            return
+        }
+        // A ringside operator eases after the action, with a very small dolly
+        // and pedestal drift. No roll, cuts or aggressive zooms during play.
+        let blend = 1 - exp(-Float(elapsedTicks) / 60 * 2.4)
+        cameraFollow += (ringCenter - cameraFollow) * blend
+        let settle = min(t / 2, 1)
+        let drift = sin(t * 0.23) * 0.09 + sin(t * 0.53) * 0.025
+        camera.position = SCNVector3(
+            cameraFollow.x * 0.55 + drift * settle + sin(t * 91) * shake,
+            (portrait ? 2.95 : 2.55) + sin(t * 0.31) * 0.035 * settle + cos(t * 77) * shake * 0.5,
+            (portrait ? 7.9 : 4.8) + sin(t * 0.19) * 0.10 * settle)
+        camera.look(at: SCNVector3(cameraFollow.x * 0.8, (portrait ? 1.5 : 2.1) + sin(t * 0.27) * 0.015 * settle, cameraFollow.z * 0.5))
+    }
+
+    private func animateCrowd(time t: Float, reducedMotion: Bool) {
+        for person in spectators {
+            let beat = t * person.tempo + person.phase
+            let movement: Float = reducedMotion ? 0 : 1
+            person.torso.eulerAngles.z = sin(beat * 0.7) * 0.045 * movement
+            person.torso.eulerAngles.x = sin(beat * 0.43) * 0.055 * movement
+            person.head.eulerAngles.y = sin(beat * 0.51) * 0.22 * movement
+            person.head.eulerAngles.x = sin(beat * 1.3) * 0.07 * movement
+            // Only a few spectators cheer at once; everyone has a distinct
+            // tempo and phase, keeping the stands from moving in unison.
+            let cheer = pow(max(0, sin(beat * 0.38)), 6)
+            for (side, arm) in person.arms.enumerated() {
+                let direction: Float = side == 0 ? -1 : 1
+                let lift: Float = person.enthusiastic ? 1.55 : 0.45
+                arm.eulerAngles.z = direction * (0.16 + movement * (cheer * lift + sin(beat * 1.7) * 0.08))
+                arm.eulerAngles.x = -0.12 - cheer * 0.3 * movement
+            }
+        }
+        for flash in flashNodes { flash.isHidden = true }
+        guard !reducedMotion, !flashNodes.isEmpty else { return }
+        // One localized flash in each four-second window, at a varying offset.
+        // Hashing the window gives random-looking timing without touching the fight RNG,
+        // allocating effects per frame, or running actions while paused.
+        let window = Int(t / 4)
+        var hash = UInt64(window) &+ 0x9E37_79B9_7F4A_7C15
+        hash = (hash ^ (hash >> 30)) &* 0xBF58_476D_1CE4_E5B9
+        hash = (hash ^ (hash >> 27)) &* 0x94D0_49BB_1331_11EB
+        hash ^= hash >> 31
+        let onset = Float(hash % 1_600) / 1_000 + 0.4
+        let age = t - Float(window) * 4 - onset
+        if age >= 0, age < 0.10 {
+            let flash = flashNodes[Int((hash >> 8) % UInt64(flashNodes.count))]
+            flash.isHidden = false
+            flash.opacity = CGFloat((1 - age / 0.10) * 0.85)
+        }
     }
 
     private func positionFighters(time: Float, reducedMotion: Bool) {
@@ -240,6 +307,7 @@ import HaymakerKit
         let shirtColors: [UIColor] = [.init(red: 0.2, green: 0.3, blue: 0.4, alpha: 1), .init(red: 0.4, green: 0.09, blue: 0.08, alpha: 1), .init(red: 0.5, green: 0.39, blue: 0.1, alpha: 1), .init(red: 0.08, green: 0.2, blue: 0.16, alpha: 1)]
         let heads = skinTones.map { color -> SCNGeometry in let g = headGeometry.copy() as! SCNGeometry; let m = material(color); m.emission.contents = color; m.emission.intensity = 0.1; g.materials = [m]; return g }
         let bodies = shirtColors.map { color -> SCNGeometry in let g = SCNCapsule(capRadius: 0.15, height: 0.43); g.radialSegmentCount = 6; let m = material(color); m.emission.contents = color; m.emission.intensity = 0.1; g.materials = [m]; return g }
+        let flashTexture = Self.mistPuff()
         for row in 0..<6 {
             let z = -6.3 - Float(row) * 1.18
             let y = Float(row) * 0.62
@@ -249,12 +317,46 @@ import HaymakerKit
             for column in 0..<42 {
                 let x = Float(column) * 0.59 - 12.1
                 let index = row * 42 + column
-                let head = node(heads[index % heads.count], at: SCNVector3(x, y + 0.56, z))
-                stage.addChildNode(head)
-                stage.addChildNode(node(bodies[index % bodies.count], at: SCNVector3(x, y + 0.27, z)))
-                if index % 7 == 0 {
-                    let arm = segment(from: SCNVector3(x + 0.13, y + 0.38, z), to: SCNVector3(x + 0.24, y + 0.87, z), radius: 0.044, material: heads[index % heads.count].firstMaterial!)
-                    stage.addChildNode(arm)
+                let seat = SCNNode()
+                seat.position = SCNVector3(x, y + 0.08, z)
+                // Small variations in build and posture break up identical rows.
+                let stature = 0.91 + Float((index * 17) % 11) * 0.018
+                seat.scale = SCNVector3(stature, stature, stature)
+                seat.eulerAngles.y = atan2(-x, -z) * 0.45
+                stage.addChildNode(seat)
+                let torso = SCNNode()
+                seat.addChildNode(torso)
+                torso.addChildNode(node(bodies[index % bodies.count], at: SCNVector3(0, 0.19, 0)))
+                let head = node(heads[index % heads.count], at: SCNVector3(0, 0.48, 0))
+                torso.addChildNode(head)
+                var arms: [SCNNode] = []
+                for side: Float in [-1, 1] {
+                    let shoulder = SCNNode()
+                    shoulder.position = SCNVector3(side * 0.14, 0.32, 0)
+                    let arm = segment(from: SCNVector3(0, 0, 0), to: SCNVector3(side * 0.04, -0.27, 0.10), radius: 0.044, material: heads[index % heads.count].firstMaterial!)
+                    shoulder.addChildNode(arm)
+                    torso.addChildNode(shoulder)
+                    arms.append(shoulder)
+                }
+                spectators.append(Spectator(torso: torso, head: head, arms: arms,
+                    phase: Float((index * 137) % 631) / 100,
+                    tempo: 0.72 + Float((index * 31) % 71) / 100,
+                    enthusiastic: index % 5 == 0))
+                if index % 11 == 0 {
+                    let flashMaterial = SCNMaterial()
+                    flashMaterial.lightingModel = .constant
+                    flashMaterial.diffuse.contents = flashTexture
+                    flashMaterial.emission.contents = UIColor(red: 0.72, green: 0.85, blue: 1, alpha: 1)
+                    flashMaterial.emission.intensity = 2
+                    flashMaterial.blendMode = .add
+                    flashMaterial.writesToDepthBuffer = false
+                    let plane = SCNPlane(width: 0.42, height: 0.42)
+                    plane.materials = [flashMaterial]
+                    let flash = node(plane, at: SCNVector3(0.19, 0.42, 0.20))
+                    flash.constraints = [SCNBillboardConstraint()]
+                    flash.isHidden = true
+                    torso.addChildNode(flash)
+                    flashNodes.append(flash)
                 }
             }
         }
@@ -280,6 +382,7 @@ import HaymakerKit
                 stage.addChildNode(node(fixture, at: SCNVector3(x, 4.75, z)))
             }
         }
+        animateCrowd(time: 0, reducedMotion: true)
     }
 
     private func buildLighting() {
