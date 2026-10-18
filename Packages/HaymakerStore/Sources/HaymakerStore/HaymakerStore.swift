@@ -33,6 +33,10 @@ public struct Records: Sendable {
     public func isUnlocked(_ opponentID: String) -> Bool {
         let roster = OpponentBook.careerRoster.contains { $0.id == opponentID }
             ? OpponentBook.careerRoster : OpponentBook.v0Roster
+        return isUnlocked(opponentID, in: roster)
+    }
+    /// Unlocked once every opponent ahead of it in `roster` has a career win.
+    public func isUnlocked(_ opponentID: String, in roster: [OpponentBook]) -> Bool {
         guard let index = roster.firstIndex(where: { $0.id == opponentID }) else { return false }
         return roster.prefix(index).allSatisfy { wins($0.id, careerOnly: true) > 0 }
     }

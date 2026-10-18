@@ -6,7 +6,7 @@ Public repo under the Auto Tool Lab program (`auto-tool-lab`). M1 (skeleton + CI
 
 ## Playable Metal arena
 
-The app opens on Mack shadowboxing, with a career ladder and seeded sparring against eight story opponents: Goldie Voltage, Nico “Nightshift” Navarro, Atlas “Undertow” Reed, Vera Velvet, Duke Doubletake, Sylvie “Slipstream” Sloane, Cassian “Saint” Sterling, and final boss Bruiser Baxter. Each bout uses the matching supplied model and an authored fighting rhythm based on the character bio. Sylvie's evasive patterns slip punches before a quick reply.
+The app opens on Mack shadowboxing, with a career ladder and seeded sparring against eight story opponents: Goldie Voltage, Nico “Nightshift” Navarro, Atlas “Undertow” Reed, Vera Velvet, Duke Doubletake, Sylvie “Slipstream” Sloane, Cassian “Saint” Sterling, and final boss Bruiser Baxter. The career ladder is reshuffled each session: the first seven opponents appear in random order, Bruiser Baxter always closes it, and early opponents are passive and easy to hit, and each bout after is more aggressive and harder (shorter gaps, tells and recoveries, heavier hits). After a win you can rematch or tap NEXT CHALLENGER. Each bout uses the matching supplied model and an authored fighting rhythm based on the character bio. Sylvie's evasive patterns slip punches before a quick reply.
 
 Before every bout, rematch, and sparring round, a versus dialog shows a close-up cropped to the top 30% of the supplied character PNG, their fighting identity, and a character-specific intimidation line. The clock and controls stay frozen until **Ring the bell**. The dialog supports portrait, landscape, VoiceOver, and scrolling at larger text sizes; closing it returns without starting a bout.
 
