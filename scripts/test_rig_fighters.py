@@ -1,6 +1,8 @@
 """Asset contract checks: rebuild determinism, topology, weights and chin isolation."""
 import math
+import re
 import struct
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,6 +10,25 @@ from rig_fighters import BONES, NAMES, ROOT, build
 
 
 class FighterAssetsTests(unittest.TestCase):
+    def test_roster_asset_contract(self):
+        roster = (ROOT/'Packages'/'HaymakerKit'/'Sources'/'HaymakerKit'/'CharacterRoster.swift').read_text()
+        pairs = set(re.findall(r'case "([^"]+)":\s*CharacterProfile\(asset: "([^"]+)"', roster))
+        pairs.add(('mack', 'mack'))  # Mack is the player, outside the opponent roster.
+        self.assertEqual(pairs, {
+            ('mack', 'mack'), ('goldie', 'goldie'), ('nico', 'nico'),
+            ('atlas', 'atlas'), ('vera', 'vera'), ('duke', 'duke'),
+            ('sylvie', 'sylvie'), ('cassian', 'cassian'), ('baxter', 'bruiser'),
+        })
+        committed = set(subprocess.check_output(
+            ['git', 'ls-files', 'Haymaker/Models/*.fighter'], cwd=ROOT, text=True
+        ).splitlines())
+        for character, asset in pairs:
+            with self.subTest(character=character, asset=asset):
+                path = f'Haymaker/Models/{asset}.fighter'
+                self.assertIn(path, committed)
+                self.assertTrue((ROOT/path).is_file())
+        self.assertEqual(committed, {f'Haymaker/Models/{name}.fighter' for name in NAMES})
+
     def test_all_assets(self):
         with tempfile.TemporaryDirectory() as temporary:
             for name in NAMES:

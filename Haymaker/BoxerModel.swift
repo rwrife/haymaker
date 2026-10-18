@@ -328,10 +328,58 @@ enum FighterModelAsset: String, CaseIterable {
     let skeleton: SCNNode
     let mesh: SCNNode
 
-    static func load(_ asset: FighterModelAsset) -> FighterRig {
+    private static var loggedFailures = Set<String>()
+
+    private static func assetData(_ asset: FighterModelAsset) -> Data? {
         guard let url = Bundle.main.url(forResource: asset.rawValue, withExtension: "fighter"),
-              let data = try? Data(contentsOf: url) else {
-            preconditionFailure("Missing bundled fighter rig: \(asset.rawValue)")
+              let data = try? Data(contentsOf: url),
+              data.count >= 16, data.prefix(4) == Data("HMR1".utf8) else { return nil }
+        func uint(_ offset: Int) -> UInt32 { data.withUnsafeBytes { UInt32(littleEndian: $0.loadUnaligned(fromByteOffset: offset, as: UInt32.self)) } }
+        let vertices = Int(uint(4)), indices = Int(uint(8)), bones = Int(uint(12))
+        guard bones == 16, vertices > 0, indices > 0, indices % 3 == 0 else { return nil }
+        let vertexStart = 16 + bones * 16
+        let indexStart = vertexStart + vertices * 60
+        guard data.count == indexStart + indices * 4 else { return nil }
+        for i in 0..<bones {
+            let offset = 16 + i * 16
+            let parent = Int(Int32(bitPattern: uint(offset)))
+            guard parent >= -1, parent < i else { return nil }
+            for lane in 1...3 {
+                guard Float(bitPattern: uint(offset + lane * 4)).isFinite else { return nil }
+            }
+        }
+        for i in 0..<vertices {
+            let offset = vertexStart + i * 60
+            for lane in 0..<13 {
+                guard Float(bitPattern: uint(offset + lane * 4)).isFinite else { return nil }
+            }
+            var totalWeight: Float = 0
+            for lane in 0..<4 {
+                let weight = Float(bitPattern: uint(offset + 36 + lane * 4))
+                let bone = data.withUnsafeBytes { UInt16(littleEndian: $0.loadUnaligned(fromByteOffset: offset + 52 + lane * 2, as: UInt16.self)) }
+                guard weight >= 0, weight <= 1, bone < UInt16(bones) else { return nil }
+                totalWeight += weight
+            }
+            guard abs(totalWeight - 1) < 0.001 else { return nil }
+        }
+        for i in 0..<indices {
+            guard uint(indexStart + i * 4) < UInt32(vertices) else { return nil }
+        }
+        return data
+    }
+
+    static func load(_ asset: FighterModelAsset) -> FighterRig {
+        let data: Data
+        if let requested = assetData(asset) {
+            data = requested
+        } else {
+            if loggedFailures.insert(asset.rawValue).inserted {
+                NSLog("Unavailable fighter asset %@.fighter; falling back to mack.fighter", asset.rawValue)
+            }
+            guard asset != .mack, let fallback = assetData(.mack) else {
+                preconditionFailure("Missing or malformed bundled fallback fighter rig: mack")
+            }
+            data = fallback
         }
         func uint(_ offset: Int) -> UInt32 { data.withUnsafeBytes { UInt32(littleEndian: $0.loadUnaligned(fromByteOffset: offset, as: UInt32.self)) } }
         func float(_ offset: Int) -> Float { Float(bitPattern: uint(offset)) }

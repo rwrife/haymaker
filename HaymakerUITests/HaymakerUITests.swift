@@ -158,6 +158,48 @@ final class HaymakerUITests: XCTestCase {
     }
 
     @MainActor
+    func testNonDefaultOpponentsReachLiveSparringBouts() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-haymakerUITestShortBout", "-haymakerUITestIsolatedStore"]
+        XCUIDevice.shared.orientation = .portrait
+        app.launch()
+        XCTAssertTrue(app.buttons["career.open"].waitForExistence(timeout: 5))
+        app.buttons["career.open"].tap()
+        let ladder = app.scrollViews["career.scroll"]
+        for id in ["atlas", "duke"] {
+            XCTAssertTrue(ladder.waitForExistence(timeout: 5))
+            let spar = app.buttons["sparring.start.\(id)"]
+            for _ in 0..<15 {
+                if spar.exists && spar.isHittable { break }
+                ladder.swipeUp()
+            }
+            XCTAssertTrue(spar.isHittable)
+            spar.tap()
+            XCTAssertTrue(app.staticTexts["versus.opponent"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.images["versus.portrait.\(id)"].exists)
+            let bell = app.buttons["versus.fight"].firstMatch
+            XCTAssertTrue(bell.waitForExistence(timeout: 5))
+            XCTAssertTrue(bell.isHittable)
+            bell.tap()
+            XCTAssertTrue(app.staticTexts["bout.clock"].waitForExistence(timeout: 5),
+                          "Live bout started against \(id)")
+            let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            shot.name = "Live bout \(id)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            XCTAssertTrue(app.staticTexts["bout.results"].waitForExistence(timeout: 25))
+            let next = app.buttons["sparring.next"]
+            for _ in 0..<8 where !next.isHittable { app.scrollViews.firstMatch.swipeUp() }
+            XCTAssertTrue(next.isHittable)
+            next.tap()
+            XCTAssertTrue(app.staticTexts["versus.opponent"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.images["versus.portrait.\(id)"].exists)
+            app.buttons["versus.cancel"].tap()
+            XCTAssertTrue(ladder.waitForExistence(timeout: 5))
+        }
+    }
+
+    @MainActor
     private func dismissVersus(_ app: XCUIApplication) {
         let bell = app.buttons["versus.fight"]
         XCTAssertTrue(bell.waitForExistence(timeout: 5))
