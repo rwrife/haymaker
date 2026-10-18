@@ -205,6 +205,23 @@ final class HaymakerUITests: XCTestCase {
     }
 
     @MainActor
+    func testFightStartsWithThreeTwoOneCountdown() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-haymakerUITestShortBout", "-haymakerUITestCountdown", "-haymakerUITestIsolatedStore"]
+        app.launch()
+        app.buttons["bout.start"].tap()
+        dismissVersus(app)
+        let countdown = app.staticTexts["bout.countdown"]
+        XCTAssertTrue(countdown.waitForExistence(timeout: 2), "A 3-2-1 countdown gates the opening bell")
+        XCTAssertFalse(app.staticTexts["bout.results"].exists)
+        // The countdown ends on its own and the fight carries on to the results card.
+        let gone = NSPredicate(format: "exists == false")
+        expectation(for: gone, evaluatedWith: countdown)
+        waitForExpectations(timeout: 6)
+        XCTAssertTrue(app.staticTexts["bout.results"].waitForExistence(timeout: 25))
+    }
+
+    @MainActor
     func testEveryStoryOpponentHasAnIntroduction() {
         let app = XCUIApplication()
         app.launchArguments = ["-haymakerUITestIsolatedStore"]

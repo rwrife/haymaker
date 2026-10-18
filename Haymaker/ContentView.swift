@@ -37,6 +37,7 @@ struct ContentView: View {
     @State private var feedbackColor = RingStyle.gold
     @State private var lastFrame: TimeInterval?
     @State private var tickAccumulator: TimeInterval = 0
+    @State private var countdown: FightCountdown?
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     private var effectiveReducedMotion: Bool { reducedMotion || systemReduceMotion }
@@ -60,6 +61,7 @@ struct ContentView: View {
                         VersusDialog(book: career.opponent, portrait: portrait, fight: beginFight, cancel: sessionReset)
                     } else {
                         match(session, portrait: portrait)
+                        if let countdown, !paused, !session.engine.isOver { countdownOverlay(countdown, portrait: portrait) }
                         if session.engine.isOver { results(session, portrait: portrait) }
                         else if paused { pauseMenu }
                     }
@@ -637,9 +639,11 @@ struct ContentView: View {
         lastEventCount = 0
         lastFrame = nil
         tickAccumulator = 0
-        feedback = "FIGHT!"
+        countdown = nil
+        // The "FIGHT!" callout is shown when the 3-2-1 countdown ends (see advanceFrame).
+        feedback = ""
         feedbackColor = RingStyle.gold
-        feedbackUntil = 70
+        feedbackUntil = 0
         if let session { scene.render(session.engine, reducedMotion: effectiveReducedMotion, highContrast: colorblindCues) }
     }
 
@@ -647,10 +651,81 @@ struct ContentView: View {
         showingVersus = false
         lastFrame = nil
         tickAccumulator = 0
+        if countdownEnabled {
+            startCountdown()
+        } else {
+            feedback = "FIGHT!"
+            feedbackColor = RingStyle.gold
+            feedbackUntil = 70
+        }
+    }
+
+    /// UI tests run short bouts against a fixed wall-clock budget, so they skip the
+    /// countdown unless they opt in with -haymakerUITestCountdown.
+    private var countdownEnabled: Bool {
+        let arguments = ProcessInfo.processInfo.arguments
+        return !arguments.contains("-haymakerUITestShortBout") || arguments.contains("-haymakerUITestCountdown")
+    }
+
+    /// Freeze the action and run the 3-2-1 beat. Used before the bout begins and
+    /// after a knockdown is answered, before the fighters may swing again.
+    private func startCountdown() {
+        guard countdownEnabled else { return }
+        countdown = FightCountdown()
+        tickAccumulator = 0
+        lastFrame = nil
+        feedback = ""
+        feedbackUntil = 0
+        if hapticsEnabled { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+        announceCountdown("3")
+    }
+
+    private func announceCountdown(_ text: String) {
+        UIAccessibility.post(notification: .announcement, argument: text)
+    }
+
+    private func countdownColor(_ value: Int) -> Color {
+        switch value {
+        case 3: return .white
+        case 2: return RingStyle.gold
+        default: return RingStyle.red
+        }
+    }
+
+    private func countdownOverlay(_ countdown: FightCountdown, portrait: Bool) -> some View {
+        let value = countdown.value ?? 1
+        let progress = countdown.stepProgress
+        // Slam in big, settle, then hold — skipped entirely under reduced motion.
+        let slam = 1 - min(1, progress * 3.5)
+        let scale: CGFloat = effectiveReducedMotion ? 1 : 1 + 1.1 * slam * slam
+        let fade = effectiveReducedMotion ? 1 : (progress > 0.82 ? max(0.25, 1 - (progress - 0.82) * 4) : 1)
+        let size: CGFloat = portrait ? 220 : 170
+        let color = countdownColor(value)
+        return ZStack {
+            Color.black.opacity(0.45)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+            VStack(spacing: 6) {
+                Text("GET READY").font(.system(size: 13, weight: .heavy)).tracking(6)
+                    .foregroundStyle(.white.opacity(0.75))
+                Text("\(value)")
+                    .font(RingStyle.type(size)).italic()
+                    .foregroundStyle(color)
+                    .shadow(color: color.opacity(0.9), radius: 28)
+                    .shadow(color: .black, radius: 6, y: 6)
+                    .scaleEffect(scale)
+                    .opacity(fade)
+                    .accessibilityIdentifier("bout.countdown")
+                    .accessibilityLabel("\(value)")
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
     }
 
     private func sessionReset() {
         showingVersus = false
+        countdown = nil
         session = nil
         scene = MatchScene(titleScreen: true)
         paused = false
@@ -669,12 +744,42 @@ struct ContentView: View {
         guard let session, !showingSettings, !showingRecords, selectedDetail == nil, !showingVersus, !paused, !session.engine.isOver, scenePhase == .active else { lastFrame = nil; return }
         let elapsed = min(0.1, max(0, now - (lastFrame ?? now)))
         lastFrame = now
+        if var running = countdown {
+            // The engine is frozen while the 3-2-1 runs; only the clock and the scene move.
+            let previous = running.value
+            running.advance(by: elapsed)
+            if let value = running.value {
+                countdown = running
+                if value != previous {
+                    if hapticsEnabled { UIImpactFeedbackGenerator(style: value == 1 ? .heavy : .medium).impactOccurred() }
+                    announceCountdown("\(value)")
+                }
+            } else {
+                countdown = nil
+                tickAccumulator = 0
+                feedback = "FIGHT!"
+                feedbackColor = RingStyle.gold
+                feedbackUntil = session.engine.totalTicks + 50
+                if hapticsEnabled { UIImpactFeedbackGenerator(style: .heavy).impactOccurred() }
+                announceCountdown("Fight!")
+            }
+            scene.render(session.engine, reducedMotion: effectiveReducedMotion, highContrast: colorblindCues)
+            return
+        }
         tickAccumulator += elapsed
+        var startCountdownAfterKnockdown = false
         while tickAccumulator >= 1.0 / 60.0 {
+            let eventsBefore = session.engine.events.count
             session.advance()
             tickAccumulator -= 1.0 / 60.0
             if session.engine.isOver {
                 career.save(session)
+                break
+            }
+            // A downed fighter answering the count: stop here and give the fight a fresh 3-2-1.
+            if session.engine.phase == .fighting, session.engine.events.count > eventsBefore,
+               session.engine.events[eventsBefore...].contains(where: { if case .rise = $0 { return true } else { return false } }) {
+                startCountdownAfterKnockdown = true
                 break
             }
         }
@@ -697,6 +802,7 @@ struct ContentView: View {
             feedbackUntil = session.engine.totalTicks + 38
         }
         lastEventCount = session.engine.events.count
+        if startCountdownAfterKnockdown { startCountdown() }
     }
 }
 
