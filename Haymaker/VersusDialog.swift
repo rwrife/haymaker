@@ -50,7 +50,6 @@ struct VersusDialog: View {
         }
         .foregroundStyle(.white)
         .accessibilityAddTraits(.isModal)
-        .accessibilityIdentifier("versus.dialog")
     }
 
     private var header: some View {
