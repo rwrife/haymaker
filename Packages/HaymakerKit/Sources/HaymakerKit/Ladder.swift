@@ -1,7 +1,7 @@
 import Foundation
 
 /// A session's career ladder: the story opponents in a random order, each
-/// stage tuned slightly harder than the one before.
+/// stage more aggressive and harder than the one before.
 ///
 /// Pure and deterministic given a random number generator, so the app can pass
 /// the system generator while tests pass a seeded one. Nothing here touches the
@@ -20,8 +20,8 @@ public enum Ladder {
         contenders.shuffled(using: &generator) + [finalBoss]
     }
 
-    /// Scales each book by its position: stage 0 is a little gentler than the
-    /// authored book, the last stage a little harder.
+    /// Scales each book by its position: stage 0 is passive and easy to beat,
+    /// the last stage aggressive and punishing.
     public static func stages(for order: [OpponentBook]) -> [OpponentBook] {
         let last = max(order.count - 1, 1)
         return order.enumerated().map { index, book in
@@ -44,27 +44,33 @@ public enum Ladder {
 public extension OpponentBook {
     /// A copy tuned to `difficulty` in `0...1` (0 easiest, 1 hardest).
     ///
-    /// Tells, recoveries and idle gaps shrink and damage grows. Impact timing
-    /// and stamina cost are untouched, and tells never drop below
-    /// `minimumTell`, so every punch stays readable. The id and name are kept,
-    /// so portraits, bios and records still match the character.
+    /// Early opponents are passive and defensive: long idle gaps, slow tells,
+    /// long recoveries and light hits. Later ones turn aggressive: gaps and
+    /// tells shrink, recoveries tighten and damage grows. Impact timing and
+    /// stamina cost are untouched, and tells never drop below `minimumTell`,
+    /// so every punch stays readable. The id and name are kept, so portraits,
+    /// bios and records still match the character.
     func scaled(difficulty: Double) -> OpponentBook {
         let d = min(max(difficulty, 0), 1)
-        let timing = 1.12 - 0.34 * d
-        let power = 0.88 + 0.32 * d
-        func ticks(_ value: Int, floor: Int) -> Int { max(Int((Double(value) * timing).rounded()), min(value, floor)) }
+        let pace = 1.35 - 0.60 * d       // tell and recovery length
+        let patience = 1.9 - 1.35 * d    // idle time between attacks
+        let power = 0.7 + 0.55 * d       // damage
+        func ticks(_ value: Int, by factor: Double, floor: Int) -> Int {
+            max(Int((Double(value) * factor).rounded()), min(value, floor))
+        }
         let entries = sequence.map { entry in
             PatternEntry(
                 move: entry.move,
-                tell: ticks(entry.tell, floor: Self.minimumTell),
+                tell: ticks(entry.tell, by: pace, floor: Self.minimumTell),
                 impact: entry.impact,
-                recover: ticks(entry.recover, floor: Self.minimumRecover),
+                recover: ticks(entry.recover, by: pace, floor: Self.minimumRecover),
                 staminaCost: entry.staminaCost,
                 damage: entry.damage == 0 ? 0 : max(Int((Double(entry.damage) * power).rounded()), 1)
             )
         }
         return OpponentBook(id: id, name: name, sequence: entries,
-                            minGap: ticks(minGap, floor: 0), gapSpread: ticks(gapSpread, floor: 0))
+                            minGap: ticks(minGap, by: patience, floor: 0),
+                            gapSpread: ticks(gapSpread, by: patience, floor: 0))
     }
 
     /// Shortest tell a scaled book may have, in ticks.

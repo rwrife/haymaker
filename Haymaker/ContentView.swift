@@ -515,7 +515,7 @@ struct ContentView: View {
                 .disabled(!career.saved).accessibilityIdentifier("sparring.next")
             } else if let next = career.nextLadderBook, next.id != career.opponent.id {
                 Button { if career.begin(next, mode: .career) { startBout() } } label: {
-                    Text("NEXT CAREER BOUT: \(next.name.uppercased())").font(RingStyle.type(17)).frame(maxWidth: .infinity).frame(height: portrait ? 48 : 44)
+                    Text("NEXT CHALLENGER: \(next.name.uppercased())").font(RingStyle.type(17)).frame(maxWidth: .infinity).frame(height: portrait ? 48 : 44)
                         .background(RingStyle.gold.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))
                 }
                 .disabled(!career.saved).accessibilityIdentifier("career.next")
