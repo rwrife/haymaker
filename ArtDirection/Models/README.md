@@ -43,3 +43,7 @@ Guard poses, left to right: Mack, Bruiser, Goldie; Nico, Atlas, Duke; Sylvie, Ca
 Mack and Bruiser, left to right: guard, chamber, contact, retraction, returned guard.
 
 ![Full-body punch sequence](rig-motion-preview.png)
+
+## Size and performance report
+
+[`asset-report.md`](asset-report.md) lists per-rig payload, vertex/triangle counts, estimated GPU buffers and roster mapping. Regenerate with `python3 scripts/fighter_asset_report.py`. If a bundled rig is missing or malformed at runtime, `FighterRig.load` logs once and falls back to Mack's rig rather than crashing. On-device frame times are not yet measured.
