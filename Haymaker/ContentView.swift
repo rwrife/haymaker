@@ -166,7 +166,7 @@ struct ContentView: View {
                 // XCUITest can scroll to them (LazyVStack never realizes offscreen rows here).
                 VStack(alignment: .leading, spacing: 8) {
                     if career.ladderComplete {
-                        Text("Career complete — all eight opponents beaten")
+                        Text("Career complete — all \(career.ladder.count) opponents beaten")
                         Button("NEW LADDER") { career.newLadder() }
                             .accessibilityIdentifier("career.newLadder")
                     }
