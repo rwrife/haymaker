@@ -96,7 +96,9 @@ struct ContentView: View {
                 settingsButton
             }
             .padding(.top, 10)
-            Spacer(minLength: 18)
+            // Fixed gap (not a flexible Spacer) so the title stays pinned to the
+            // upper left and clear of the fighter warming up in the arena.
+            Color.clear.frame(height: 18)
             HStack {
                 VStack(alignment: .leading, spacing: 1) {
                     Text("HAYMAKER").font(RingStyle.type(portrait ? 61 : 76)).italic()
