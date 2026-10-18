@@ -59,6 +59,47 @@ struct FightCountdownTests {
         #expect(abs(countdown.totalSeconds - 2.7) < 0.0001)
     }
 
+    @Test("knockdown count spreads 3, 2, 1 across the whole window")
+    func knockdownCountSpansWindow() {
+        // 90-tick window (the default): 30 ticks per number.
+        #expect(FightCountdown.knockdownValue(elapsedTicks: 0, windowTicks: 90) == 3)
+        #expect(FightCountdown.knockdownValue(elapsedTicks: 29, windowTicks: 90) == 3)
+        #expect(FightCountdown.knockdownValue(elapsedTicks: 30, windowTicks: 90) == 2)
+        #expect(FightCountdown.knockdownValue(elapsedTicks: 59, windowTicks: 90) == 2)
+        #expect(FightCountdown.knockdownValue(elapsedTicks: 60, windowTicks: 90) == 1)
+        #expect(FightCountdown.knockdownValue(elapsedTicks: 89, windowTicks: 90) == 1)
+    }
+
+    @Test("knockdown count is absent outside the window")
+    func knockdownCountOutsideWindow() {
+        #expect(FightCountdown.knockdownValue(elapsedTicks: 90, windowTicks: 90) == nil)
+        #expect(FightCountdown.knockdownValue(elapsedTicks: -1, windowTicks: 90) == nil)
+        #expect(FightCountdown.knockdownValue(elapsedTicks: 0, windowTicks: 0) == nil)
+        #expect(FightCountdown.knockdownStepProgress(elapsedTicks: 90, windowTicks: 90) == nil)
+    }
+
+    @Test("knockdown count never skips or repeats a number as ticks advance")
+    func knockdownCountIsMonotonic() {
+        for window in [1, 2, 3, 7, 90, 241] {
+            var last = 3
+            for tick in 0..<window {
+                let value = FightCountdown.knockdownValue(elapsedTicks: tick, windowTicks: window)
+                #expect(value != nil)
+                #expect((value ?? 0) <= last)
+                #expect((value ?? 0) >= 1)
+                last = value ?? last
+            }
+        }
+    }
+
+    @Test("knockdown step progress restarts at each number")
+    func knockdownStepProgress() {
+        #expect(FightCountdown.knockdownStepProgress(elapsedTicks: 0, windowTicks: 90) == 0)
+        #expect(FightCountdown.knockdownStepProgress(elapsedTicks: 30, windowTicks: 90) == 0)
+        let mid = FightCountdown.knockdownStepProgress(elapsedTicks: 15, windowTicks: 90) ?? -1
+        #expect(abs(mid - 0.5) < 0.0001)
+    }
+
     @Test("degenerate inputs are sanitized")
     func sanitizesInputs() {
         let countdown = FightCountdown(from: 0, stepSeconds: 0)

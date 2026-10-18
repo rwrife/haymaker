@@ -41,6 +41,26 @@ public struct FightCountdown: Sendable, Equatable {
         return min(1, max(0, into / stepSeconds))
     }
 
+    // MARK: - Knockdown count (tick-driven, engine keeps running)
+
+    /// The number to show while a downed fighter's knockdown window runs: `from`…1
+    /// spread evenly across `windowTicks`, so the count lands on 1 just as the
+    /// fighter gets back up. Nil outside the window. Driven by engine ticks (not a
+    /// wall clock) so it stays in step with the animation and freezes on pause.
+    public static func knockdownValue(elapsedTicks: Int, windowTicks: Int, from: Int = defaultFrom) -> Int? {
+        guard windowTicks > 0, elapsedTicks >= 0, elapsedTicks < windowTicks else { return nil }
+        let beats = max(1, from)
+        return max(1, beats - (elapsedTicks * beats) / windowTicks)
+    }
+
+    /// 0…1 progress through the number currently showing during a knockdown window
+    /// (0 right as the number changes). Nil outside the window.
+    public static func knockdownStepProgress(elapsedTicks: Int, windowTicks: Int, from: Int = defaultFrom) -> Double? {
+        guard windowTicks > 0, elapsedTicks >= 0, elapsedTicks < windowTicks else { return nil }
+        let scaled = Double(elapsedTicks) * Double(max(1, from)) / Double(windowTicks)
+        return min(1, max(0, scaled - scaled.rounded(.down)))
+    }
+
     /// Advance by real elapsed seconds. Negative input is ignored and the
     /// total is clamped so a long frame can never overshoot the end.
     public mutating func advance(by seconds: TimeInterval) {

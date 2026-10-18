@@ -38,6 +38,7 @@ struct ContentView: View {
     @State private var lastFrame: TimeInterval?
     @State private var tickAccumulator: TimeInterval = 0
     @State private var countdown: FightCountdown?
+    @State private var lastKnockdownValue: Int?
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     private var effectiveReducedMotion: Bool { reducedMotion || systemReduceMotion }
@@ -62,6 +63,7 @@ struct ContentView: View {
                     } else {
                         match(session, portrait: portrait)
                         if let countdown, !paused, !session.engine.isOver { countdownOverlay(countdown, portrait: portrait) }
+                        else if let down = knockdownCount(session.engine), !paused, !session.engine.isOver { knockdownOverlay(down, portrait: portrait) }
                         if session.engine.isOver { results(session, portrait: portrait) }
                         else if paused { pauseMenu }
                     }
@@ -642,6 +644,7 @@ struct ContentView: View {
         lastFrame = nil
         tickAccumulator = 0
         countdown = nil
+        lastKnockdownValue = nil
         // The "FIGHT!" callout is shown when the 3-2-1 countdown ends (see advanceFrame).
         feedback = ""
         feedbackColor = RingStyle.gold
@@ -669,8 +672,8 @@ struct ContentView: View {
         return !arguments.contains("-haymakerUITestShortBout") || arguments.contains("-haymakerUITestCountdown")
     }
 
-    /// Freeze the action and run the 3-2-1 beat. Used before the bout begins and
-    /// after a knockdown is answered, before the fighters may swing again.
+    /// Freeze the action and run the 3-2-1 beat before the opening bell. (A knockdown
+    /// count is different: it runs inside the live fight, see `knockdownCount`.)
     private func startCountdown() {
         guard countdownEnabled else { return }
         countdown = FightCountdown()
@@ -725,9 +728,47 @@ struct ContentView: View {
         .accessibilityAddTraits(.isModal)
     }
 
+    /// While a fighter is down, the engine keeps running and the count tracks the
+    /// knockdown window itself, so "1" lands as the fighter is back on their feet.
+    private func knockdownCount(_ fight: FightEngine) -> (value: Int, progress: Double, player: Bool)? {
+        guard fight.phase == .fighting else { return nil }
+        for (isPlayer, status) in [(true, fight.player), (false, fight.opponent)] where status.state == .knockedDown {
+            guard let value = FightCountdown.knockdownValue(elapsedTicks: status.ticksInCurrentState, windowTicks: status.stateDuration),
+                  let progress = FightCountdown.knockdownStepProgress(elapsedTicks: status.ticksInCurrentState, windowTicks: status.stateDuration) else { continue }
+            return (value, progress, isPlayer)
+        }
+        return nil
+    }
+
+    /// Non-blocking: the fight keeps animating underneath and controls stay live.
+    private func knockdownOverlay(_ down: (value: Int, progress: Double, player: Bool), portrait: Bool) -> some View {
+        let slam = 1 - min(1, down.progress * 3.5)
+        let scale: CGFloat = effectiveReducedMotion ? 1 : 1 + 0.7 * slam * slam
+        let color = countdownColor(down.value)
+        let size: CGFloat = portrait ? 120 : 92
+        let caption = down.player ? "GET UP!" : "\(career.opponent.name.uppercased()) IS DOWN"
+        return VStack(spacing: 0) {
+            Text(caption).font(.system(size: 12, weight: .heavy)).tracking(4)
+                .foregroundStyle(.white.opacity(0.85))
+                .shadow(color: .black, radius: 4)
+            Text("\(down.value)")
+                .font(RingStyle.type(size)).italic()
+                .foregroundStyle(color)
+                .shadow(color: color.opacity(0.9), radius: 20)
+                .shadow(color: .black, radius: 5, y: 5)
+                .scaleEffect(scale)
+                .accessibilityIdentifier("bout.knockdownCount")
+                .accessibilityLabel("Count \(down.value)")
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.top, portrait ? 112 : 84)
+        .allowsHitTesting(false)
+    }
+
     private func sessionReset() {
         showingVersus = false
         countdown = nil
+        lastKnockdownValue = nil
         session = nil
         scene = MatchScene(titleScreen: true)
         paused = false
@@ -769,19 +810,11 @@ struct ContentView: View {
             return
         }
         tickAccumulator += elapsed
-        var startCountdownAfterKnockdown = false
         while tickAccumulator >= 1.0 / 60.0 {
-            let eventsBefore = session.engine.events.count
             session.advance()
             tickAccumulator -= 1.0 / 60.0
             if session.engine.isOver {
                 career.save(session)
-                break
-            }
-            // A downed fighter answering the count: stop here and give the fight a fresh 3-2-1.
-            if session.engine.phase == .fighting, session.engine.events.count > eventsBefore,
-               session.engine.events[eventsBefore...].contains(where: { if case .rise = $0 { return true } else { return false } }) {
-                startCountdownAfterKnockdown = true
                 break
             }
         }
@@ -799,12 +832,21 @@ struct ContentView: View {
             case .blocked: feedback = "BLOCKED!"; feedbackColor = .white
             case .knockdown: feedback = "KNOCKDOWN!"; feedbackColor = RingStyle.gold
             case .roundStart: feedback = "FIGHT!"; feedbackColor = RingStyle.gold
+            case .rise where session.engine.phase == .fighting: feedback = "FIGHT!"; feedbackColor = RingStyle.gold
             default: continue
             }
             feedbackUntil = session.engine.totalTicks + 38
         }
         lastEventCount = session.engine.events.count
-        if startCountdownAfterKnockdown { startCountdown() }
+        // The knockdown count runs inside the engine's own window; beat it with haptics and VoiceOver.
+        let downValue = knockdownCount(session.engine)?.value
+        if downValue != lastKnockdownValue {
+            lastKnockdownValue = downValue
+            if let downValue {
+                if hapticsEnabled { UIImpactFeedbackGenerator(style: downValue == 1 ? .heavy : .light).impactOccurred() }
+                announceCountdown("\(downValue)")
+            }
+        }
     }
 }
 
