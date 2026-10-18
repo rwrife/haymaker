@@ -112,7 +112,7 @@ struct ContentView: View {
             }
             Spacer()
             if let error = career.error { Text(error).foregroundStyle(.red) }
-            Button { if career.begin(.goldie, mode: .career) { startBout() } } label: {
+            Button { if let first = career.nextLadderBook ?? career.ladder.first, career.begin(first, mode: .career) { startBout() } } label: {
                 HStack {
                     Image(systemName: "bolt.fill")
                     Text("STEP INTO THE RING").font(RingStyle.type(22)).italic().tracking(1)
@@ -157,28 +157,33 @@ struct ContentView: View {
             }
             if let error = career.error { Text(error).foregroundStyle(.red) }
             Text("CAREER LADDER").font(RingStyle.type(23)).foregroundStyle(RingStyle.gold)
+            Text("A new random order every session. Each bout is tougher than the last.")
+                .font(.caption).foregroundStyle(.white.opacity(0.7)).multilineTextAlignment(.center)
             ScrollView {
                 // Non-lazy: all ladder + sparring rows must exist in the AX hierarchy so
                 // XCUITest can scroll to them (LazyVStack never realizes offscreen rows here).
                 VStack(alignment: .leading, spacing: 8) {
-                    if career.historyLoaded && OpponentBook.careerRoster.allSatisfy({ career.records.wins($0.id, careerOnly: true) > 0 }) {
+                    if career.ladderComplete {
                         Text("Career complete — all eight opponents beaten")
+                        Button("NEW LADDER") { career.newLadder() }
+                            .accessibilityIdentifier("career.newLadder")
                     }
-                    ForEach(OpponentBook.careerRoster) { book in
+                    ForEach(Array(career.ladder.enumerated()), id: \.element.id) { index, book in
                         HStack {
                             VStack(alignment: .leading) {
+                                Text("BOUT \(index + 1) OF \(career.ladder.count)").font(.caption2).foregroundStyle(RingStyle.gold)
                                 Text(book.name).font(RingStyle.type(20))
-                                Text(!career.historyLoaded ? "History unavailable" : career.records.wins(book.id, careerOnly: true) > 0 ? "Beaten" :
-                                     (career.records.isUnlocked(book.id) ? "Ready" : "Locked — beat previous opponents"))
+                                Text(!career.historyLoaded ? "History unavailable" : career.isBeaten(book.id) ? "Beaten" :
+                                     (career.isUnlocked(book.id) ? "Ready" : "Locked — beat previous opponents"))
                                     .font(.caption).accessibilityIdentifier("career.status.\(book.id)")
                                 Button("\(book.name) bio and records") { selectedDetail = book }
                                     .font(.caption).accessibilityIdentifier("opponent.detail.\(book.id)")
                             }
                             Spacer()
-                            Button(book.id == "goldie" ? "Start bout" : "Fight \(book.name)") {
+                            Button(index == 0 ? "Start bout" : "Fight \(book.name)") {
                                 if career.begin(book, mode: .career) { startBout() }
                             }
-                            .disabled(!career.historyLoaded || !career.records.isUnlocked(book.id))
+                            .disabled(!career.isUnlocked(book.id))
                             .accessibilityIdentifier("career.start.\(book.id)")
                         }
                         .padding(8).background(RingStyle.ink.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
@@ -508,9 +513,7 @@ struct ContentView: View {
                         .background(RingStyle.gold.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))
                 }
                 .disabled(!career.saved).accessibilityIdentifier("sparring.next")
-            } else if let next = OpponentBook.careerRoster.first(where: {
-                career.records.isUnlocked($0.id) && career.records.wins($0.id, careerOnly: true) == 0
-            }), next.id != career.opponent.id {
+            } else if let next = career.nextLadderBook, next.id != career.opponent.id {
                 Button { if career.begin(next, mode: .career) { startBout() } } label: {
                     Text("NEXT CAREER BOUT: \(next.name.uppercased())").font(RingStyle.type(17)).frame(maxWidth: .infinity).frame(height: portrait ? 48 : 44)
                         .background(RingStyle.gold.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))

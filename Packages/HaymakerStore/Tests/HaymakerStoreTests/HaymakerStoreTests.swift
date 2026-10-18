@@ -81,6 +81,23 @@ struct HaymakerStoreTests {
         #expect(!career.isUnlocked("lattice"))
         #expect(career.ledger.comparison(for: win) == .noImprovement)
     }
+    @Test func unlocksFollowACustomLadderOrder() {
+        let order: [OpponentBook] = [.atlas, .goldie, .baxter]
+        func win(_ book: OpponentBook, mode: BoutMode = .career) -> SavedBout {
+            SavedBout(mode: mode, result: FightEngine.simulate(
+                config: EngineConfig(rounds: 1, roundTicks: 600, restTicks: 0),
+                seed: 42, book: book, inputs: Array(repeating: .jab, count: 600)))
+        }
+        let fresh = Records()
+        #expect(fresh.isUnlocked("atlas", in: order))
+        #expect(!fresh.isUnlocked("goldie", in: order))
+        #expect(!fresh.isUnlocked("nico", in: order))
+        let afterAtlas = Records(bouts: [win(.atlas)])
+        #expect(afterAtlas.isUnlocked("goldie", in: order))
+        #expect(!afterAtlas.isUnlocked("baxter", in: order))
+        #expect(!Records(bouts: [win(.atlas, mode: .sparring)]).isUnlocked("goldie", in: order))
+        #expect(Records(bouts: [win(.atlas), win(.goldie)]).isUnlocked("baxter", in: order))
+    }
     @Test func storyLadderRequiresCareerWinsAndEndsWithBaxter() throws {
         let store = try BoutStore()
         let roster = OpponentBook.careerRoster
