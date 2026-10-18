@@ -125,12 +125,12 @@ struct HaymakerStoreTests {
             if index + 1 < OpponentBook.v0Roster.count {
                 #expect(!before.isUnlocked(OpponentBook.v0Roster[index + 1].id))
             }
-            // One button press every 32 ticks (fewer than two presses/second), with no
+            // One button press every 33 ticks (fewer than two presses/second), with no
             // hidden state mutation or custom move/damage configuration.
             var engine = FightEngine(config: config, seed: 0xCAFE_2026, book: book)
             var inputs: [PlayerInput] = []
             while !engine.isOver && inputs.count < config.hardTickCap {
-                let input: PlayerInput = inputs.count % 32 == 0 ? .uppercut : .none
+                let input: PlayerInput = inputs.count % 33 == 0 ? .uppercut : .none
                 inputs.append(input)
                 engine.tick(input)
             }

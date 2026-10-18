@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Print and regenerate the offline HMR1 manifest using only the standard library."""
+"""Print and regenerate the offline HMR2 manifest using only the standard library."""
 import math
 import re
 import struct
@@ -15,13 +15,13 @@ def measure(path):
     if len(data) < 16:
         raise ValueError(f'{path.name}: truncated header')
     magic, vertices, indices, bones = struct.unpack_from('<4sIII', data)
-    vertex_start = 16 + bones * 16
+    vertex_start = 16 + bones * 28
     index_start = vertex_start + vertices * 60
-    if (magic != b'HMR1' or bones != 16 or not vertices or not indices
+    if (magic != b'HMR2' or bones != 22 or not vertices or not indices
             or indices % 3 or len(data) != index_start + indices * 4):
-        raise ValueError(f'{path.name}: invalid HMR1 layout')
-    for i, (parent, *position) in enumerate(struct.iter_unpack('<i3f', data[16:vertex_start])):
-        if not -1 <= parent < i or not all(map(math.isfinite, position)):
+        raise ValueError(f'{path.name}: invalid HMR2 layout')
+    for i, (parent, *joint) in enumerate(struct.iter_unpack('<i6f', data[16:vertex_start])):
+        if not -1 <= parent < i or not all(map(math.isfinite, joint)):
             raise ValueError(f'{path.name}: invalid bone {i}')
     for i, row in enumerate(struct.iter_unpack('<13f4H', data[vertex_start:index_start])):
         weights, bone_ids = row[9:13], row[13:]
@@ -64,7 +64,7 @@ def main():
     worst_path, worst = max(rows, key=lambda row: row[1][0])
     lines += [
         '',
-        'HMR1 uses a 16-byte header, 16-byte bone records, 60-byte vertices '
+        'HMR2 uses a 16-byte header, 22 28-byte bone records (parent index, joint head and aim point), 60-byte vertices '
         '(position, normal, RGB, four Float32 weights, four UInt16 bone indices), '
         'and UInt32 triangle indices; all fields are little endian. Every record is parsed and validated.',
         '',

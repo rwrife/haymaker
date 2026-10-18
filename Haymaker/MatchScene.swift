@@ -8,16 +8,18 @@ import HaymakerKit
     let scene = SCNScene()
     let camera = SCNNode()
     private let stage = SCNNode()
+    /// Keep rendering this long after the bout ends (knockout fall, celebration).
+    static let postBoutRenderSeconds = 6.0
+    /// Delay before the results card covers the arena, so the finish is seen.
+    static let resultsDelay = 2.2
     private var rival = BoxerModel(isRival: true)
     private let hero = BoxerModel(isRival: false)
-    private var lastEventCount = 0
+    private let choreographer: BoutChoreographer
     private var reducedMotion = false
     private var shake: Float = 0
-    private var recoilRival: Float = 0
-    private var recoilHero: Float = 0
     private var portrait = true
-    private var lastTick = 0
-    private var effects: [(node: SCNNode, expires: Int)] = []
+    private var lastRender: CFTimeInterval?
+    private var effects: [(node: SCNNode, expires: Double)] = []
     private var cameraFollow = SIMD3<Float>(repeating: 0)
     private struct Spectator {
         let torso: SCNNode
@@ -32,10 +34,10 @@ import HaymakerKit
 
     private var titleScreen: Bool
     private let mist = SCNNode()
-    private var ringCenter = SIMD3<Float>(0, 0, 0.2)
 
     init(titleScreen: Bool = false) {
         self.titleScreen = titleScreen
+        choreographer = BoutChoreographer(hero: hero, rival: rival)
         scene.background.contents = UIColor(red: 0.014, green: 0.023, blue: 0.047, alpha: 1)
         scene.fogColor = UIColor(red: 0.05, green: 0.07, blue: 0.11, alpha: 1)
         scene.fogStartDistance = 9
@@ -64,11 +66,8 @@ import HaymakerKit
         camera.camera?.screenSpaceAmbientOcclusionIntensity = 0.9
         camera.camera?.screenSpaceAmbientOcclusionRadius = 0.25
         scene.rootNode.addChildNode(camera)
-        rival.resetMotion()
-        hero.resetMotion()
-        rival.pose(FighterStatus(), time: 0, recoil: 0, reducedMotion: true)
-        hero.pose(FighterStatus(), time: 0, recoil: 0, reducedMotion: true)
-        positionFighters(time: 0, reducedMotion: true)
+        choreographer.reset()
+        choreographer.restPose()
         layout(portrait: true)
         if titleScreen { renderTitle(time: 0, reducedMotion: true) }
     }
@@ -78,6 +77,7 @@ import HaymakerKit
             rival.root.removeFromParentNode()
             rival = BoxerModel(asset: asset, isRival: true)
             stage.addChildNode(rival.root)
+            choreographer.replaceRival(rival)
         }
         // All child-list changes stay on the main actor, including effect cleanup.
         for effect in effects { effect.node.removeFromParentNode() }
@@ -87,18 +87,12 @@ import HaymakerKit
         rival.root.isHidden = false
         hero.root.eulerAngles.y = .pi - 0.16
         layout(portrait: portrait)
-        lastEventCount = 0
-        lastTick = 0
+        lastRender = nil
         shake = 0
         cameraFollow = .zero
         animateCrowd(time: 0, reducedMotion: true)
-        recoilHero = 0
-        recoilRival = 0
-        rival.resetMotion()
-        hero.resetMotion()
-        rival.pose(FighterStatus(), time: 0, recoil: 0, reducedMotion: true)
-        hero.pose(FighterStatus(), time: 0, recoil: 0, reducedMotion: true)
-        positionFighters(time: 0, reducedMotion: true)
+        choreographer.reset()
+        choreographer.restPose()
     }
 
     func layout(portrait: Bool) {
@@ -118,58 +112,52 @@ import HaymakerKit
     /// Presentation-only shadowboxing: no bout, opponent, or career progress.
     func renderTitle(time: TimeInterval, reducedMotion: Bool) {
         guard titleScreen else { return }
-        let t = reducedMotion ? Float(0) : Float(time.truncatingRemainder(dividingBy: 120))
         SCNTransaction.begin()
         SCNTransaction.animationDuration = 0
         rival.root.isHidden = true
-        hero.poseWarmup(time: t, reducedMotion: reducedMotion)
+        hero.poseTitle(time: time, reducedMotion: reducedMotion)
         hero.root.position = SCNVector3(0, 0, portrait ? 0.85 : 0.55)
         hero.root.eulerAngles.y = .pi / 9
         SCNTransaction.commit()
     }
 
-    func render(_ fight: FightEngine, reducedMotion: Bool, highContrast: Bool) {
+    /// Render one frame. `frameDelta` advances the presentation clock (animation keeps
+    /// moving while the engine is frozen for a countdown or after the bout);
+    /// `tickFraction` is the unconsumed part of the next engine tick (0…1).
+    func render(_ fight: FightEngine, reducedMotion: Bool, highContrast: Bool, frameDelta: Double? = nil, tickFraction: Double = 0) {
         self.reducedMotion = reducedMotion
         mist.isPaused = reducedMotion
-        for effect in effects where effect.expires <= fight.totalTicks {
-            effect.node.removeFromParentNode()
-        }
-        effects.removeAll { $0.expires <= fight.totalTicks }
-        let elapsed = max(0, fight.totalTicks - lastTick)
-        lastTick = fight.totalTicks
-        let decay = pow(Float(0.86), Float(elapsed))
-        recoilHero *= decay
-        recoilRival *= decay
-        shake *= decay
-        if fight.events.count < lastEventCount { lastEventCount = 0 }
-        for event in fight.events.dropFirst(lastEventCount) {
-            switch event {
-            case let .landed(_, by, _, damage, counter):
-                if by == .player { recoilRival = 0.35 } else { recoilHero = 0.3 }
-                if !reducedMotion {
-                    shake = counter ? 0.085 : 0.045
-                    impact(at: by == .player ? SCNVector3(0.4, 2.15, -0.15) : SCNVector3(-0.5, 1.9, 1.3), strong: damage > 15)
-                }
-            case let .dodged(_, attacker, _):
-                if !reducedMotion { trail(rivalDodged: attacker == .player) }
-            case .parried:
-                if !reducedMotion { trail(rivalDodged: false) }
-            default: break
-            }
-        }
-        lastEventCount = fight.events.count
-        let t = Float(fight.totalTicks) / 60
+        let wall = CACurrentMediaTime()
+        let dt = min(0.1, max(0, frameDelta ?? lastRender.map { wall - $0 } ?? 0))
+        lastRender = wall
+        shake *= pow(Float(0.86), Float(dt * 60))
         SCNTransaction.begin()
         SCNTransaction.animationDuration = 0
-        rival.pose(fight.opponent, time: t, recoil: recoilRival, reducedMotion: reducedMotion)
-        hero.pose(fight.player, time: t + 0.8, recoil: recoilHero, reducedMotion: reducedMotion)
-        positionFighters(time: t, reducedMotion: reducedMotion)
-        updateCamera(time: t, elapsedTicks: elapsed, reducedMotion: reducedMotion)
+        let cues = choreographer.update(fight, dt: dt, tickFraction: min(1, max(0, tickFraction)), reducedMotion: reducedMotion)
+        let now = choreographer.clock
+        for effect in effects where effect.expires <= now { effect.node.removeFromParentNode() }
+        effects.removeAll { $0.expires <= now }
+        for cue in cues where !reducedMotion {
+            let position = SCNVector3(cue.position)
+            switch cue.kind {
+            case let .impact(strong, counter):
+                shake = max(shake, counter ? 0.085 : 0.045)
+                impact(at: position, strong: strong)
+            case .knockdown:
+                shake = max(shake, 0.07)
+            case .dodge, .parry:
+                trail(at: position)
+            case .blocked:
+                break
+            }
+        }
+        let t = Float(now)
+        updateCamera(time: t, elapsed: Float(dt), reducedMotion: reducedMotion)
         animateCrowd(time: t, reducedMotion: reducedMotion)
         SCNTransaction.commit()
     }
 
-    private func updateCamera(time t: Float, elapsedTicks: Int, reducedMotion: Bool) {
+    private func updateCamera(time t: Float, elapsed: Float, reducedMotion: Bool) {
         guard !reducedMotion else {
             cameraFollow = .zero
             // Restore position AND aim after toggling Reduced Motion mid-bout.
@@ -178,8 +166,8 @@ import HaymakerKit
         }
         // A ringside operator eases after the action, with a very small dolly
         // and pedestal drift. No roll, cuts or aggressive zooms during play.
-        let blend = 1 - exp(-Float(elapsedTicks) / 60 * 2.4)
-        cameraFollow += (ringCenter - cameraFollow) * blend
+        let blend = 1 - exp(-elapsed * 2.4)
+        cameraFollow += (choreographer.ringCenter - cameraFollow) * blend
         let settle = min(t / 2, 1)
         let drift = sin(t * 0.23) * 0.09 + sin(t * 0.53) * 0.025
         camera.position = SCNVector3(
@@ -224,26 +212,6 @@ import HaymakerKit
             flash.isHidden = false
             flash.opacity = CGFloat((1 - age / 0.10) * 0.85)
         }
-    }
-
-    private func positionFighters(time: Float, reducedMotion: Bool) {
-        // Both fighters circle the same center and keep facing one another.
-        // Root travel follows the same strike/recovery curve as the gloves.
-        // They slowly circle and shuffle around the canvas (a few steps, never
-        // near the ropes) so the ropes and crowd slide past behind them.
-        let orbit: Float = reducedMotion ? 0 : sin(time * 0.32) * 0.34 + sin(time * 0.9) * 0.04
-        let drift: Float = reducedMotion ? 0 : sin(time * 0.21) * 0.55 + sin(time * 0.8) * 0.065
-        let depth: Float = reducedMotion ? 0 : sin(time * 0.27 + 1.1) * 0.32
-        let axis = SIMD3<Float>(sin(0.64 + orbit), 0, -cos(0.64 + orbit))
-        let center = SIMD3<Float>(drift, 0, 0.20 + depth)
-        ringCenter = center
-        hero.root.simdPosition = center - axis * (1.06 - hero.forwardDrive * 0.25)
-        rival.root.simdPosition = center + axis * (1.06 - rival.forwardDrive * 0.25)
-        hero.root.simdPosition.x -= hero.slip * 0.24
-        rival.root.simdPosition.x += rival.slip * 0.24
-        let facing = rival.root.simdPosition - hero.root.simdPosition
-        hero.root.eulerAngles.y = atan2(facing.x, facing.z)
-        rival.root.eulerAngles.y = atan2(-facing.x, -facing.z)
     }
 
     private func buildRing() {
@@ -517,20 +485,20 @@ import HaymakerKit
         emitter.position = position
         emitter.addParticleSystem(sparks)
         stage.addChildNode(emitter)
-        effects.append((emitter, lastTick + 42))
+        effects.append((emitter, choreographer.clock + 0.7))
     }
 
-    private func trail(rivalDodged: Bool) {
+    private func trail(at position: SCNVector3) {
         let arc = SCNTorus(ringRadius: 0.62, pipeRadius: 0.015)
         let glow = material(.white)
         glow.lightingModel = .constant
         glow.emission.contents = UIColor.white
         arc.materials = [glow]
-        let streak = node(arc, at: rivalDodged ? SCNVector3(0.4, 1.8, -0.15) : SCNVector3(-0.8, 1.45, 1.2))
+        let streak = node(arc, at: position)
         streak.scale = SCNVector3(1.3, 0.35, 1)
         stage.addChildNode(streak)
         streak.runAction(.group([.scale(to: 1.9, duration: 0.22), .fadeOut(duration: 0.22)]))
-        effects.append((streak, lastTick + 14))
+        effects.append((streak, choreographer.clock + 0.24))
     }
 }
 

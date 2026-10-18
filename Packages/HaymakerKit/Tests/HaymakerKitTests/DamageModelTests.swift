@@ -27,6 +27,19 @@ struct DamageModelTests {
         #expect(!DamageModel.isThreeCountKO(knockdownCount: 2, maxKnockdowns: 3))
     }
 
+    @Test("standard knockdown window is 3 s (180 ticks): room to fall and get back up")
+    func standardKnockdownWindow() {
+        #expect(DamageConfig.standard.knockdownTicks == 180)
+        #expect(EngineConfig().damage.knockdownTicks == 180)
+        var engine = FightEngine(config: EngineConfig(), seed: 6, book: .twitch)
+        engine.forcePlayerKnockdown()
+        for _ in 0..<179 { engine.tick(.none) }
+        #expect(engine.player.state == .knockedDown)
+        engine.tick(.none)
+        #expect(engine.player.state == .idle)
+        #expect(engine.events.contains { if case .rise = $0 { true } else { false } })
+    }
+
     @Test("revival floors HP upward, never downward")
     func revival() {
         #expect(DamageModel.revivalHP(current: 5, floor: 30) == 30)

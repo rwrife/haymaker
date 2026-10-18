@@ -53,11 +53,12 @@ bash scripts/test_host_sessions.sh
 bash scripts/check_zero_network.sh
 bash scripts/check_native_only.sh
 python3 scripts/test_rig_fighters.py                  # when touching fighter assets or rigs
+python3 scripts/test_fighter_clips.py                 # when touching fighter.clips or the clip extractor
 ```
 
 The iOS build and simulator UI journey need macOS with Xcode and only run in CI on the pinned toolchain. If you can't run them locally, rely on the PR build.
 
-Engine changes need tests in `Packages/HaymakerKit/Tests`. Keep the engine deterministic — no wall-clock time, unseeded randomness, or I/O in it. Rebuild fighter assets with `python3 scripts/rig_fighters.py` rather than editing generated models by hand.
+Engine changes need tests in `Packages/HaymakerKit/Tests`. Keep the engine deterministic — no wall-clock time, unseeded randomness, or I/O in it. Rebuild fighter assets with `python3 scripts/rig_fighters.py` rather than editing generated models by hand. Never commit Mixamo `.fbx` downloads; only the derived `.skin` sidecars and `fighter.clips` belong in the repo.
 
 ## Pull request review and auto-merge
 
