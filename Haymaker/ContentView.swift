@@ -39,11 +39,13 @@ struct ContentView: View {
     @State private var tickAccumulator: TimeInterval = 0
     @State private var countdown: FightCountdown?
     @State private var lastKnockdownValue: Int?
+    /// Seconds the arena has kept rendering since the bout ended (finish, celebration).
+    @State private var postBoutElapsed: TimeInterval = 0
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     private var effectiveReducedMotion: Bool { reducedMotion || systemReduceMotion }
     private var rendererIdle: Bool {
-        (session == nil ? showingCareer || effectiveReducedMotion : session?.engine.isOver != false) || showingVersus || paused || showingSettings || showingRecords || selectedDetail != nil || scenePhase != .active
+        (session == nil ? showingCareer || effectiveReducedMotion : session?.engine.isOver != false && postBoutElapsed >= MatchScene.postBoutRenderSeconds) || showingVersus || paused || showingSettings || showingRecords || selectedDetail != nil || scenePhase != .active
     }
     private let clock = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
 
@@ -64,8 +66,9 @@ struct ContentView: View {
                         match(session, portrait: portrait)
                         if let countdown, !paused, !session.engine.isOver { countdownOverlay(countdown, portrait: portrait) }
                         else if let down = knockdownCount(session.engine), !paused, !session.engine.isOver { knockdownOverlay(down, portrait: portrait) }
-                        if session.engine.isOver { results(session, portrait: portrait) }
-                        else if paused { pauseMenu }
+                        if session.engine.isOver {
+                            if postBoutElapsed >= MatchScene.resultsDelay { results(session, portrait: portrait) }
+                        } else if paused { pauseMenu }
                     }
                 } else if showingCareer { careerScreen(portrait: portrait) }
                 else { home(portrait: portrait) }
@@ -275,6 +278,7 @@ struct ContentView: View {
                     Image(systemName: "pause.fill").frame(width: 44, height: 44)
                         .background(.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
                 }
+                .disabled(fight.isOver)
                 .accessibilityLabel("Pause bout").accessibilityIdentifier("bout.pause")
             }
             .font(.system(size: 9, weight: .heavy))
@@ -648,6 +652,7 @@ struct ContentView: View {
         tickAccumulator = 0
         countdown = nil
         lastKnockdownValue = nil
+        postBoutElapsed = 0
         // The "FIGHT!" callout is shown when the 3-2-1 countdown ends (see advanceFrame).
         feedback = ""
         feedbackColor = RingStyle.gold
@@ -773,6 +778,7 @@ struct ContentView: View {
         countdown = nil
         lastKnockdownValue = nil
         session = nil
+        postBoutElapsed = 0
         scene = MatchScene(titleScreen: true)
         paused = false
         lastFrame = nil
@@ -787,9 +793,16 @@ struct ContentView: View {
             scene.renderTitle(time: now, reducedMotion: effectiveReducedMotion)
             return
         }
-        guard let session, !showingSettings, !showingRecords, selectedDetail == nil, !showingVersus, !paused, !session.engine.isOver, scenePhase == .active else { lastFrame = nil; return }
+        guard let session, !showingSettings, !showingRecords, selectedDetail == nil, !showingVersus, !paused || session.engine.isOver, scenePhase == .active else { lastFrame = nil; return }
         let elapsed = min(0.1, max(0, now - (lastFrame ?? now)))
         lastFrame = now
+        if session.engine.isOver {
+            // Keep the finish (knockout fall, celebration) on screen before the renderer idles.
+            guard postBoutElapsed < MatchScene.postBoutRenderSeconds else { return }
+            postBoutElapsed += elapsed
+            scene.render(session.engine, reducedMotion: effectiveReducedMotion, highContrast: colorblindCues, frameDelta: elapsed)
+            return
+        }
         if var running = countdown {
             // The engine is frozen while the 3-2-1 runs; only the clock and the scene move.
             let previous = running.value
@@ -809,7 +822,7 @@ struct ContentView: View {
                 if hapticsEnabled { UIImpactFeedbackGenerator(style: .heavy).impactOccurred() }
                 announceCountdown("Fight!")
             }
-            scene.render(session.engine, reducedMotion: effectiveReducedMotion, highContrast: colorblindCues)
+            scene.render(session.engine, reducedMotion: effectiveReducedMotion, highContrast: colorblindCues, frameDelta: elapsed)
             return
         }
         tickAccumulator += elapsed
@@ -821,7 +834,8 @@ struct ContentView: View {
                 break
             }
         }
-        scene.render(session.engine, reducedMotion: effectiveReducedMotion, highContrast: colorblindCues)
+        scene.render(session.engine, reducedMotion: effectiveReducedMotion, highContrast: colorblindCues,
+                     frameDelta: elapsed, tickFraction: tickAccumulator * 60)
         for event in session.engine.events.dropFirst(lastEventCount) {
             switch event {
             case let .landed(_, by, _, _, counter):

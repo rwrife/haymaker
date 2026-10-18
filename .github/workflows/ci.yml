@@ -124,6 +124,9 @@ jobs:
       - name: Verify fighter asset topology, weights, and reproducible exports
         run: python3 scripts/test_rig_fighters.py
 
+      - name: Verify the shared fighter animation clip library
+        run: python3 scripts/test_fighter_clips.py
+
       - name: Run HaymakerKit package tests on pinned macOS toolchain
         run: swift test --package-path Packages/HaymakerKit
       - name: Run HaymakerStore package tests and migrations on pinned macOS toolchain

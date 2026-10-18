@@ -74,7 +74,7 @@ public struct DamageConfig: Sendable, Codable, Hashable {
         maxStamina: Int = 100,
         staminaRegenPerTick: Int = 2,
         knockdownThreshold: Int = 25,
-        knockdownTicks: Int = 90,
+        knockdownTicks: Int = 180,
         blockDamageReduction: Int = 8,
         parryWindowTicks: Int = 6
     ) {

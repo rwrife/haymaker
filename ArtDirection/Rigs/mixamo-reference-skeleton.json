@@ -1,0 +1,348 @@
+{
+ "description": "Mixamo auto-rig rest pose (No Fingers, 25 bones) fitted by Mixamo to mack.obj; exported from the supplied Mixamo FBX animations. Units match the OBJ sculpts (mack.obj height 0.9995). Axes: Y-up, +Z front, +X = character's anatomical left. Leaf *_End bones are folded into 'end'.",
+ "source": "Mixamo FBX (without skin), mixamorig namespace; 24/30 fps clips",
+ "bones": [
+  {
+   "name": "Hips",
+   "parent": -1,
+   "head": [
+    0.0,
+    0.569018,
+    0.0
+   ],
+   "tail": [
+    0.0,
+    0.62526,
+    0.0
+   ],
+   "end": null
+  },
+  {
+   "name": "Spine",
+   "parent": 0,
+   "head": [
+    0.0,
+    0.615718,
+    -0.0085
+   ],
+   "tail": [
+    0.0,
+    0.67022,
+    -0.018434
+   ],
+   "end": null
+  },
+  {
+   "name": "Spine1",
+   "parent": 1,
+   "head": [
+    0.0,
+    0.67022,
+    -0.018434
+   ],
+   "tail": [
+    0.0,
+    0.732494,
+    -0.029784
+   ],
+   "end": null
+  },
+  {
+   "name": "Spine2",
+   "parent": 2,
+   "head": [
+    0.0,
+    0.732494,
+    -0.029784
+   ],
+   "tail": [
+    0.0,
+    0.80768,
+    -0.043488
+   ],
+   "end": null
+  },
+  {
+   "name": "Neck",
+   "parent": 3,
+   "head": [
+    0.0,
+    0.80254,
+    -0.042551
+   ],
+   "tail": [
+    0.0,
+    0.81254,
+    -0.042551
+   ],
+   "end": null
+  },
+  {
+   "name": "Head",
+   "parent": 4,
+   "head": [
+    0.0,
+    0.80384,
+    -0.042251
+   ],
+   "tail": [
+    0.0,
+    0.94799,
+    -0.042251
+   ],
+   "end": [
+    0.0,
+    0.94324,
+    -0.005551
+   ]
+  },
+  {
+   "name": "LeftShoulder",
+   "parent": 3,
+   "head": [
+    0.0437,
+    0.797111,
+    -0.042781
+   ],
+   "tail": [
+    0.132209,
+    0.78687,
+    -0.043142
+   ],
+   "end": null
+  },
+  {
+   "name": "LeftArm",
+   "parent": 6,
+   "head": [
+    0.132209,
+    0.78687,
+    -0.043142
+   ],
+   "tail": [
+    0.260509,
+    0.78687,
+    -0.043142
+   ],
+   "end": null
+  },
+  {
+   "name": "LeftForeArm",
+   "parent": 7,
+   "head": [
+    0.260509,
+    0.78687,
+    -0.043142
+   ],
+   "tail": [
+    0.395809,
+    0.78687,
+    -0.043142
+   ],
+   "end": null
+  },
+  {
+   "name": "LeftHand",
+   "parent": 8,
+   "head": [
+    0.395809,
+    0.78687,
+    -0.043142
+   ],
+   "tail": [
+    0.531109,
+    0.78687,
+    -0.043142
+   ],
+   "end": null
+  },
+  {
+   "name": "RightShoulder",
+   "parent": 3,
+   "head": [
+    -0.0437,
+    0.797084,
+    -0.042369
+   ],
+   "tail": [
+    -0.132212,
+    0.78687,
+    -0.042008
+   ],
+   "end": null
+  },
+  {
+   "name": "RightArm",
+   "parent": 10,
+   "head": [
+    -0.132212,
+    0.78687,
+    -0.042008
+   ],
+   "tail": [
+    -0.260612,
+    0.78687,
+    -0.042008
+   ],
+   "end": null
+  },
+  {
+   "name": "RightForeArm",
+   "parent": 11,
+   "head": [
+    -0.260612,
+    0.78687,
+    -0.042008
+   ],
+   "tail": [
+    -0.396012,
+    0.78687,
+    -0.042008
+   ],
+   "end": null
+  },
+  {
+   "name": "RightHand",
+   "parent": 12,
+   "head": [
+    -0.396012,
+    0.78687,
+    -0.042008
+   ],
+   "tail": [
+    -0.531412,
+    0.78687,
+    -0.042008
+   ],
+   "end": null
+  },
+  {
+   "name": "LeftUpLeg",
+   "parent": 0,
+   "head": [
+    0.0543,
+    0.543018,
+    -0.0077
+   ],
+   "tail": [
+    0.049233,
+    0.306573,
+    -0.008407
+   ],
+   "end": null
+  },
+  {
+   "name": "LeftLeg",
+   "parent": 14,
+   "head": [
+    0.049233,
+    0.306573,
+    -0.008407
+   ],
+   "tail": [
+    0.0543,
+    0.072429,
+    -0.030088
+   ],
+   "end": null
+  },
+  {
+   "name": "LeftFoot",
+   "parent": 15,
+   "head": [
+    0.0543,
+    0.072429,
+    -0.030088
+   ],
+   "tail": [
+    0.079802,
+    0.006744,
+    0.045996
+   ],
+   "end": null
+  },
+  {
+   "name": "LeftToeBase",
+   "parent": 16,
+   "head": [
+    0.079802,
+    0.006744,
+    0.045996
+   ],
+   "tail": [
+    0.091025,
+    0.00608,
+    0.087293
+   ],
+   "end": [
+    0.091025,
+    0.00608,
+    0.087293
+   ]
+  },
+  {
+   "name": "RightUpLeg",
+   "parent": 0,
+   "head": [
+    -0.0543,
+    0.543018,
+    -0.0066
+   ],
+   "tail": [
+    -0.049233,
+    0.306581,
+    -0.00872
+   ],
+   "end": null
+  },
+  {
+   "name": "RightLeg",
+   "parent": 18,
+   "head": [
+    -0.049233,
+    0.306581,
+    -0.00872
+   ],
+   "tail": [
+    -0.0543,
+    0.072427,
+    -0.031348
+   ],
+   "end": null
+  },
+  {
+   "name": "RightFoot",
+   "parent": 19,
+   "head": [
+    -0.0543,
+    0.072427,
+    -0.031348
+   ],
+   "tail": [
+    -0.079793,
+    0.006766,
+    0.046522
+   ],
+   "end": null
+  },
+  {
+   "name": "RightToeBase",
+   "parent": 20,
+   "head": [
+    -0.079793,
+    0.006766,
+    0.046522
+   ],
+   "tail": [
+    -0.091006,
+    0.006103,
+    0.087925
+   ],
+   "end": [
+    -0.091006,
+    0.006103,
+    0.087925
+   ]
+  }
+ ]
+}
