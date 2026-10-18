@@ -5,9 +5,9 @@ import Testing
 struct CharacterRosterTests {
     @Test func storyLadderAndAssets() {
         let roster = OpponentBook.careerRoster
-        #expect(roster.map(\.id) == ["goldie", "nico", "atlas", "vera", "duke", "sylvie", "cassian", "baxter"])
-        #expect(Set(roster.map(\.sequence)).count == 8)
-        #expect(Set(roster.compactMap { $0.character?.asset }).count == 8)
+        #expect(roster.map(\.id) == ["goldie", "nico", "atlas", "vera", "duke", "sylvie", "cassian", "jaison", "baxter"])
+        #expect(Set(roster.map(\.sequence)).count == 9)
+        #expect(Set(roster.compactMap { $0.character?.asset }).count == 9)
         for book in roster {
             #expect(book.character != nil)
             #expect(book.bio != "No biography recorded.")
@@ -21,6 +21,20 @@ struct CharacterRosterTests {
         let inputs = (0..<600).map { $0 % 30 == 0 ? PlayerInput.jab : .none }
         let first = FightEngine.simulate(config: config, seed: 42, book: book, inputs: inputs)
         #expect(first == FightEngine.simulate(config: config, seed: 42, book: book, inputs: inputs))
+    }
+
+    @Test func jaisonMeasuresThenLandsTheFinalFitting() {
+        let result = FightEngine.simulate(config: EngineConfig(rounds: 1, roundTicks: 650, restTicks: 0),
+                                          seed: 42, book: .jaison, inputs: Array(repeating: .none, count: 650))
+        let punches = result.events.compactMap { event -> Move? in
+            if case let .landed(_, .opponent, move, _, _) = event { return move }
+            return nil
+        }
+        // Guard and slip do not count as punches; the first offensive cycle
+        // measures with jabs before the signature hook–uppercut combination.
+        #expect(Array(punches.prefix(4)) == [.jab, .jab, .hook, .uppercut])
+        #expect(OpponentBook.jaison.character?.taunt == "Let’s get this sorted.")
+        #expect(Ladder.contenders.contains { $0.id == "jaison" })
     }
 
     @Test func sylvieSlipsPunchesWithoutThrowingADodge() {
