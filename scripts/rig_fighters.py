@@ -11,7 +11,7 @@ import struct
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-NAMES = ('mack', 'bruiser', 'goldie', 'nico', 'atlas', 'duke', 'sylvie', 'cassian', 'vera')
+NAMES = ('mack', 'bruiser', 'goldie', 'nico', 'atlas', 'duke', 'sylvie', 'cassian', 'vera', 'jaison')
 # name, parent, global bind position (normalized to source height)
 BONES = [('hips', -1, (0, .50, 0)), ('spine', 0, (0, .64, 0)),
          ('neck', 1, (0, .805, 0)), ('head', 2, (0, .85, 0))]

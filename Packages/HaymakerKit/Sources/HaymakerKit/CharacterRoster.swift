@@ -11,7 +11,7 @@ public struct CharacterProfile: Sendable, Hashable {
 
 public extension OpponentBook {
     /// The story ladder. Prototype books remain available for historical replays.
-    static let careerRoster: [OpponentBook] = [.goldie, .nico, .atlas, .vera, .duke, .sylvie, .cassian, .baxter]
+    static let careerRoster: [OpponentBook] = [.goldie, .nico, .atlas, .vera, .duke, .sylvie, .cassian, .jaison, .baxter]
 
     static let goldie = OpponentBook(id: "goldie", name: "Goldie Voltage", sequence: [
         punch(.jab, 48, 12, 24, 4, 6), punch(.jab, 30, 10, 24, 4, 6),
@@ -50,6 +50,14 @@ public extension OpponentBook {
         punch(.uppercut, 42, 14, 40, 11, 21)
     ], minGap: 22, gapSpread: 8)
 
+    /// Measures behind his guard, slips into a compact counter, then throws
+    /// The Final Fitting: a short hook followed by a sharp uppercut.
+    static let jaison = OpponentBook(id: "jaison", name: "Jaison “Black Tie” Mercer", sequence: [
+        punch(.block, 44, 48, 24, 4, 0), punch(.jab, 36, 10, 24, 4, 10),
+        punch(.dodge, 28, 24, 16, 4, 0), punch(.jab, 24, 8, 20, 4, 12),
+        punch(.hook, 30, 10, 16, 8, 16), punch(.uppercut, 28, 12, 44, 11, 22)
+    ], minGap: 14, gapSpread: 6)
+
     private static func punch(_ move: Move, _ tell: Int, _ impact: Int, _ recover: Int,
                               _ stamina: Int, _ damage: Int) -> PatternEntry {
         PatternEntry(move: move, tell: tell, impact: impact, recover: recover, staminaCost: stamina, damage: damage)
@@ -78,6 +86,9 @@ public extension OpponentBook {
         case "cassian": CharacterProfile(asset: "cassian",
             bio: "A former titleholder whose victory saved his neighborhood gym. Behind the flawless public image, Cassian is an exacting contender testing balance, timing, and what happens when a perfect plan breaks.",
             style: "TIMING • LAYERED DEFENSE", taunt: "I polished my footwork for this. Please don't scuff the masterpiece.")
+        case "jaison": CharacterProfile(asset: "jaison",
+            bio: "Jaison Elias Mercer grew up above Mercer & Son, learning that confidence comes from preparation. A charity exhibition revealed his counterpunching talent and earned Vera Velvet's mentorship. Quiet, dryly funny and meticulous, he repairs his waistcoat after every bout and intends to be announced as champion. The Final Fitting pairs a short body hook with a sharp uppercut.",
+            style: "PRECISE COUNTERS • THE FINAL FITTING", taunt: "Let’s get this sorted.")
         case "baxter": CharacterProfile(asset: "bruiser",
             bio: "The theatrical reigning champion was once a generous small-gym mentor. Baxter protects his reputation with heavyweight pressure, big windups, feints, guarded pauses and punishing counters. Earn his corner.",
             style: "FINAL BOSS • COMPLETE PRESSURE", taunt: "You want this corner? Earn it. And try not to dent the spotlight.")

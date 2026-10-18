@@ -1,9 +1,10 @@
 # Haymaker character backstories
 
-Story reference for the supplied character models, intro portraits, and defeated cut-scene portraits. These stories guide the playable roster, pre-fight dialogue, and future career scenes. Goldie and Nico retain their established concept backgrounds. Atlas, Vera, Duke, Sylvie, and Cassian's stories expand their existing concept backgrounds. Mack and Bruiser's histories are story proposals for the player and final boss. Bruiser remains the final boss as requested; Cassian is a championship contender rather than a replacement final boss. The playable ladder is Goldie, Nico, Atlas, Vera, Duke, Sylvie, Cassian, then Bruiser Baxter.
+Story reference for the supplied character models, intro portraits, and defeated cut-scene portraits. These stories guide the playable roster, pre-fight dialogue, and future career scenes. Goldie and Nico retain their established concept backgrounds. Atlas, Vera, Duke, Sylvie, and Cassian's stories expand their existing concept backgrounds. Mack and Bruiser's histories are story proposals for the player and final boss. Bruiser remains the final boss as requested; Cassian is a championship contender rather than a replacement final boss. Career shuffles Goldie, Nico, Atlas, Vera, Duke, Sylvie, Cassian, and Jaison each session, then closes with Bruiser Baxter.
 
 | Character | Career role | Model | Intro portrait | Defeated portrait |
 | --- | --- | --- | --- | --- |
+| Jaison “Black Tie” Mercer | Opponent | [jaison.obj](Models/jaison.obj) | [jaison.png](IntroScenes/jaison.png) | Not supplied |
 | Mack | Player | [mack.obj](Models/mack.obj) | Not supplied | [`mack-defeated.png`](DefeatedPortraits/mack-defeated.png) |
 | Goldie Voltage | Opponent | [goldie.obj](Models/goldie.obj) | [goldie.png](IntroScenes/goldie.png) | [`goldie-defeated.png`](DefeatedPortraits/goldie-defeated.png) |
 | Nico “Nightshift” Navarro | Opponent | [nico.obj](Models/nico.obj) | [nico.png](IntroScenes/nico.png) | [`nico-defeated.png`](DefeatedPortraits/nico-defeated.png) |
@@ -141,3 +142,29 @@ Mack's attempt to save another neighborhood gym feels uncomfortably familiar. Ca
 **Fighting identity:** economical technical boxing; measured attacks and layered defense test timing rather than sheer speed or power.
 
 **Voice:** “Let's see what we do when the plan breaks.”
+
+## Jaison Elias Mercer — “Black Tie”
+
+Jaison grew up above Mercer & Son, a tiny alterations shop that dressed everyone from wedding parties to washed-up prizefighters. He could take a suit apart before he could drive. His father taught him that confidence came from preparation: measure carefully, keep your hands steady, and never let anyone see you panic.
+
+He discovered those rules worked in a boxing ring, too.
+
+While working a championship banquet, Jaison stepped into a charity exhibition after the scheduled amateur failed to appear. The visiting contender expected an easy round against a skinny kid in glasses. Jaison expected to survive long enough to earn the staff their promised donation.
+
+Halfway through the round, his glasses went flying and a shirt sleeve split at the shoulder. He returned to his corner, handed over the glasses, and tore off the other sleeve.
+
+Then he went back out and dropped the contender with a perfectly timed counter.
+
+The crowd remembered the waistcoat. Vera Velvet, watching from the back of the room, remembered his footwork. She offered to train him—with one condition: he had to stop apologizing every time he landed a punch.
+
+Now Jaison enters every bout wearing a reinforced version of that same outfit, repaired by hand after each fight. Promoters keep trying to sell him as a novelty act. He intends to make them announce him as champion.
+
+**Personality:** Quiet, dryly funny, meticulous. He straightens his opponent’s crooked collar at weigh-ins, then studies exactly where their guard falls.
+
+**Fighting style:** Precise counters and compact combinations. He spends the opening exchanges measuring your reach, then starts slipping punches by inches.
+
+**Signature move — “The Final Fitting”:** A short body hook folds your guard inward, opening the way for a sharp uppercut.
+
+**Walkout line:** “Let’s get this sorted.”
+
+Gameplay uses the existing hook and uppercut moves in that order; body targeting and guard displacement are story flavor, not new engine mechanics.
