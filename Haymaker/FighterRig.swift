@@ -133,12 +133,21 @@ struct FighterRigData: Sendable {
                               vertices: vertices, indices: indices, blobs: blobs)
     }
 
+    /// Parsed once per process: measuring the head skin is costly, and every title
+    /// screen and opponent change builds fresh `BoxerModel`s. Failures aren't cached.
     static func load(_ asset: FighterModelAsset, bundle: Bundle = .main) throws -> FighterRigData {
+        let key = bundle.bundleURL.path + "/" + asset.rawValue
+        if let rig = cacheLock.withLock({ cache[key] }) { return rig }
         guard let url = bundle.url(forResource: asset.rawValue, withExtension: "fighter") else {
             throw FighterAssetError.missing("\(asset.rawValue).fighter")
         }
-        return try parse(Data(contentsOf: url), name: asset.rawValue)
+        let rig = try parse(Data(contentsOf: url), name: asset.rawValue)
+        cacheLock.withLock { cache[key] = rig }
+        return rig
     }
+
+    private static let cacheLock = NSLock()
+    nonisolated(unsafe) private static var cache: [String: FighterRigData] = [:]
 
     /// Skeleton-only fallback (invisible mesh) built from the clip library's
     /// source rest pose, so a broken install degrades instead of crashing.
