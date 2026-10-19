@@ -1,6 +1,7 @@
 """HMR2 fighter asset checks (stdlib only): byte-exact rebuild from OBJ + skin sidecar, the 22-bone
 skeleton contract, and the skin-weight guarantees the Mixamo animations rely on (rigid gloves, boots
 and head; no weight crossing between the left and right limbs)."""
+import json
 import math
 import re
 import struct
@@ -87,6 +88,22 @@ class FighterAssetsTests(unittest.TestCase):
                 committed = (ROOT / 'Haymaker' / 'Models' / f'{name}.fighter').read_bytes()
                 self.assertTrue(self.assets[name][0] == committed,
                                 f'{name}.fighter is stale: run python3 scripts/rig_fighters.py')
+
+    def test_defeated_portraits_cover_the_story_roster(self):
+        roster = (ROOT/'Packages'/'HaymakerKit'/'Sources'/'HaymakerKit'/'CharacterRoster.swift').read_text()
+        assets = set(re.findall(r'CharacterProfile\(asset: "([^"]+)"', roster))
+        catalog = ROOT/'Haymaker'/'Assets.xcassets'
+        self.assertEqual({p.stem.removesuffix('-defeated') for p in catalog.glob('*-defeated.imageset')}, assets)
+        for asset in assets:
+            with self.subTest(asset=asset):
+                filename = f'{asset}-defeated.png'
+                imageset = catalog/f'{asset}-defeated.imageset'
+                contents = json.loads((imageset/'Contents.json').read_text())
+                self.assertEqual(contents['images'], [{'filename': filename, 'idiom': 'universal'}])
+                data = (imageset/filename).read_bytes()
+                self.assertEqual(data, (ROOT/'ArtDirection'/'DefeatedPortraits'/filename).read_bytes())
+                self.assertEqual(data[:8], b'\x89PNG\r\n\x1a\n')
+                self.assertEqual(struct.unpack_from('>II', data, 16), (1024, 1536))
 
     def test_header_and_skeleton(self):
         self.assertEqual(BONES, SPEC_BONES)

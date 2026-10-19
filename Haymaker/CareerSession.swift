@@ -4,6 +4,16 @@ import HaymakerKit
 import HaymakerStore
 
 @MainActor @Observable final class CareerSession {
+    struct LadderSummary {
+        let bouts: Int
+        let wins: Int
+        let score: Int
+        let landed: Int
+        let thrown: Int
+        let counters: Int
+        let knockouts: Int
+    }
+
     private var store: BoutStore?
     private(set) var records = Records()
     private(set) var historyLoaded = false
@@ -65,6 +75,22 @@ import HaymakerStore
     func isBeaten(_ id: String) -> Bool { ladderRecords.wins(id, careerOnly: true) > 0 }
     func isUnlocked(_ id: String) -> Bool { historyLoaded && ladderRecords.isUnlocked(id, in: ladder) }
     var ladderComplete: Bool { historyLoaded && ladder.allSatisfy { isBeaten($0.id) } }
+    var canCelebrateVictory: Bool {
+        saved && mode == .career && ladderComplete && records.bouts.last?.result.outcome.isPlayerWin == true
+    }
+    /// Includes rematches and losses on this ladder, but never sparring or earlier ladders.
+    var ladderSummary: LadderSummary {
+        let bouts = ladderRecords.bouts.filter { $0.mode == .career }
+        return LadderSummary(
+            bouts: bouts.count,
+            wins: bouts.filter { $0.result.outcome.isPlayerWin }.count,
+            score: bouts.reduce(0) { $0 + $1.result.score.points },
+            landed: bouts.reduce(0) { $0 + $1.result.playerStats.landed },
+            thrown: bouts.reduce(0) { $0 + $1.result.playerStats.thrown },
+            counters: bouts.reduce(0) { $0 + $1.result.playerStats.counters },
+            knockouts: bouts.filter { $0.result.outcome == .playerWinByKO }.count
+        )
+    }
     /// The first unlocked opponent on the ladder that has not been beaten yet.
     var nextLadderBook: OpponentBook? { ladder.first { isUnlocked($0.id) && !isBeaten($0.id) } }
     /// Draws a fresh random ladder and starts progress over.

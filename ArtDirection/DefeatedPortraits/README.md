@@ -1,6 +1,6 @@
 # Defeated character portraits
 
-Ten AI-generated "just lost the fight" portraits for future loss and knockout cut scenes. Each one is an image edit of that character's existing reference art, so the face, hair, costume colors, gloves, framing and art style carry over. Only the condition and pose change: slumped posture, lowered gloves, swollen eye, split lip, bruising, light blood and scuffed gear. The tone is stylized and not graphic. Each character is isolated on a fully transparent background, so the portrait can be placed directly over any scene. These are source art outside the app's resource directory; no cut-scene behavior is implemented by this addition.
+Eleven "just lost the fight" portraits, including the user-supplied Hunter portrait. The generated portraits are image edits of each character's existing reference art, so the face, hair, costume colors, gloves, framing and art style carry over. Only the condition and pose change: slumped posture, lowered gloves, swollen eye, split lip, bruising, light blood and scuffed gear. The tone is stylized and not graphic. Each character is isolated on a fully transparent background, so the portrait can be placed directly over any scene. The ten opponent PNGs are copied unchanged into matching `*-defeated.imageset` entries in `Haymaker/Assets.xcassets` for victory results, cropped to their top 30% at runtime. Mack's defeated portrait remains source art only. All ten story opponents, including Hunter, Jaison and Bruiser Baxter, are covered; no defeated portraits are missing.
 
 | Character | Portrait | Edited from |
 | --- | --- | --- |
@@ -14,6 +14,7 @@ Ten AI-generated "just lost the fight" portraits for future loss and knockout cu
 | Cassian “Saint” Sterling | [cassian-defeated.png](cassian-defeated.png) | [`../IntroScenes/cassian.png`](../IntroScenes/cassian.png) |
 | Bruiser Baxter, the final boss | [bruiser-defeated.png](bruiser-defeated.png) | [`../IntroScenes/bruiser.png`](../IntroScenes/bruiser.png) |
 | Jaison “Black Tie” Mercer | [jaison-defeated.png](jaison-defeated.png) | [`../IntroScenes/jaison.png`](../IntroScenes/jaison.png) |
+| Hunter “Redline” Mercer | [hunter-defeated.png](hunter-defeated.png) | User-supplied original defeat portrait |
 
 ## Provenance
 
@@ -45,4 +46,4 @@ See [character backstories](../character-backstories.md) for each character's st
 
 ## Hunter Rowan Mercer — “Redline”
 
-User-supplied original character assets received October 19, 2026: `hunter.obj`, `hunter.png` (versus portrait), and `hunter-defeated.png` (archived defeat portrait for future cut scenes). The OBJ is rigged with the existing offline pipeline; runtime uses the generated `hunter.fighter`. No external stock assets.
+User-supplied original character assets received October 19, 2026: `hunter.obj`, `hunter.png` (versus portrait), and `hunter-defeated.png` (bundled unchanged for victory results). The OBJ is rigged with the existing offline pipeline; runtime uses the generated `hunter.fighter`. No external stock assets.

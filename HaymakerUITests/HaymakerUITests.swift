@@ -132,6 +132,76 @@ final class HaymakerUITests: XCTestCase {
     }
 
     @MainActor
+    func testDefeatedPortraitsSurpriseNextFightAndCareerFinale() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-haymakerUITestShortBout", "-haymakerUITestIsolatedStore", "-haymakerUITestJabEachTick"]
+        XCUIDevice.shared.orientation = .portrait
+        app.launch()
+        defer { XCUIDevice.shared.orientation = .portrait }
+        XCTAssertTrue(app.buttons["bout.start"].waitForExistence(timeout: 5))
+        app.buttons["bout.start"].tap()
+        let roster = ["goldie", "nico", "atlas", "vera", "duke", "sylvie", "cassian", "jaison", "hunter", "baxter"]
+        let bouts = roster.count + 1
+        for (index, id) in roster.enumerated() {
+            XCTAssertTrue(app.images["versus.portrait.\(id)"].waitForExistence(timeout: 5))
+            dismissVersus(app)
+            if index == roster.count - 1 { break }
+            XCTAssertTrue(app.staticTexts["bout.results"].waitForExistence(timeout: 25))
+            XCTAssertTrue(app.images["results.portrait.\(id)"].exists, "Show the defeated fighter, not their intro portrait")
+            XCTAssertFalse(app.staticTexts["career.victory"].exists)
+            if index == 0 {
+                let rematch = app.buttons["bout.again"]
+                scrollToButton(rematch, in: app)
+                rematch.tap()
+                XCTAssertTrue(app.images["versus.portrait.goldie"].waitForExistence(timeout: 5))
+                dismissVersus(app)
+                XCTAssertTrue(app.staticTexts["bout.results"].waitForExistence(timeout: 25))
+                XCTAssertTrue(app.images["results.portrait.goldie"].exists)
+            }
+            settleOrientation(app, landscape: index.isMultiple(of: 2))
+            let next = app.buttons["career.next"]
+            scrollToButton(next, in: app)
+            XCTAssertEqual(next.label, "NEXT FIGHT", "Do not reveal the next opponent in the button or its accessibility label")
+            let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            shot.name = "Defeated \(id)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            next.tap()
+        }
+        XCTAssertTrue(app.staticTexts["career.victory"].waitForExistence(timeout: 25))
+        XCTAssertFalse(app.staticTexts["bout.results"].exists, "The last win opens the career finale instead of another bout card")
+        XCTAssertFalse(app.buttons["career.next"].exists)
+        XCTAssertFalse(app.buttons["bout.again"].exists)
+        for landscape in [false, true] {
+            settleOrientation(app, landscape: landscape)
+            let endGame = app.buttons["career.endGame"]
+            scrollToButton(endGame, in: app)
+            XCTAssertTrue(app.frame.contains(endGame.frame), "The full End game button stays on screen in both orientations")
+            XCTAssertGreaterThanOrEqual(endGame.frame.height, 44)
+            XCTAssertTrue(app.staticTexts["career.victory.wins"].label.contains("\(bouts)/\(bouts)"), "Final stats include the rematch")
+            let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            shot.name = landscape ? "Career finale landscape" : "Career finale portrait"
+            shot.lifetime = .keepAlways
+            add(shot)
+        }
+        app.buttons["career.endGame"].tap()
+        XCTAssertTrue(app.buttons["bout.start"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["career.victory"].exists)
+        app.buttons["career.open"].tap()
+        XCTAssertEqual(app.staticTexts["career.status.goldie"].label, "Ready")
+        XCTAssertFalse(app.buttons["career.start.nico"].isEnabled)
+        app.buttons["records.open"].tap()
+        XCTAssertTrue(app.staticTexts["Career bouts \(bouts)"].waitForExistence(timeout: 5), "End game preserves the local ledger")
+    }
+
+    @MainActor
+    private func scrollToButton(_ button: XCUIElement, in app: XCUIApplication) {
+        XCTAssertTrue(button.waitForExistence(timeout: 5))
+        for _ in 0..<8 where !button.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        XCTAssertTrue(button.isHittable)
+    }
+
+    @MainActor
     func testEndlessSparringKeepsOpponentAndCountsRounds() {
         let app = XCUIApplication()
         app.launchArguments = ["-haymakerUITestShortBout", "-haymakerUITestIsolatedStore"]

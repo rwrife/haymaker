@@ -27,6 +27,7 @@ Rules:
 - Fight outcomes are a pure function of (seed, player inputs) — replayable, testable, cheat-checkable.
 - Append-only bout ledger; records are derived, never edited.
 - Zero network by construction; CI grep gate enforces the empty allowlist.
+- Victory presentation stays in the app: defeated portraits share the versus top-30% crop; the career finale loops Mack's bundled victory clip without advancing the completed engine. Finale stats derive only from saved career bouts on the current ladder, and End game resets ladder progress while preserving the append-only ledger.
 
 ## Technology choices and rationale
 

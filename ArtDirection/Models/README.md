@@ -124,4 +124,4 @@ Jaison’s source is the user-supplied `jaison.obj`. It has 4,824 colored vertic
 
 ## Hunter Rowan Mercer — “Redline”
 
-User-supplied original character assets received October 19, 2026: `hunter.obj`, `hunter.png` (versus portrait), and `hunter-defeated.png` (archived defeat portrait for future cut scenes). The OBJ is rigged with the existing offline pipeline; runtime uses the generated `hunter.fighter`. No external stock assets.
+User-supplied original character assets received October 19, 2026: `hunter.obj`, `hunter.png` (versus portrait), and `hunter-defeated.png` (bundled unchanged for victory results). The OBJ is rigged with the existing offline pipeline; runtime uses the generated `hunter.fighter`. No external stock assets.

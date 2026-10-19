@@ -99,17 +99,7 @@ struct VersusDialog: View {
     }
 
     private func face(height: CGFloat? = nil) -> some View {
-        GeometryReader { geometry in
-            // The source PNGs are 1024 × 1536. Fill the panel using only
-            // their top 30%, keeping the crop pinned to the top edge.
-            let scale = max(geometry.size.width / 1024, geometry.size.height / (1536 * 0.30))
-            let imageWidth = 1024 * scale
-            let imageHeight = 1536 * scale
-            Image("\(book.character?.asset ?? "bruiser")-intro")
-                .resizable()
-                .frame(width: imageWidth, height: imageHeight)
-                .position(x: geometry.size.width / 2, y: imageHeight / 2)
-        }
+        FighterPortrait(assetName: "\(book.character?.asset ?? "bruiser")-intro")
         .frame(height: height)
         .background(LinearGradient(colors: [gold.opacity(0.18), ink], startPoint: .topLeading, endPoint: .bottomTrailing))
         .clipped()
