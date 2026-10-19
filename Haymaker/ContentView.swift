@@ -69,8 +69,9 @@ struct ContentView: View {
                     if showingVersus {
                         VersusDialog(book: career.opponent, portrait: portrait, fight: beginFight, cancel: sessionReset)
                     } else {
-                        match(session, portrait: portrait)
-                            .accessibilityHidden(session.engine.isOver && postBoutElapsed >= MatchScene.resultsDelay)
+                        if !session.engine.isOver || postBoutElapsed < MatchScene.resultsDelay {
+                            match(session, portrait: portrait)
+                        }
                         if let countdown, !paused, !session.engine.isOver { countdownOverlay(countdown, portrait: portrait) }
                         else if let down = knockdownCount(session.engine), !paused, !session.engine.isOver { knockdownOverlay(down, portrait: portrait) }
                         if session.engine.isOver {
@@ -604,7 +605,7 @@ struct ContentView: View {
                     if portrait { Color.clear.frame(height: geometry.size.height * 0.42) }
                     HStack {
                         if !portrait { Spacer(minLength: 0) }
-                        careerVictoryDialog
+                        careerVictoryDialog(portrait: portrait)
                             .frame(maxWidth: portrait ? 420 : min(420, geometry.size.width * 0.52))
                     }
                 }
@@ -615,17 +616,17 @@ struct ContentView: View {
         .accessibilityAddTraits(.isModal)
     }
 
-    private var careerVictoryDialog: some View {
+    private func careerVictoryDialog(portrait: Bool) -> some View {
         let stats = career.ladderSummary
-        return VStack(spacing: 14) {
+        return VStack(spacing: portrait ? 14 : 8) {
             Text("CAREER COMPLETE").font(.system(size: 11, weight: .heavy)).tracking(3)
                 .foregroundStyle(RingStyle.gold)
                 .accessibilityIdentifier("career.victory")
-            Text("VICTORY").font(RingStyle.type(48)).italic().foregroundStyle(RingStyle.gold)
+            Text("VICTORY").font(RingStyle.type(portrait ? 48 : 36)).italic().foregroundStyle(RingStyle.gold)
             Text("Mack owns the ring. All \(career.ladder.count) opponents defeated.")
-                .font(.subheadline).multilineTextAlignment(.center)
+                .font(portrait ? .subheadline : .caption).multilineTextAlignment(.center)
             Text("FIGHTER STATS").font(.system(size: 10, weight: .heavy)).tracking(2)
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: portrait ? 2 : 3), spacing: portrait ? 12 : 8) {
                 resultStat("TOTAL SCORE", value: stats.score.formatted())
                 resultStat("WINS / BOUTS", value: "\(stats.wins)/\(stats.bouts)")
                     .accessibilityIdentifier("career.victory.wins")
@@ -641,12 +642,12 @@ struct ContentView: View {
                     showingCareer = false
                 }
             } label: {
-                Text("END GAME").font(RingStyle.type(23)).frame(maxWidth: .infinity, minHeight: 48)
+                Text("END GAME").font(RingStyle.type(portrait ? 23 : 20)).frame(maxWidth: .infinity, minHeight: portrait ? 48 : 44)
                     .foregroundStyle(RingStyle.ink).background(RingStyle.gold, in: RoundedRectangle(cornerRadius: 8))
             }
             .accessibilityIdentifier("career.endGame")
         }
-        .padding(20)
+        .padding(portrait ? 20 : 16)
         .background(RingStyle.ink.opacity(0.9), in: RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(RingStyle.gold.opacity(0.6)))
     }

@@ -176,6 +176,8 @@ final class HaymakerUITests: XCTestCase {
             settleOrientation(app, landscape: landscape)
             let endGame = app.buttons["career.endGame"]
             scrollToButton(endGame, in: app)
+            XCTAssertTrue(app.frame.contains(endGame.frame), "The full End game button stays on screen in both orientations")
+            XCTAssertGreaterThanOrEqual(endGame.frame.height, 44)
             XCTAssertTrue(app.staticTexts["career.victory.wins"].label.contains("\(bouts)/\(bouts)"), "Final stats include the rematch")
             let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
             shot.name = landscape ? "Career finale landscape" : "Career finale portrait"
