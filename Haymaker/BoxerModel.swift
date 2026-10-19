@@ -16,6 +16,7 @@ import HaymakerKit
     let scale: Float
     private let bones: [SCNNode]
     private var titleTime: Double?
+    private var victoryTime: Double?
     /// The director's most recent motion (diagnostics and QA captions).
     private(set) var lastMotion: Motion?
     /// The animator's pose this frame, before aim and floor contact.
@@ -195,6 +196,7 @@ import HaymakerKit
         yieldShift = [(.zero, .zero, .zero, .zero), (.zero, .zero, .zero, .zero)]
         yieldMotion = [(nil, nil), (nil, nil)]
         titleTime = nil
+        victoryTime = nil
     }
 
     /// Advance one presentation frame from the fighter's engine status.
@@ -215,6 +217,19 @@ import HaymakerKit
         guard let clip = motions[.warmup] ?? motions[.idle] else { return }
         let frame = reducedMotion ? 0 : Float(time.truncatingRemainder(dividingBy: 3_600)) * clip.fps
         let motion = Motion(clip: clip.id, frame: frame, rate: reducedMotion ? 0 : clip.fps, key: -1, fade: 0.3)
+        animated = animator.update(motion, dt: Float(dt), now: time, reducedMotion: reducedMotion)
+        finish(aimAt: nil)
+    }
+
+    /// The victory clip starts and ends in guard, so it can repeat throughout the finale.
+    func poseVictory(time: Double, reducedMotion: Bool) {
+        let dt = victoryTime.map { min(0.1, max(0, time - $0)) } ?? 0
+        victoryTime = time
+        guard let clip = motions[.victory] else { return }
+        let duration = Double(max(1, clip.lastFrame) / clip.fps)
+        let frame = reducedMotion ? clip.marker("armsUp", 0) : Float(time.truncatingRemainder(dividingBy: duration)) * clip.fps
+        let motion = Motion(clip: .victory, frame: frame, rate: reducedMotion ? 0 : clip.fps, key: -2, fade: AnimationTuning.victoryFade)
+        lastMotion = motion
         animated = animator.update(motion, dt: Float(dt), now: time, reducedMotion: reducedMotion)
         finish(aimAt: nil)
     }

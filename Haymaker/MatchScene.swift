@@ -33,6 +33,7 @@ import HaymakerKit
     private var flashNodes: [SCNNode] = []
 
     private var titleScreen: Bool
+    private var careerVictory = false
     private let mist = SCNNode()
 
     init(titleScreen: Bool = false) {
@@ -84,6 +85,7 @@ import HaymakerKit
         effects.removeAll()
         // Reuse the arena and renderer between rounds.
         titleScreen = false
+        careerVictory = false
         rival.root.isHidden = false
         hero.root.eulerAngles.y = .pi - 0.16
         layout(portrait: portrait)
@@ -98,6 +100,13 @@ import HaymakerKit
     func layout(portrait: Bool) {
         self.portrait = portrait
         camera.simdOrientation = simd_quatf(angle: 0, axis: SIMD3<Float>(0, 1, 0))
+        if careerVictory {
+            hero.root.position = portrait ? SCNVector3(0, 0, 0.5) : SCNVector3(-1.9, 0, 0.5)
+            camera.position = portrait ? SCNVector3(0, 2.5, 8.4) : SCNVector3(0, 2.7, 7.5)
+            camera.look(at: SCNVector3(0, portrait ? 0.6 : 1.55, 0))
+            camera.camera?.fieldOfView = portrait ? 43 : 38
+            return
+        }
         if titleScreen {
             camera.position = portrait ? SCNVector3(0, 2.9, 8.8) : SCNVector3(0, 2.7, 7.5)
             camera.look(at: SCNVector3(0, 1.55, 0))
@@ -118,6 +127,29 @@ import HaymakerKit
         hero.poseTitle(time: time, reducedMotion: reducedMotion)
         hero.root.position = SCNVector3(0, 0, portrait ? 0.85 : 0.55)
         hero.root.eulerAngles.y = .pi / 9
+        SCNTransaction.commit()
+    }
+
+    func beginCareerVictory(reducedMotion: Bool) {
+        careerVictory = true
+        titleScreen = false
+        rival.root.isHidden = true
+        for effect in effects { effect.node.removeFromParentNode() }
+        effects.removeAll()
+        hero.resetMotion()
+        hero.root.eulerAngles.y = .pi / 9
+        layout(portrait: portrait)
+        renderCareerVictory(time: 0, reducedMotion: reducedMotion)
+    }
+
+    /// Presentation only: the completed engine and saved results never advance.
+    func renderCareerVictory(time: TimeInterval, reducedMotion: Bool) {
+        guard careerVictory else { return }
+        mist.isPaused = reducedMotion
+        SCNTransaction.begin()
+        SCNTransaction.animationDuration = 0
+        hero.poseVictory(time: time, reducedMotion: reducedMotion)
+        animateCrowd(time: Float(time), reducedMotion: reducedMotion)
         SCNTransaction.commit()
     }
 

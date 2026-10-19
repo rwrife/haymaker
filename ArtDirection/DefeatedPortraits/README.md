@@ -1,6 +1,6 @@
 # Defeated character portraits
 
-Ten AI-generated "just lost the fight" portraits for future loss and knockout cut scenes. Each one is an image edit of that character's existing reference art, so the face, hair, costume colors, gloves, framing and art style carry over. Only the condition and pose change: slumped posture, lowered gloves, swollen eye, split lip, bruising, light blood and scuffed gear. The tone is stylized and not graphic. Each character is isolated on a fully transparent background, so the portrait can be placed directly over any scene. These are source art outside the app's resource directory; no cut-scene behavior is implemented by this addition.
+Ten AI-generated "just lost the fight" portraits. Each one is an image edit of that character's existing reference art, so the face, hair, costume colors, gloves, framing and art style carry over. Only the condition and pose change: slumped posture, lowered gloves, swollen eye, split lip, bruising, light blood and scuffed gear. The tone is stylized and not graphic. Each character is isolated on a fully transparent background, so the portrait can be placed directly over any scene. The nine opponent PNGs are copied unchanged into matching `*-defeated.imageset` entries in `Haymaker/Assets.xcassets` for victory results, cropped to their top 30% at runtime. Mack's defeated portrait remains source art only. All nine story opponents, including Jaison and Bruiser Baxter, are covered; no defeated portraits are missing.
 
 | Character | Portrait | Edited from |
 | --- | --- | --- |

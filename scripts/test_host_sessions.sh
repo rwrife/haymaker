@@ -12,7 +12,7 @@ ln -s "$root/Packages" "$probe/Packages"
 cat > "$probe/Package.swift" <<'PACKAGE'
 // swift-tools-version: 6.2
 import PackageDescription
-let package = Package(name: "Probe", dependencies: [.package(path: "Packages/HaymakerKit"), .package(path: "Packages/HaymakerStore")], targets: [.executableTarget(name: "Probe", dependencies: [.product(name: "HaymakerKit", package: "HaymakerKit"), .product(name: "HaymakerStore", package: "HaymakerStore")])])
+let package = Package(name: "Probe", platforms: [.macOS(.v14)], dependencies: [.package(path: "Packages/HaymakerKit"), .package(path: "Packages/HaymakerStore")], targets: [.executableTarget(name: "Probe", dependencies: [.product(name: "HaymakerKit", package: "HaymakerKit"), .product(name: "HaymakerStore", package: "HaymakerStore")])])
 PACKAGE
 cat > "$probe/Sources/Probe/Probe.swift" <<'SWIFT'
 import Foundation
@@ -72,9 +72,75 @@ import HaymakerStore
         precondition(history.begin(.twitch, mode: .career))
         print("PASS: unavailable history blocks career; failed reload stays unavailable; successful empty load enables career")
         print("PASS: failed save prevents begin/nextRound; retry preserves ID; saves once; saved navigation resumes")
+
+        func complete(_ book: OpponentBook, attacking: Bool = true) -> FightSession {
+            let session = FightSession(seed: 0xCAFE_2026, book: book, shortUITestBout: true)
+            for _ in 0..<session.engine.config.hardTickCap {
+                if session.engine.isOver { break }
+                if attacking { session.submit(.jab) }
+                session.advance()
+            }
+            precondition(session.engine.isOver && session.replayMatches)
+            return session
+        }
+        let ladderStore = try BoutStore()
+        try ladderStore.append(SavedBout(mode: .career, result: FightEngine.simulate(
+            seed: 7, book: .goldie, inputs: []
+        )))
+        var failFinalSave = false
+        let ladder = CareerSession(storeFactory: { ladderStore }, appendBout: { store, bout in
+            if failFinalSave { throw Failure() }
+            try store.append(bout)
+        }, ladderFactory: Ladder.authored)
+        precondition(ladder.ladderSummary.bouts == 0 && !ladder.canCelebrateVictory)
+        precondition(ladder.begin(.goldie, mode: .sparring))
+        ladder.save(complete(.goldie))
+        precondition(ladder.saved && ladder.ladderSummary.bouts == 0 && !ladder.ladderComplete)
+
+        var expected: [BoutResult] = []
+        let loss = complete(ladder.ladder[0], attacking: false)
+        precondition(!loss.engine.outcome!.isPlayerWin)
+        precondition(ladder.begin(ladder.ladder[0], mode: .career))
+        ladder.save(loss)
+        expected.append(ladder.records.bouts.last!.result)
+        precondition(!ladder.ladderComplete && !ladder.canCelebrateVictory)
+        for (index, book) in ladder.ladder.enumerated() {
+            precondition(ladder.nextLadderBook?.id == book.id)
+            precondition(ladder.begin(book, mode: .career))
+            let win = complete(book)
+            precondition(win.engine.outcome!.isPlayerWin, "UI-test jab driver must beat \(book.id)")
+            failFinalSave = index == ladder.ladder.count - 1
+            ladder.save(win)
+            if failFinalSave {
+                precondition(!ladder.saved && !ladder.ladderComplete && !ladder.canCelebrateVictory)
+                precondition(!ladder.newLadder())
+                failFinalSave = false
+                ladder.save(win)
+            }
+            precondition(ladder.saved && ladder.isBeaten(book.id))
+            expected.append(ladder.records.bouts.last!.result)
+            precondition(ladder.canCelebrateVictory == (index == ladder.ladder.count - 1))
+        }
+        precondition(ladder.ladderComplete && ladder.nextLadderBook == nil)
+        let summary = ladder.ladderSummary
+        precondition(summary.bouts == 10 && summary.wins == 9)
+        precondition(summary.score == expected.reduce(0) { $0 + $1.score.points })
+        precondition(summary.landed == expected.reduce(0) { $0 + $1.playerStats.landed })
+        precondition(summary.thrown == expected.reduce(0) { $0 + $1.playerStats.thrown })
+        precondition(summary.counters == expected.reduce(0) { $0 + $1.playerStats.counters })
+        precondition(summary.knockouts == expected.filter { $0.outcome == .playerWinByKO }.count)
+        precondition(ladder.begin(.goldie, mode: .sparring))
+        ladder.save(complete(.goldie))
+        precondition(!ladder.canCelebrateVictory && ladder.ladderSummary.bouts == 10)
+        let savedCount = ladder.records.bouts.count
+        precondition(ladder.newLadder())
+        precondition(!ladder.ladderComplete && !ladder.canCelebrateVictory && ladder.ladderSummary.bouts == 0)
+        precondition(ladder.nextLadderBook?.id == "goldie" && ladder.records.bouts.count == savedCount)
+        print("PASS: nine real wins complete the ladder only after a successful final save; sparring never ends career")
+        print("PASS: finale totals include ladder losses, exclude older history and sparring; End game resets progress, not records")
     }
 }
 SWIFT
-flags=()
-if [[ $(uname -s) == Linux ]]; then flags=(-Xswiftc -DGRDBCUSTOMSQLITE); fi
-swift run --package-path "$probe" -j 4 "${flags[@]}"
+flags=(--package-path "$probe" -j 4)
+if [[ $(uname -s) == Linux ]]; then flags+=(-Xswiftc -DGRDBCUSTOMSQLITE); fi
+swift run "${flags[@]}"

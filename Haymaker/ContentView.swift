@@ -41,11 +41,15 @@ struct ContentView: View {
     @State private var lastKnockdownValue: Int?
     /// Seconds the arena has kept rendering since the bout ended (finish, celebration).
     @State private var postBoutElapsed: TimeInterval = 0
+    @State private var showingCareerVictory = false
+    @State private var victoryElapsed: TimeInterval = 0
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     private var effectiveReducedMotion: Bool { reducedMotion || systemReduceMotion }
     private var rendererIdle: Bool {
-        (session == nil ? showingCareer || effectiveReducedMotion : session?.engine.isOver != false && postBoutElapsed >= MatchScene.postBoutRenderSeconds) || showingVersus || paused || showingSettings || showingRecords || selectedDetail != nil || scenePhase != .active
+        let idle = showingCareerVictory ? effectiveReducedMotion :
+            (session == nil ? showingCareer || effectiveReducedMotion : session?.engine.isOver != false && postBoutElapsed >= MatchScene.postBoutRenderSeconds)
+        return idle || showingVersus || paused || showingSettings || showingRecords || selectedDetail != nil || scenePhase != .active
     }
     private let clock = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
 
@@ -59,15 +63,18 @@ struct ContentView: View {
                 LinearGradient(colors: [.black.opacity(0.8), .clear, .clear, RingStyle.ink.opacity(0.95)], startPoint: .top, endPoint: .bottom)
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
-                if let session {
+                if showingCareerVictory {
+                    careerVictory(portrait: portrait)
+                } else if let session {
                     if showingVersus {
                         VersusDialog(book: career.opponent, portrait: portrait, fight: beginFight, cancel: sessionReset)
                     } else {
                         match(session, portrait: portrait)
+                            .accessibilityHidden(session.engine.isOver && postBoutElapsed >= MatchScene.resultsDelay)
                         if let countdown, !paused, !session.engine.isOver { countdownOverlay(countdown, portrait: portrait) }
                         else if let down = knockdownCount(session.engine), !paused, !session.engine.isOver { knockdownOverlay(down, portrait: portrait) }
                         if session.engine.isOver {
-                            if postBoutElapsed >= MatchScene.resultsDelay { results(session, portrait: portrait) }
+                            if postBoutElapsed >= MatchScene.resultsDelay, !career.canCelebrateVictory { results(session, portrait: portrait) }
                         } else if paused { pauseMenu }
                     }
                 } else if showingCareer { careerScreen(portrait: portrait) }
@@ -456,26 +463,64 @@ struct ContentView: View {
         let draw = session.engine.outcome == .draw
         return ZStack {
             RingStyle.ink.opacity(0.85).ignoresSafeArea()
-            if portrait {
-                ScrollView {
-                    VStack(spacing: 19) {
-                        resultsSummary(session, win: win, draw: draw, portrait: true)
-                        resultsActions(session, portrait: true)
+            GeometryReader { geometry in
+                if portrait {
+                    ScrollView {
+                        VStack(spacing: 19) {
+                            resultsSummary(session, win: win, draw: draw, portrait: true)
+                            if win, let character = session.engine.book.character {
+                                defeatedPortrait(session.engine.book, asset: character.asset)
+                                    .frame(height: min(geometry.size.height * 0.3, 240))
+                            }
+                            resultsActions(session, portrait: true)
+                        }
+                        .frame(maxWidth: 400).padding(28)
+                        .frame(maxWidth: .infinity, minHeight: geometry.size.height)
                     }
-                    .frame(maxWidth: 400).padding(28)
+                } else if win, let character = session.engine.book.character {
+                    HStack(spacing: 28) {
+                        VStack(spacing: 10) {
+                            defeatedPortrait(session.engine.book, asset: character.asset)
+                            resultsButtons(session, portrait: false)
+                        }
+                        .frame(maxWidth: 350)
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 8) {
+                                resultsSummary(session, win: win, draw: draw, portrait: false)
+                                boutStats(session, portrait: false)
+                                if career.mode == .sparring { sparringStats(portrait: false) }
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .frame(maxWidth: 780)
+                    .padding(.horizontal, 32).padding(.vertical, 16)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    HStack(alignment: .center, spacing: 32) {
+                        resultsSummary(session, win: win, draw: draw, portrait: false)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        resultsActions(session, portrait: false)
+                            .frame(maxWidth: 360)
+                    }
+                    .frame(maxWidth: 780)
+                    .padding(.horizontal, 32)
+                    .padding(.vertical, 16)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-            } else {
-                HStack(alignment: .center, spacing: 32) {
-                    resultsSummary(session, win: win, draw: draw, portrait: false)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    resultsActions(session, portrait: false)
-                        .frame(maxWidth: 360)
-                }
-                .frame(maxWidth: 780)
-                .padding(.horizontal, 32)
-                .padding(.vertical, 16)
             }
         }
+        .accessibilityAddTraits(.isModal)
+    }
+
+    private func defeatedPortrait(_ book: OpponentBook, asset: String) -> some View {
+        FighterPortrait(assetName: "\(asset)-defeated")
+            .background(LinearGradient(colors: [RingStyle.gold.opacity(0.18), RingStyle.ink], startPoint: .topLeading, endPoint: .bottomTrailing))
+            .overlay(Rectangle().stroke(RingStyle.gold.opacity(0.55)))
+            .accessibilityElement(children: .ignore)
+            .accessibilityAddTraits(.isImage)
+            .accessibilityLabel("Defeated portrait of \(book.name)")
+            .accessibilityIdentifier("results.portrait.\(book.id)")
     }
 
     private func resultsSummary(_ session: FightSession, win: Bool, draw: Bool, portrait: Bool) -> some View {
@@ -504,45 +549,115 @@ struct ContentView: View {
 
     private func resultsActions(_ session: FightSession, portrait: Bool) -> some View {
         VStack(spacing: portrait ? 19 : 10) {
-            HStack(spacing: 25) {
-                resultStat("SCORE", value: session.engine.playerScore().points.formatted())
-                resultStat("LANDED", value: "\(session.engine.playerStats.landed)/\(session.engine.playerStats.thrown)")
-                resultStat("COUNTERS", value: "\(session.engine.playerStats.counters)")
-            }
-            .padding(.vertical, portrait ? 10 : 4)
-            if career.mode == .sparring {
-                Text("Run: \(career.runBouts.count) rounds • score \(career.runBouts.reduce(0) { $0 + $1.result.score.points }) • landed \(career.runBouts.reduce(0) { $0 + $1.result.playerStats.landed })")
-                    .font(portrait ? .body : .caption)
-                    .accessibilityIdentifier("sparring.stats")
-                Button { if career.nextRound() { startBout() } } label: {
-                    Text("NEXT SPARRING ROUND").font(RingStyle.type(19)).frame(maxWidth: .infinity).frame(height: portrait ? 48 : 44)
-                        .background(RingStyle.gold.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))
-                }
-                .disabled(!career.saved).accessibilityIdentifier("sparring.next")
-            } else if let next = career.nextLadderBook, next.id != career.opponent.id {
-                Button { if career.begin(next, mode: .career) { startBout() } } label: {
-                    Text("NEXT CHALLENGER: \(next.name.uppercased())").font(RingStyle.type(17)).frame(maxWidth: .infinity).frame(height: portrait ? 48 : 44)
-                        .background(RingStyle.gold.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))
-                }
-                .disabled(!career.saved).accessibilityIdentifier("career.next")
-            }
+            boutStats(session, portrait: portrait)
+            if career.mode == .sparring { sparringStats(portrait: portrait) }
+            resultsButtons(session, portrait: portrait)
+        }
+    }
+
+    private func boutStats(_ session: FightSession, portrait: Bool) -> some View {
+        HStack(spacing: 25) {
+            resultStat("SCORE", value: session.engine.playerScore().points.formatted())
+            resultStat("LANDED", value: "\(session.engine.playerStats.landed)/\(session.engine.playerStats.thrown)")
+            resultStat("COUNTERS", value: "\(session.engine.playerStats.counters)")
+        }
+        .padding(.vertical, portrait ? 10 : 4)
+    }
+
+    private func sparringStats(portrait: Bool) -> some View {
+        Text("Run: \(career.runBouts.count) rounds • score \(career.runBouts.reduce(0) { $0 + $1.result.score.points }) • landed \(career.runBouts.reduce(0) { $0 + $1.result.playerStats.landed })")
+            .font(portrait ? .body : .caption)
+            .accessibilityIdentifier("sparring.stats")
+    }
+
+    private func resultsButtons(_ session: FightSession, portrait: Bool) -> some View {
+        VStack(spacing: portrait ? 12 : 8) {
             Button { if career.begin(career.opponent, mode: career.mode) { startBout() } } label: {
                 Text("REMATCH").font(RingStyle.type(23)).italic().frame(maxWidth: .infinity).frame(height: portrait ? 52 : 46)
                     .foregroundStyle(RingStyle.ink).background(RingStyle.gold, in: RoundedRectangle(cornerRadius: 8))
             }
             .disabled(!career.saved)
             .accessibilityIdentifier("bout.again")
+            if career.mode == .sparring {
+                Button { if career.nextRound() { startBout() } } label: {
+                    Text("NEXT SPARRING ROUND").font(RingStyle.type(19)).frame(maxWidth: .infinity).frame(height: portrait ? 48 : 44)
+                        .background(RingStyle.gold.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))
+                }
+                .disabled(!career.saved).accessibilityIdentifier("sparring.next")
+            } else if session.engine.outcome?.isPlayerWin == true, let next = career.nextLadderBook, next.id != career.opponent.id {
+                Button { if career.begin(next, mode: .career) { startBout() } } label: {
+                    Text("NEXT FIGHT").font(RingStyle.type(19)).frame(maxWidth: .infinity).frame(height: portrait ? 48 : 44)
+                        .background(RingStyle.gold.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))
+                }
+                .disabled(!career.saved).accessibilityIdentifier("career.next")
+            }
             Button("CAREER LADDER") { if career.saved { sessionReset(); showingCareer = true } }
                 .font(.system(size: 11, weight: .heavy)).tracking(1.4).padding(portrait ? 8 : 4)
                 .disabled(!career.saved).accessibilityIdentifier("career.home")
         }
     }
 
+    private func careerVictory(portrait: Bool) -> some View {
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(spacing: 0) {
+                    if portrait { Color.clear.frame(height: geometry.size.height * 0.42) }
+                    HStack {
+                        if !portrait { Spacer(minLength: 0) }
+                        careerVictoryDialog
+                            .frame(maxWidth: portrait ? 420 : min(420, geometry.size.width * 0.52))
+                    }
+                }
+                .padding(.horizontal, 24).padding(.vertical, 16)
+                .frame(maxWidth: .infinity, minHeight: geometry.size.height, alignment: .bottom)
+            }
+        }
+        .accessibilityAddTraits(.isModal)
+    }
+
+    private var careerVictoryDialog: some View {
+        let stats = career.ladderSummary
+        return VStack(spacing: 14) {
+            Text("CAREER COMPLETE").font(.system(size: 11, weight: .heavy)).tracking(3)
+                .foregroundStyle(RingStyle.gold)
+                .accessibilityIdentifier("career.victory")
+            Text("VICTORY").font(RingStyle.type(48)).italic().foregroundStyle(RingStyle.gold)
+            Text("Mack owns the ring. All \(career.ladder.count) opponents defeated.")
+                .font(.subheadline).multilineTextAlignment(.center)
+            Text("FIGHTER STATS").font(.system(size: 10, weight: .heavy)).tracking(2)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                resultStat("TOTAL SCORE", value: stats.score.formatted())
+                resultStat("WINS / BOUTS", value: "\(stats.wins)/\(stats.bouts)")
+                    .accessibilityIdentifier("career.victory.wins")
+                resultStat("LANDED / THROWN", value: "\(stats.landed)/\(stats.thrown)")
+                resultStat("ACCURACY", value: stats.thrown > 0 ? "\(stats.landed * 100 / stats.thrown)%" : "—")
+                resultStat("KNOCKOUTS", value: "\(stats.knockouts)")
+                resultStat("COUNTERS", value: "\(stats.counters)")
+            }
+            .accessibilityIdentifier("career.victoryStats")
+            Button {
+                if career.newLadder() {
+                    sessionReset()
+                    showingCareer = false
+                }
+            } label: {
+                Text("END GAME").font(RingStyle.type(23)).frame(maxWidth: .infinity, minHeight: 48)
+                    .foregroundStyle(RingStyle.ink).background(RingStyle.gold, in: RoundedRectangle(cornerRadius: 8))
+            }
+            .accessibilityIdentifier("career.endGame")
+        }
+        .padding(20)
+        .background(RingStyle.ink.opacity(0.9), in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(RingStyle.gold.opacity(0.6)))
+    }
+
     private func resultStat(_ title: String, value: String) -> some View {
         VStack(spacing: 3) {
             Text(value).font(RingStyle.type(28)).foregroundStyle(RingStyle.gold)
+                .lineLimit(1).minimumScaleFactor(0.6)
             Text(title).font(.system(size: 8, weight: .heavy)).tracking(1.5).foregroundStyle(.white.opacity(0.6))
         }
+        .accessibilityElement(children: .combine)
     }
 
     private var pauseMenu: some View {
@@ -641,6 +756,8 @@ struct ContentView: View {
     }
 
     private func startBout() {
+        showingCareerVictory = false
+        victoryElapsed = 0
         let isUITest = ProcessInfo.processInfo.arguments.contains("-haymakerUITestShortBout")
         session = FightSession(seed: career.seed, book: career.opponent, sparring: career.mode == .sparring, shortUITestBout: isUITest)
         scene.resetForNextBout(book: career.opponent)
@@ -774,6 +891,8 @@ struct ContentView: View {
     }
 
     private func sessionReset() {
+        showingCareerVictory = false
+        victoryElapsed = 0
         showingVersus = false
         countdown = nil
         lastKnockdownValue = nil
@@ -796,7 +915,18 @@ struct ContentView: View {
         guard let session, !showingSettings, !showingRecords, selectedDetail == nil, !showingVersus, !paused || session.engine.isOver, scenePhase == .active else { lastFrame = nil; return }
         let elapsed = min(0.1, max(0, now - (lastFrame ?? now)))
         lastFrame = now
+        if showingCareerVictory {
+            if !effectiveReducedMotion { victoryElapsed += elapsed }
+            scene.renderCareerVictory(time: victoryElapsed, reducedMotion: effectiveReducedMotion)
+            return
+        }
         if session.engine.isOver {
+            if postBoutElapsed >= MatchScene.resultsDelay, career.canCelebrateVictory {
+                showingCareerVictory = true
+                victoryElapsed = 0
+                scene.beginCareerVictory(reducedMotion: effectiveReducedMotion)
+                return
+            }
             // Keep the finish (knockout fall, celebration) on screen before the renderer idles.
             guard postBoutElapsed < MatchScene.postBoutRenderSeconds else { return }
             postBoutElapsed += elapsed
