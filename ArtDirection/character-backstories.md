@@ -4,7 +4,7 @@ Story reference for the supplied character models, intro portraits, and defeated
 
 | Character | Career role | Model | Intro portrait | Defeated portrait |
 | --- | --- | --- | --- | --- |
-| Jaison “Black Tie” Mercer | Opponent | [jaison.obj](Models/jaison.obj) | [jaison.png](IntroScenes/jaison.png) | Not supplied |
+| Jaison “Black Tie” Mercer | Opponent | [jaison.obj](Models/jaison.obj) | [jaison.png](IntroScenes/jaison.png) | [`jaison-defeated.png`](DefeatedPortraits/jaison-defeated.png) |
 | Mack | Player | [mack.obj](Models/mack.obj) | Not supplied | [`mack-defeated.png`](DefeatedPortraits/mack-defeated.png) |
 | Goldie Voltage | Opponent | [goldie.obj](Models/goldie.obj) | [goldie.png](IntroScenes/goldie.png) | [`goldie-defeated.png`](DefeatedPortraits/goldie-defeated.png) |
 | Nico “Nightshift” Navarro | Opponent | [nico.obj](Models/nico.obj) | [nico.png](IntroScenes/nico.png) | [`nico-defeated.png`](DefeatedPortraits/nico-defeated.png) |
