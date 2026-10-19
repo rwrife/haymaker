@@ -270,7 +270,7 @@ final class HaymakerUITests: XCTestCase {
         app.launch()
         app.buttons["career.open"].tap()
         let ladder = app.scrollViews["career.scroll"]
-        for id in ["goldie", "nico", "atlas", "vera", "duke", "sylvie", "cassian", "jaison", "baxter"] {
+        for id in ["goldie", "nico", "atlas", "vera", "duke", "sylvie", "cassian", "jaison", "hunter", "baxter"] {
             let spar = app.buttons["sparring.start.\(id)"]
             for _ in 0..<15 {
                 if spar.exists && spar.isHittable { break }

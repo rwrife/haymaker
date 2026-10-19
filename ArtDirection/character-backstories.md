@@ -168,3 +168,21 @@ Now Jaison enters every bout wearing a reinforced version of that same outfit, r
 **Walkout line:** “Let’s get this sorted.”
 
 Gameplay uses the existing hook and uppercut moves in that order; body targeting and guard displacement are story flavor, not new engine mechanics.
+
+## Hunter Rowan Mercer — “Redline”
+
+Hunter learned to box holding the pads for his brother. After closing Mercer & Son each evening, he and Jaison would push the cutting tables aside and train between hanging suits. Jaison practiced until every counter was perfect. Hunter kept asking, “What if he throws another punch?” Then he’d throw another punch.
+
+When Jaison’s exhibition upset made headlines, Hunter became his unofficial cornerman: carrying gloves, studying opponents, and arguing with him about combinations over breakfast. He loved watching his brother win. Hearing announcers introduce him only as “Jaison’s brother” wore thin.
+
+His first amateur bout settled that. Facing a defensive favorite, Hunter kept changing his rhythm, cutting off escapes and making every retreat cost something. By the final bell, the other fighter was exhausted—and Hunter was asking his corner whether there was another round. The nickname “Redline” stuck.
+
+He fights in black formalwear with torn sleeves and the crimson tie from his first night in Jaison’s corner. Both brothers still repair their gear at the family shop. They’ve agreed to help each other reach the championship. They haven’t agreed on what happens if they get there together.
+
+**Personality:** Easygoing outside the ring, fiercely competitive inside it. He can make Jaison laugh at exactly the wrong moment.
+
+**Fighting style:** Relentless pressure, shifting rhythms, and punches thrown while stepping forward. His eagerness can leave him open to a well-timed counter.
+
+**Signature move — Closing Time:** Two quick jabs drive you backward, a body hook pulls your guard down, and a stepping right catches you trying to escape. Runtime uses the existing straight-punch (`jab`) move for the finishing right; body targeting and a dedicated right-cross animation are not separate mechanics.
+
+**Walkout line:** “Try keeping up.”

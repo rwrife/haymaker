@@ -42,3 +42,7 @@ Ten AI-generated "just lost the fight" portraits for future loss and knockout cu
 - Generated art may differ slightly from the originals in small costume details such as emblems, laces and trim. Review each portrait in context before use in a cut scene.
 
 See [character backstories](../character-backstories.md) for each character's story and fighting identity, and [IntroScenes](../IntroScenes/README.md) for the original intro portraits.
+
+## Hunter Rowan Mercer — “Redline”
+
+User-supplied original character assets received October 19, 2026: `hunter.obj`, `hunter.png` (versus portrait), and `hunter-defeated.png` (archived defeat portrait for future cut scenes). The OBJ is rigged with the existing offline pipeline; runtime uses the generated `hunter.fighter`. No external stock assets.

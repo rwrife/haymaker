@@ -11,7 +11,7 @@ public struct CharacterProfile: Sendable, Hashable {
 
 public extension OpponentBook {
     /// The story ladder. Prototype books remain available for historical replays.
-    static let careerRoster: [OpponentBook] = [.goldie, .nico, .atlas, .vera, .duke, .sylvie, .cassian, .jaison, .baxter]
+    static let careerRoster: [OpponentBook] = [.goldie, .nico, .atlas, .vera, .duke, .sylvie, .cassian, .jaison, .hunter, .baxter]
 
     static let goldie = OpponentBook(id: "goldie", name: "Goldie Voltage", sequence: [
         punch(.jab, 48, 12, 24, 4, 6), punch(.jab, 30, 10, 24, 4, 6),
@@ -58,6 +58,13 @@ public extension OpponentBook {
         punch(.hook, 30, 10, 16, 8, 16), punch(.uppercut, 28, 12, 44, 11, 22)
     ], minGap: 14, gapSpread: 6)
 
+    /// Closing Time: two quick jabs, a body hook and a committed right.
+    /// The long final recovery rewards a patient counter after the pressure.
+    static let hunter = OpponentBook(id: "hunter", name: "Hunter “Redline” Mercer", sequence: [
+        punch(.jab, 26, 8, 12, 4, 11), punch(.jab, 18, 8, 12, 4, 12),
+        punch(.hook, 30, 12, 16, 8, 17), punch(.jab, 24, 12, 60, 10, 22)
+    ], minGap: 8, gapSpread: 12)
+
     private static func punch(_ move: Move, _ tell: Int, _ impact: Int, _ recover: Int,
                               _ stamina: Int, _ damage: Int) -> PatternEntry {
         PatternEntry(move: move, tell: tell, impact: impact, recover: recover, staminaCost: stamina, damage: damage)
@@ -89,6 +96,9 @@ public extension OpponentBook {
         case "jaison": CharacterProfile(asset: "jaison",
             bio: "Jaison Elias Mercer grew up above Mercer & Son, learning that confidence comes from preparation. A charity exhibition revealed his counterpunching talent and earned Vera Velvet's mentorship. Quiet, dryly funny and meticulous, he repairs his waistcoat after every bout and intends to be announced as champion. The Final Fitting pairs a short body hook with a sharp uppercut.",
             style: "PRECISE COUNTERS • THE FINAL FITTING", taunt: "Let’s get this sorted.")
+        case "hunter": CharacterProfile(asset: "hunter",
+            bio: "Hunter Rowan Mercer learned to box holding pads for his brother Jaison after closing Mercer & Son. Easygoing outside the ring and fiercely competitive inside it, Redline wants a name of his own. He fights in torn-sleeve black formalwear and the crimson tie from his first night in Jaison’s corner. Closing Time drives two quick jabs into a body hook and stepping right. His relentless, shifting pressure leaves him open to a patient counter. Both brothers want the championship; neither has settled what happens if they get there together.",
+            style: "RELENTLESS PRESSURE • CLOSING TIME", taunt: "Try keeping up.")
         case "baxter": CharacterProfile(asset: "bruiser",
             bio: "The theatrical reigning champion was once a generous small-gym mentor. Baxter protects his reputation with heavyweight pressure, big windups, feints, guarded pauses and punishing counters. Earn his corner.",
             style: "FINAL BOSS • COMPLETE PRESSURE", taunt: "You want this corner? Earn it. And try not to dent the spotlight.")
