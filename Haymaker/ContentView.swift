@@ -560,6 +560,7 @@ struct ContentView: View {
         HStack(spacing: 25) {
             resultStat("SCORE", value: session.engine.playerScore().points.formatted())
             resultStat("LANDED", value: "\(session.engine.playerStats.landed)/\(session.engine.playerStats.thrown)")
+                .accessibilityIdentifier("results.landed")
             resultStat("COUNTERS", value: "\(session.engine.playerStats.counters)")
         }
         .padding(.vertical, portrait ? 10 : 4)
