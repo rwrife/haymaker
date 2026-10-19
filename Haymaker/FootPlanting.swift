@@ -62,17 +62,33 @@ struct FootPlanter {
         var lock = SIMD2<Float>.zero
         var from = SIMD2<Float>.zero
         var to = SIMD2<Float>.zero
+        /// Landing clock (held in the air while a strained step chases).
         var elapsed: Float = 0
+        /// Travel clock: drives the step's XZ and never holds.
+        var travel: Float = 0
         var duration: Float = FootTuning.minStep
+        /// Displayed XZ of a step and where it is heading (after the stance hold).
+        var at = SIMD2<Float>.zero
+        var goal = SIMD2<Float>.zero
+        /// Share of the remaining way to `goal` covered this frame.
+        var advance: Float = 0
+        /// Late in a grounded step its destination stays put (no landing slide).
+        var settling = false
         var height: Float = 0
         var releasing = false
+        /// Time since the foot was let go: it crossfades off its plant (or its step's own
+        /// path) onto the clip's foot over `FootTuning.release`.
+        var released: Float = 0
         var strained = false
         /// Last solved hip–ankle distance as a share of the leg's length.
         var stretch: Float = 0
         /// Its rate of change (per second), for the strain lookahead.
         var stretchRate: Float = 0
-        /// The leg (extrapolated) cannot reach the foot: a step chases the clip's foot.
+        /// The leg (extrapolated) cannot reach a step's landing spot: it chases the clip's foot.
         var overreach = false
+        /// Hip-to-landing-spot distance (share of the leg's length) of a step, and its rate.
+        var landing: Float = 0
+        var landingRate: Float = 0
         /// 0…1 how hard a strained step chases the clip's foot.
         var chase: Float = 0
         /// `lock` holds the displayed position (set on the first solve).
@@ -113,11 +129,19 @@ struct FootPlanter {
             return simd_length(SIMD2<Float>(v.x, v.z))
         } ?? 0
         var landed = [false, false]
+        var grounds: [Float] = [0, 0]
+        // How straight the clip itself holds each leg: a pose standing tall (taunts, victory)
+        // is not a strain, only reaching past it is.
+        let natural = feet.map { foot -> Float in
+            let length = simd_distance(heads[foot.upLeg + 1], heads[foot.upLeg]) + simd_distance(heads[foot.foot], heads[foot.upLeg + 1])
+            return simd_distance(joints[foot.foot], joints[foot.upLeg]) / length
+        }
         for i in feet.indices {
             var foot = feet[i]
             let animated = Self.transform(toStage, joints[foot.toe])
             let ground = Self.transform(toStage, SIMD3<Float>(joints[0].x, heads[foot.toe].y, joints[0].z)).y
             let lift = animated.y - ground
+            grounds[i] = min(animated.y, ground + FootTuning.landing)
             let flat = flats[i]
             let other = feet[1 - i]
             let otherStepping = other.phase == .stepping
@@ -127,8 +151,12 @@ struct FootPlanter {
             }
             if !enabled {
                 switch foot.phase {
-                case .planted: start(&foot, from: foot.lock, to: flat, release: true)
-                case .stepping: foot.releasing = true
+                case .planted: start(&foot, from: foot.lock, to: foot.lock, release: true)
+                case .stepping:
+                    if !foot.releasing {
+                        foot.releasing = true
+                        foot.released = 0
+                    }
                 case .free: break
                 }
             } else {
@@ -157,34 +185,58 @@ struct FootPlanter {
                 }
             }
             if foot.phase == .stepping {
+                let span = max(1e-4, foot.duration)
+                // Only a step still well in the air starts chasing (a late chase would skate a low foot).
                 let chasing = enabled && foot.overreach && !foot.releasing
+                    && (foot.chase > 0 || foot.elapsed < FootTuning.chaseHold * span)
                 let ramp = dt / FootTuning.chaseRamp
                 foot.chase = chasing ? min(1, foot.chase + ramp) : max(0, foot.chase - ramp)
-                if !chasing || foot.elapsed + dt < FootTuning.chaseHold * foot.duration {
+                if !chasing || foot.elapsed + dt < FootTuning.chaseHold * span {
                     foot.elapsed += dt
                 } else {
-                    foot.elapsed = max(foot.elapsed, min(foot.elapsed + dt, FootTuning.chaseHold * foot.duration))
+                    foot.elapsed = max(foot.elapsed, min(foot.elapsed + dt, FootTuning.chaseHold * span))
                 }
-                let u = min(1, foot.elapsed / max(1e-4, foot.duration))
+                let before = min(1, foot.travel / span)
+                foot.travel = min(span, foot.travel + dt)
+                let u = min(1, foot.elapsed / span), p = min(1, foot.travel / span)
+                foot.settling = false
                 if foot.releasing {
-                    foot.to = flat
+                    // The step's own path (or the plant) is what the foot crossfades off.
                 } else if foot.chase > 0 {
-                    let base = u < FootTuning.destinationFreeze ? FootTuning.destinationFollow : 0
+                    let base = p < FootTuning.destinationFreeze ? FootTuning.destinationFollow : 0
                     let pace = base + (FootTuning.chaseFollow - base) * smoothstep(foot.chase)
                     foot.to = Self.approach(foot.to, flat, pace * dt)
                     foot.height = max(foot.height, min(0.1, simd_distance(foot.from, foot.to) * 0.35))
-                } else if u < FootTuning.destinationFreeze {
+                } else if p < FootTuning.destinationFreeze {
                     // Track the clip's foot, but a crossfade jerking it can't jerk the step.
                     foot.to = Self.approach(foot.to, flat, FootTuning.destinationFollow * dt)
                 } else if lift > FootTuning.landing {
                     // The clip lifts the foot again late in the step: follow it at a pace.
                     foot.to = Self.approach(foot.to, flat, FootTuning.freeFollow * dt)
+                } else {
+                    foot.settling = true
                 }
-                let xz = foot.from + (foot.to - foot.from) * smoothstep(u)
-                let y = foot.releasing ? animated.y : max(animated.y, ground + foot.height * sin(.pi * u))
+                if !foot.settling { foot.goal = foot.to }
+                // Cover this frame's share of the remaining way: a destination that moves
+                // mid-step is spread over the rest of the step instead of jerking the foot.
+                let eased = smoothstep(before)
+                foot.advance = before >= 1 ? 1 : min(1, (smoothstep(p) - eased) / max(1e-4, 1 - eased))
+                var xz = foot.at + (foot.goal - foot.at) * foot.advance
+                var y = foot.height > 0 ? max(animated.y, ground + foot.height * sin(.pi * u)) : animated.y
+                var done = u >= 1
+                if foot.releasing {
+                    // Blend onto the clip's (moving) foot as a whole, not a share of the way left
+                    // each frame: the foot joins the fall at its pace instead of snapping on at the end.
+                    foot.at = xz
+                    foot.released += dt
+                    let w = smoothstep(min(1, foot.released / FootTuning.release))
+                    xz += (flat - xz) * w
+                    y += (animated.y - y) * w
+                    done = foot.released / FootTuning.release >= 1
+                }
                 targets[i] = SIMD3<Float>(xz.x, y, xz.y)
-                if u >= 1 {
-                    foot.lock = foot.to
+                if done {
+                    foot.lock = xz
                     landed[i] = true
                     if foot.releasing || !enabled {
                         foot.phase = .free
@@ -209,14 +261,30 @@ struct FootPlanter {
                 feet[i].overreach = false
                 feet[i].stretch = 0
                 feet[i].stretchRate = 0
+                feet[i].landing = 0
+                feet[i].landingRate = 0
                 continue
             }
             let stretch = Self.solveLeg(&pose, heads: heads, upLeg: feet[i].upLeg, toeTarget: Self.transform(fromStage, target))
             if dt > 0, feet[i].stretch > 0 { feet[i].stretchRate = (stretch - feet[i].stretch) / dt }
             feet[i].stretch = stretch
             let predicted = stretch + max(0, feet[i].stretchRate) * FootTuning.strainLookahead
-            feet[i].strained = predicted > FootTuning.strain
-            feet[i].overreach = predicted > (feet[i].overreach ? FootTuning.chaseRelease : FootTuning.chaseStrain)
+            feet[i].strained = predicted > max(FootTuning.strain, natural[i] + 0.015)
+            guard feet[i].phase == .stepping, !feet[i].releasing else {
+                feet[i].overreach = false
+                feet[i].landing = 0
+                feet[i].landingRate = 0
+                continue
+            }
+            feet[i].at = SIMD2<Float>(target.x, target.z)
+            // A step chases when its landing spot (not the foot in flight) runs out of the leg's reach.
+            let spot = SIMD3<Float>(feet[i].goal.x, grounds[i], feet[i].goal.y)
+            let landing = Self.reach(pose, heads: heads, upLeg: feet[i].upLeg, toeTarget: Self.transform(fromStage, spot))
+            if dt > 0, feet[i].landing > 0 { feet[i].landingRate = (landing - feet[i].landing) / dt }
+            feet[i].landing = landing
+            let reaching = landing + max(0, feet[i].landingRate) * FootTuning.strainLookahead
+            let strain = max(FootTuning.chaseStrain, natural[i] + 0.02), release = max(FootTuning.chaseRelease, natural[i] + 0.005)
+            feet[i].overreach = reaching > (feet[i].overreach ? release : strain)
         }
     }
 
@@ -240,9 +308,20 @@ struct FootPlanter {
                 return p - d * (1 - wanted / width)
             }
             let xz: SIMD2<Float>
-            if stepping {
-                let u = min(1, foot.elapsed / max(1e-4, foot.duration))
-                xz = foot.from + (held(foot.to) - foot.from) * smoothstep(u)
+            if foot.settling && (stepping || landed[i]) {
+                // A settling step keeps the hold it froze with; it only gives way past the limit.
+                let d = foot.goal + heels[i] - anchor, width = simd_length(d)
+                guard width > limit else { continue }
+                foot.goal -= d * (1 - limit / width)
+                if stepping {
+                    xz = foot.at + (foot.goal - foot.at) * foot.advance
+                } else {
+                    foot.lock = foot.goal
+                    xz = foot.lock
+                }
+            } else if stepping {
+                foot.goal = held(foot.to)
+                xz = foot.at + (foot.goal - foot.at) * foot.advance
             } else {
                 foot.lock = held(foot.lock)
                 xz = foot.lock
@@ -252,6 +331,23 @@ struct FootPlanter {
             targets[i] = target
             feet[i] = foot
         }
+        // Steps leaving a wide stance (or feet pivoting under it) still close: whatever is
+        // in the air takes in the spread past the limit, a planted or landing foot never moves.
+        guard let a = targets[0], let b = targets[1] else { return }
+        let d = SIMD2<Float>(a.x, a.z) + heels[0] - SIMD2<Float>(b.x, b.z) - heels[1], width = simd_length(d)
+        guard width > limit else { return }
+        let free = feet.indices.map { i in
+            !landed[i] && (feet[i].phase == .free || (feet[i].phase == .stepping && !feet[i].releasing)) ? Float(1) : 0
+        }
+        let shares = free[0] + free[1]
+        guard shares > 0 else { return }
+        let close = d / width * (width - limit) / shares
+        for i in feet.indices where free[i] > 0 {
+            let move = i == 0 ? -close : close
+            targets[i]?.x += move.x
+            targets[i]?.z += move.y
+            if feet[i].phase == .free { feet[i].lock += move }
+        }
     }
 
     private mutating func start(_ foot: inout Foot, from: SIMD2<Float>, to: SIMD2<Float>, release: Bool) {
@@ -259,8 +355,16 @@ struct FootPlanter {
         foot.phase = .stepping
         foot.from = from
         foot.to = to
+        foot.at = from
+        foot.goal = to
+        foot.settling = false
+        foot.advance = 0
+        foot.travel = 0
+        foot.landing = 0
+        foot.landingRate = 0
         foot.elapsed = 0
         foot.releasing = release
+        foot.released = 0
         foot.duration = release ? FootTuning.release
             : min(FootTuning.maxStep, FootTuning.minStep + distance * FootTuning.stepPerUnit)
         foot.height = release ? 0 : min(0.1, max(0.03, distance * 0.35))
@@ -275,6 +379,15 @@ struct FootPlanter {
     static func transform(_ m: simd_float4x4, _ p: SIMD3<Float>) -> SIMD3<Float> {
         let v = m * SIMD4<Float>(p, 1)
         return SIMD3<Float>(v.x, v.y, v.z)
+    }
+
+    /// Hip-to-ankle distance (share of the leg's length) for a toe target, keeping the clip's foot orientation.
+    static func reach(_ pose: FighterPose, heads: [SIMD3<Float>], upLeg: Int, toeTarget: SIMD3<Float>) -> Float {
+        let leg = upLeg + 1, foot = upLeg + 2, toe = upLeg + 3
+        let globals = pose.globals(), joints = pose.joints(heads: heads)
+        let ankleTarget = toeTarget - globals[foot].act(heads[toe] - heads[foot])
+        let length = simd_distance(heads[leg], heads[upLeg]) + simd_distance(heads[foot], heads[leg])
+        return simd_distance(ankleTarget, joints[upLeg]) / length
     }
 
     /// Two-bone IK: bend the knee to the needed hip–ankle distance, swing the thigh

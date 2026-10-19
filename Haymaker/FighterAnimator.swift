@@ -20,6 +20,9 @@ enum AnimationTuning {
     }
     static let maxAnticipationAngle: Float = 0.42
     static let playerPunchFade: Float = 0.06
+    /// A hook thrown straight out of the guard skips the clip's long drop into the
+    /// chamber: its glove has far to go to the cocked pose, so its arm blends in longer.
+    static let playerHookArmFade: Float = 0.1
     /// Fastest an untold (player) punch extension may run versus the mocap.
     static let maxPunchSpeedup: Float = 2.5
     /// Fastest the lower body (step, Hips travel, legs) may run versus the mocap.
@@ -48,6 +51,8 @@ enum AnimationTuning {
     static let punchExitFade: Float = 0.3
     static let guardFade: Float = 0.07
     static let parryFade: Float = 0.05
+    /// Fades this short (s) blend linearly.
+    static let evenFade: Float = 0.051
     static let slipFade: Float = 0.06
     static let guardLoad = 0.12
     static let parryLoad = 4.0 / 60
@@ -110,8 +115,25 @@ enum AnimationTuning {
     static let maxClavicleAim: Float = 0.3
     /// How far the glove sinks into the target at contact (rig units).
     static let aimBite: Float = 0.05
-    /// How far (radians) an open guard glove swings out as a hook comes in on its side.
-    static let guardGive: Float = 0.5
+    /// How far a glove may press into a head's skin where the blob overhangs it (rig units).
+    static let skinBite: Float = 0.035
+    /// Until contact a punching glove stays this far (rig units) per second still to
+    /// go off its target: it closes at a strike's speed rather than arriving early.
+    static let contactLead: Float = 2.4
+    /// How far a glove giving way to the other fighter's glove or head still overlaps it (rig units).
+    static let gloveYieldBite: Float = 0.03
+    /// Frames ahead a glove starts giving way to a part coming at it (each counting less).
+    static let gloveYieldLead = 6
+    /// A glove's give changes by at most `start + growth × last frame's change` per 60 Hz frame (rig units).
+    static let gloveYieldStart: Float = 0.034
+    static let gloveYieldGrowth: Float = 2.2
+    /// On the stage a give never moves a glove or elbow faster than the animation already
+    /// does, past `calmStart + calmGrowth × its speed the frame before` (rig units per 60 Hz frame).
+    static let gloveYieldCalmStart: Float = 0.036
+    static let gloveYieldCalmGrowth: Float = 2.3
+    /// How far (rig units) an open guard glove drops and opens as a hook comes in on its side.
+    static let guardDrop: Float = 0.3
+    static let guardOpen: Float = 0.08
     /// Most the elbow may flex to stop a glove on a target that is closer than the punch reaches.
     static let maxElbowFlex: Float = 1.0
     /// Most the elbow may open to reach a target a bent-arm punch falls short of.
@@ -134,6 +156,17 @@ enum AnimationTuning {
         }
     }
     static let blockedImpulse: Float = 0.07
+    /// A landed blow carries the head at least this far (stage units) along it within
+    /// `braceFrames` frames of contact (on top of the impulse, which a fighter lunging
+    /// into the blow can cancel), leaning spine, neck and head by `braceShares`, at most
+    /// `braceMaxAngle` radians; the lean eases off `braceHold` per frame while held, then
+    /// with a time constant of `braceRelease` seconds.
+    static let braceTravel: Float = 0.045
+    static let braceFrames = 2
+    static let braceShares: [(bone: Int, share: Float)] = [(2, 0.12), (3, 0.2), (4, 0.3), (5, 0.38)]
+    static let braceMaxAngle: Float = 0.3
+    static let braceHold: Float = 0.8
+    static let braceRelease: Float = 0.035
 }
 
 /// Re-timing of a punch's approach: the mocap's glove slows down well before its
@@ -234,7 +267,8 @@ struct Motion: Sendable {
     /// Identity of a continuous motion; changing it starts a crossfade of `fade` seconds.
     var key: Int
     var fade: Float
-    /// A shorter crossfade for the punching arm (a punch out of a slow blend still lands).
+    /// The punching arm's own crossfade: shorter (a punch out of a slow blend still
+    /// lands) or longer (a glove with far to go to the clip's pose gets there smoothly).
     var armFade: Float?
     var anticipation: Float = 0
     /// 0…1 subtle breathing on a held pose.
@@ -475,20 +509,20 @@ final class FighterAnimator {
     func update(_ motion: Motion, dt: Float, now: Double, reducedMotion: Bool) -> FighterPose {
         let step = max(0, dt)
         if let current, current.key != motion.key {
-            if source != nil, fadeElapsed < fadeDuration {
+            if source != nil, fadeElapsed < max(fadeDuration, armFadeDuration ?? 0) {
                 source = .frozen(basePose)
             } else {
                 source = .live(current)
             }
             fadeElapsed = 0
             fadeDuration = max(0.001, motion.fade)
-            armFadeDuration = motion.armFade.map { max(0.001, min($0, fadeDuration)) }
+            armFadeDuration = motion.armFade.map { max(0.001, $0) }
         }
         current = motion
         var out = sample(motion)
         if let active = source {
             fadeElapsed += step
-            if fadeElapsed >= fadeDuration {
+            if fadeElapsed >= max(fadeDuration, armFadeDuration ?? 0) {
                 source = nil
             } else {
                 let from: FighterPose
@@ -505,7 +539,10 @@ final class FighterAnimator {
                     from = snapshot
                 }
                 let target = out
-                out = FighterPose.blend(from, target, smoothstep(fadeElapsed / fadeDuration))
+                // A fade over only a few frames ramps evenly: smoothstep's samples would
+                // put half the blend into the middle frame.
+                let blend = min(1, fadeElapsed / fadeDuration)
+                out = FighterPose.blend(from, target, fadeDuration <= AnimationTuning.evenFade ? blend : smoothstep(blend))
                 if let arm = armFadeDuration, let bones = guardArms[motion.clip] {
                     let weight = smoothstep(min(1, fadeElapsed / arm))
                     for (bone, _) in bones { out.rotations[bone] = slerpShortest(from.rotations[bone], target.rotations[bone], weight) }
@@ -673,6 +710,8 @@ final class FighterDirector {
     /// 0…1 how strongly the punching arm is steered onto the target (1 at contact).
     private(set) var aim: Float = 0
     private(set) var aimClip: ClipID = .jab
+    /// Seconds until the winding-up punch lands (nil when no punch is on its way).
+    private(set) var contactIn: Double?
     private(set) var downTimes: DownTimes?
     /// True on the frame the fighter entered a new non-idle engine state.
     private(set) var enteredAction = false
@@ -881,6 +920,7 @@ final class FighterDirector {
 
     func update(_ input: Input) -> Motion {
         enteredAction = false
+        contactIn = nil
         let status = input.status
         let id = StateID(state: status.state, start: input.totalTicks - status.ticksInCurrentState, move: status.currentMove)
         if id != stateID {
@@ -1211,12 +1251,14 @@ final class FighterDirector {
         let t = stateTime(input)
         strike = Float(min(1, max(0, (t - plan.hold) / plan.duration)))
         strikeDuration = plan.duration
+        contactIn = max(0, plan.hold + plan.duration - t)
         let frame = clock.frame(at: t0 + (t1 - t0) * strike)
         let holding = t < plan.hold
         let rate = holding ? 0 : (t1 - t0) / Float(plan.duration) / clock.slope(at: frame)
         var motion = Motion(clip: id, frame: frame, rate: rate, key: attackKey, fade: AnimationTuning.playerPunchFade,
                             anticipation: told ? AnimationTuning.anticipation(lastAttack) : 0, hold: holding ? 1 : 0)
         motion.offArm = start + (contact - start) * strike
+        if id == .hook, !told { motion.armFade = AnimationTuning.playerHookArmFade }
         return motion
     }
 

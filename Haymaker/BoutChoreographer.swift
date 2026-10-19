@@ -55,11 +55,24 @@ import HaymakerKit
     /// Per attacker: what the glove actually aims at (defender rig space): the head,
     /// or the guard glove covering it while the defender blocks.
     private var aimPoint: [Combatant: (center: SIMD3<Float>, radius: Float)] = [:]
+    /// Per fighter: how far its shown Hips trailed its clip at the end of last frame
+    /// (`BoxerModel.hipsShift`), read by both attackers this frame alike.
+    private var hipsShift: [Combatant: SIMD3<Float>] = [:]
     private var wasAttacking: [Combatant: Bool] = [:]
+    /// Per attacker: the current punch was thrown while the defender was down.
+    private var swingAtDowned: [Combatant: Bool] = [:]
     /// Each fighter's step (`step(_:)`) on the previous frame, and per attacker the
     /// step its punch winds up from: a punch steps `budget` from there (up to `limit` to land).
     private var lastStep: [Combatant: Float] = [:]
+    /// Frames since a fighter held its ground against an incoming punch (while it lets go).
+    private var loosed: [Combatant: Float] = [:]
     private var windupOrigin: [Combatant: (step: Float, budget: Float, limit: Float)] = [:]
+    /// How much farther than its windup start a punch's root step still carries the Hips
+    /// (they travel at most `AnimationTuning.windupHipsTravel` in a windup, the clip's drive included).
+    private var windupCapacity: [Combatant: Float] = [:]
+    /// A fighter stepping into a punch its attacker's footwork cannot carry to the head
+    /// (the attacker's side is the key's other side): a counter lands because the head came to it.
+    private var drawIn: [Combatant: Float] = [:]
     private var frameStep: Float = 0
     /// Extra separation (scene units) easing the fighters apart while a glove that
     /// is not landing a punch would sink into the other fighter's gloves or head
@@ -109,10 +122,15 @@ import HaymakerKit
         endTime = nil
         pending.removeAll()
         aimHead.removeAll()
+        hipsShift.removeAll()
         aimPoint.removeAll()
         wasAttacking.removeAll()
+        swingAtDowned.removeAll()
         lastStep.removeAll()
+        loosed.removeAll()
         windupOrigin.removeAll()
+        windupCapacity.removeAll()
+        drawIn.removeAll()
         spread.removeAll()
         give.removeAll()
         hero.resetMotion()
@@ -198,10 +216,11 @@ import HaymakerKit
             let status = defender == .player ? fight.player : fight.opponent
             pending.append((.impact(strong: damage > 15 || move == .uppercut, counter: counter), by, move))
             // The head snaps along the blow on the very next frame, even under a knockdown.
-            model(defender).animator.impulse(push: blowDirection(by: by, move: move),
-                                             angle: AnimationTuning.impulse(move) * (counter ? 1.2 : 1))
+            let push = blowDirection(by: by, move: move)
+            model(defender).animator.impulse(push: push, angle: AnimationTuning.impulse(move) * (counter ? 1.2 : 1))
             // A knockdown blow is carried by the fall itself.
             guard status.state != .knockedDown, status.state != .ko else { return }
+            model(defender).braceForBlow(push: push)
             var weight: Float, rate: Float, clip: ClipID
             switch move {
             case .hook:
@@ -287,6 +306,7 @@ import HaymakerKit
         axis = SIMD3<Float>(sin(0.64 + orbit), 0, -cos(0.64 + orbit))
         let center = SIMD3<Float>(drift, 0, 0.20 + depth)
         ringCenter = center
+        hipsShift = [.player: hero.hipsShift, .opponent: rival.hipsShift]
         // The clips carry their own weight shifts and root motion; the scene only
         // adds the step-in that makes each punch reach its target.
         let half = spacing.base / 2
@@ -295,14 +315,33 @@ import HaymakerKit
         hero.root.simdPosition = center - axis * (half - step(.player))
         rival.root.simdPosition = center + axis * (half - step(.opponent))
         // Re-solve each punch's slide against where the defender's head really is.
+        let struck = wasAttacking
         for side in [Combatant.player, .opponent] { track(side, state: states[side] ?? .idle, defenderState: states[side.other] ?? .idle,
                                                           center: center, half: half) }
-        hero.root.simdPosition = center - axis * (half - step(.player))
-        rival.root.simdPosition = center + axis * (half - step(.opponent))
-        for side in [Combatant.player, .opponent] { lastStep[side] = step(side) }
+        for side in [Combatant.player, .opponent] {
+            var paced = pacedStep(side)
+            // Caught on the way back out: a fighter does not drift off a punch already on its
+            // way, nor before the frame it lands.
+            let state = states[side] ?? .idle
+            let incoming = states[side.other] == .attacking || struck[side.other] == true
+            if incoming, state != .attacking, state != .dodging, let last = lastStep[side] {
+                paced = max(paced, last)
+                loosed[side] = 0
+            } else if let frames = loosed[side], let last = lastStep[side] {
+                // Let go of the hold as a step that gathers pace, not a jolt back to the mark.
+                let pace = Self.stepPace * frameStep * 60 * min(1, (frames + 1) / Self.loosenFrames)
+                if state != .attacking { paced = last + min(pace, max(-pace, paced - last)) }
+                loosed[side] = frames + 1 >= Self.loosenFrames ? nil : frames + 1
+            }
+            lastStep[side] = paced
+        }
+        hero.root.simdPosition = center - axis * (half - (lastStep[.player] ?? 0))
+        rival.root.simdPosition = center + axis * (half - (lastStep[.opponent] ?? 0))
         separate(states: states)
-        hero.finish(aimAt: aimTarget(by: .player), plantFeet: frameStep, guardGive: guardGive(.player, states: states))
-        rival.finish(aimAt: aimTarget(by: .opponent), plantFeet: frameStep, guardGive: guardGive(.opponent, states: states))
+        hero.finish(aimAt: aimTarget(by: .player, states: states), plantFeet: frameStep, guardGive: guardGive(.player, states: states))
+        rival.finish(aimAt: aimTarget(by: .opponent, states: states), plantFeet: frameStep, guardGive: guardGive(.opponent, states: states))
+        hero.yieldGloves(to: rival, attacking: states[.player] == .attacking, dt: frameStep)
+        rival.yieldGloves(to: hero, attacking: states[.opponent] == .attacking, dt: frameStep)
     }
 
     private func guardGive(_ side: Combatant, states: [Combatant: FighterState]) -> BoxerModel.GuardGive? {
@@ -310,7 +349,8 @@ import HaymakerKit
         let open: Set<FighterState> = [.idle, .telling, .attacking, .recovering]
         let incoming = states[side.other] == .attacking && attacker.director.lungeMove == .hook && open.contains(state)
         let now = give[side, default: 0]
-        let rate = (incoming ? 1 / Self.giveIn : -1 / Self.giveOut) * frameStep
+        // A guard thrown up against it closes the opening as fast as it opened.
+        let rate = (incoming ? 1 / Self.giveIn : open.contains(state) ? -1 / Self.giveOut : -1 / Self.giveIn) * frameStep
         let weight = min(1, max(0, now + rate))
         give[side] = weight
         guard weight > 0, let hand = spacing.hand[side.other]?[.hook] else { return nil }
@@ -318,10 +358,20 @@ import HaymakerKit
         return .init(arm: hand == .rightHand ? .leftArm : .rightArm, weight: smoothstep(weight))
     }
 
+    /// The step this frame, moving the root no faster than footwork allows: a punch's
+    /// lunge plus a re-solve after a snapping head (parry, reaction) never adds up to a skate.
+    private func pacedStep(_ side: Combatant) -> Float {
+        let wanted = step(side)
+        guard let last = lastStep[side] else { return wanted }
+        let pace = Self.stepPace * frameStep * 60
+        return last + min(pace, max(-pace, wanted - last))
+    }
+
     private func step(_ fighter: Combatant) -> Float {
         let director = model(fighter).director
         return director.lunge * (spacing.slide(fighter, director.lungeMove) + director.reach)
             + director.lungeCarry * (spacing.slide(fighter, director.carryMove) + director.carryReach)
+            + (drawIn[fighter] ?? 0)
     }
 
     /// While a punch flies, follow the defender's head (unless it is slipping) and
@@ -332,7 +382,11 @@ import HaymakerKit
         // The glove lands on the first frame after the attack state ends: track that frame too.
         let landing = !attacking && wasAttacking[side] == true
         wasAttacking[side] = attacking
-        guard attacking || landing else { return }
+        guard attacking || landing else {
+            // Drawn in by the last punch: the blow (or the next exchange) sends the fighter back out.
+            if let drawn = drawIn[side.other], drawn > 0 { drawIn[side.other] = max(0, drawn - Self.drawInRelease * frameStep * 60) }
+            return
+        }
         let attacker = model(side), defender = model(side.other)
         if entering {
             // A fighter still reeling from the last blow gathers itself as the next one comes:
@@ -344,9 +398,17 @@ import HaymakerKit
             let drive = max(0, (contactHips[side]?[attacker.director.lungeMove] ?? 0) - attacker.animated.hips.z) * attacker.scale
             let limit = min(Self.maxWindupStep, max(0.05, Self.windupPaceLimit * frames))
             windupOrigin[side] = (lastStep[side] ?? 0, min(limit, max(0.05, Self.windupPace * frames - drive)), limit)
+            windupCapacity[side] = max(0, AnimationTuning.windupHipsTravel - Self.windupHipsMargin - drive)
         }
-        if defenderState != .dodging {
-            let head = defender.blob(.head, in: defender.animated)
+        if entering { swingAtDowned[side] = defenderState == .knockedDown || defenderState == .ko }
+        if swingAtDowned[side] == true {
+            // Nobody punches a fighter on the canvas: the engine's swing at a downed
+            // fighter is thrown at the air where a standing head would be.
+            if entering || aimHead[side] == nil { aimHead[side] = defender.nominalHead }
+        } else if defenderState != .dodging {
+            var head = defender.blob(.head, in: defender.animated)
+            // Where the head will be shown: the defender's paced Hips still trail its clip.
+            head.center += hipsShift[side.other] ?? .zero
             if !entering, let previous = aimHead[side] {
                 // Follow a snapping head (parry, reaction) at a pace the arm can track.
                 let move = head.center - previous.center, length = simd_length(move), pace = Self.headTrackSpeed * frameStep
@@ -385,10 +447,22 @@ import HaymakerKit
             let cover = defenderState == .blocking ? max(0, (aimPoint[side]?.radius ?? head.radius) - head.radius) * defender.scale : 0
             target = min(Self.maxReach, max(-Self.maxRetreat, simd_dot(offset, toward) + gloveSpread - cover))
         }
+        // A root step past what the windup carries the Hips to only spreads the stance:
+        // the rest of the way, the defender comes to the punch (at a step's pace).
+        var reach = target
+        if let capacity = windupCapacity[side] {
+            let carried = origin.step + capacity - slide
+            let over = reach - carried
+            reach = min(reach, carried)
+            let drawn = drawIn[side.other] ?? 0
+            let drawable = defenderState != .dodging && defenderState != .knockedDown && defenderState != .ko && swingAtDowned[side] != true
+            drawIn[side.other] = drawable ? min(Self.maxDrawIn, max(0, drawn + over * Self.drawInGain * frameStep * 60))
+                : max(0, drawn - Self.drawInRelease * frameStep * 60)
+        }
         // Footwork, not teleporting: a defender's sudden snap (parry, reaction) is followed at a pace.
         // The root moves by lunge × reach: early in the lunge the reach can settle faster.
         let pace = Self.reachSpeed * frameStep / max(0.25, attacker.director.lunge)
-        attacker.director.reach = entering ? target : attacker.director.reach + min(pace, max(-pace, target - attacker.director.reach))
+        attacker.director.reach = entering ? reach : attacker.director.reach + min(pace, max(-pace, reach - attacker.director.reach))
     }
 
     /// Extra step-in (scene units, on top of the punch's static slide) at which the
@@ -559,18 +633,38 @@ import HaymakerKit
         }
     }
 
-    private func aimTarget(by side: Combatant) -> BoxerModel.AimTarget? {
+    private func aimTarget(by side: Combatant, states: [Combatant: FighterState]) -> BoxerModel.AimTarget? {
         let attacker = model(side), defender = model(side.other)
         guard attacker.director.aim > 0.001, let head = aimPoint[side] ?? aimHead[side] else { return nil }
-        return .init(center: attacker.local(defender.placed(head.center)), radius: head.radius * defender.scale / attacker.scale)
+        var target = BoxerModel.AimTarget(center: attacker.local(defender.placed(head.center)), radius: head.radius * defender.scale / attacker.scale)
+        let defending = states[side.other] ?? .idle
+        target.air = defending == .dodging || swingAtDowned[side] == true
+        if defending != .blocking, !target.air {
+            let bone = FighterBone.head.rawValue, pose = defender.animated
+            let turn = attacker.root.simdOrientation.inverse * defender.root.simdOrientation * pose.globals()[bone]
+            target.skin = .init(center: attacker.local(defender.placed(defender.blob(.head, in: pose).center + (hipsShift[side.other] ?? .zero))), rotation: simd_normalize(turn),
+                                scale: defender.scale / attacker.scale, blob: defender.rig.blobs[bone])
+        }
+        return target
     }
 
     static let maxReach: Float = 0.5
+    /// Fastest the root steps along the fight axis (scene units per 60 Hz frame).
+    static let stepPace: Float = 0.058
+    /// Frames over which a fighter let off holding its ground gathers its full stepping pace.
+    static let loosenFrames: Float = 4
     /// Most a punch's windup moves the root (scene units), and per frame of its strike.
     static let maxWindupStep: Float = 0.4
     static let windupPace: Float = 0.045
     /// Per frame of the strike, the most a windup steps to make a punch land at all.
     static let windupPaceLimit: Float = 0.051
+    /// Room (scene units) kept under the windup's Hips travel when solving its step.
+    static let windupHipsMargin: Float = 0.01
+    /// Most a defender steps into a punch that falls short (scene units), how fast that
+    /// step follows the shortfall (share per 60 Hz frame) and lets go after it (units per frame).
+    static let maxDrawIn: Float = 0.2
+    static let drawInGain: Float = 0.5
+    static let drawInRelease: Float = 0.008
     /// Extra steer (radians) a punch accepts to land without stepping past its windup's footwork.
     static let looseAim: Float = 0.12
     /// How much closer than the bare touch a live step-in solve stands.

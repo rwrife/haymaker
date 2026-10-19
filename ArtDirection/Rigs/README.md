@@ -61,7 +61,8 @@ Conventions are Mixamo's: Y-up, +Z front, and `Left*` bones on the character's a
     low-poly sculpt (4.8k vertices) has noisy baked-texture skin that trips this test on the bare forearm.
     When the test fires at the very start of the search, the cuff is instead where the slab's median colour
     leaves the mid-forearm colour. That puts his cuff at x .35 (left) and .335 (right); the white cuff rim
-    is at about .345–.35.
+    is at about .345–.35. These were measured on the supplied colours, before his gloves were repainted
+    (white cuff from |x| .342, black glove from .388; see `ArtDirection/Models/README.md`).
 - `<name>.joints.json → notes` records the measured landmarks for review.
 
 ### 2. Bone heat (`scripts/blender/autorig_weights.py`)
