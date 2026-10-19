@@ -128,7 +128,7 @@ struct FighterRigData: Sendable {
             return nil
         }
         if let badVertex { throw FighterAssetError.invalid("\(name): \(badVertex)") }
-        let blobs = BoneBlob.measure(vertices: vertices, count: vertexCount, heads: heads, aims: aims)
+        let blobs = BoneBlob.measure(vertices: vertices, count: vertexCount, indices: indices, heads: heads, aims: aims)
         return FighterRigData(name: name, heads: heads, aims: aims, vertexCount: vertexCount, indexCount: indexCount,
                               vertices: vertices, indices: indices, blobs: blobs)
     }
@@ -180,6 +180,57 @@ struct BoneBlob: Sendable {
     /// Extreme skin points (relative to the bone head) in 14 directions: the
     /// lowest one after posing approximates where this part meets the floor.
     let probes: [SIMD3<Float>]
+    /// Extreme skin points in 96 directions: a close hull where a contact must be exact
+    /// (a glove stopping on a head at any angle the elbow turns it).
+    let hull: [SIMD3<Float>]
+    /// The head's skin: its distance from the center over a cube map of directions
+    /// (bone frame, `skinGrid`² cells a face). Where a head is no sphere (the jaw, the
+    /// ears, the cut down to the neck) a glove stops on the skin itself. Empty elsewhere.
+    let skin: [Float]
+
+    static let skinGrid = 12
+
+    /// How far `point` (bone frame, relative to the center) is inside the skin.
+    func depth(of point: SIMD3<Float>) -> Float {
+        let length = simd_length(point), n = Self.skinGrid
+        guard length > 1e-5, skin.count == 6 * n * n else { return radius - length }
+        let (face, u, v) = Self.cubeFace(point)
+        // Bilinear between the four nearest cell centres on the face.
+        func axis(_ t: Float) -> (Int, Int, Float) {
+            let s = min(Float(n - 1), max(0, (t + 1) / 2 * Float(n) - 0.5))
+            let i = min(n - 2, Int(s))
+            return (i, i + 1, s - Float(i))
+        }
+        let (i0, i1, fu) = axis(u), (j0, j1, fv) = axis(v), base = face * n * n
+        let top = skin[base + j0 * n + i0] * (1 - fu) + skin[base + j0 * n + i1] * fu
+        let bottom = skin[base + j1 * n + i0] * (1 - fu) + skin[base + j1 * n + i1] * fu
+        return top * (1 - fv) + bottom * fv - length
+    }
+
+    /// The cube face `direction` points through and where on it (both in −1…1).
+    static func cubeFace(_ d: SIMD3<Float>) -> (face: Int, u: Float, v: Float) {
+        let a = abs(d)
+        if a.x >= a.y, a.x >= a.z { return (d.x > 0 ? 0 : 1, d.y / a.x, d.z / a.x) }
+        if a.y >= a.z { return (d.y > 0 ? 2 : 3, d.x / a.y, d.z / a.y) }
+        return (d.z > 0 ? 4 : 5, d.x / a.z, d.y / a.z)
+    }
+
+    /// The direction through the centre of cube cell `index`.
+    static func cubeDirection(_ index: Int) -> SIMD3<Float> {
+        let n = skinGrid, face = index / (n * n), j = (index / n) % n, i = index % n
+        let u = (Float(i) + 0.5) / Float(n) * 2 - 1, v = (Float(j) + 0.5) / Float(n) * 2 - 1
+        let sign: Float = face % 2 == 0 ? 1 : -1
+        switch face / 2 {
+        case 0: return simd_normalize(SIMD3(sign, u, v))
+        case 1: return simd_normalize(SIMD3(u, sign, v))
+        default: return simd_normalize(SIMD3(u, v, sign))
+        }
+    }
+
+    static let hullDirections: [SIMD3<Float>] = (0..<96).map { i in
+        let y = 1 - (Float(i) + 0.5) / 48, r = (1 - y * y).squareRoot(), phi = Float(i) * 2.399963
+        return SIMD3<Float>(cos(phi) * r, y, sin(phi) * r)
+    }
 
     private static let probeDirections: [SIMD3<Float>] = {
         var directions: [SIMD3<Float>] = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]
@@ -187,13 +238,14 @@ struct BoneBlob: Sendable {
         return directions
     }()
 
-    static func measure(vertices: Data, count: Int, heads: [SIMD3<Float>], aims: [SIMD3<Float>]) -> [BoneBlob] {
+    static func measure(vertices: Data, count: Int, indices: Data = Data(), heads: [SIMD3<Float>], aims: [SIMD3<Float>]) -> [BoneBlob] {
         let bones = heads.count
         var sum = [SIMD3<Float>](repeating: .zero, count: bones)
         var square = [Float](repeating: 0, count: bones)
         var total = [Float](repeating: 0, count: bones)
-        let directions = probeDirections
+        let directions = probeDirections, around = hullDirections
         var extremes = [[(Float, SIMD3<Float>)]](repeating: directions.map { _ in (-Float.infinity, .zero) }, count: bones)
+        var hulls = [[(Float, SIMD3<Float>)]](repeating: around.map { _ in (-Float.infinity, .zero) }, count: bones)
         vertices.withUnsafeBytes { buffer in
             for v in 0..<count {
                 var best = 0, weight: Float = 0
@@ -213,21 +265,112 @@ struct BoneBlob: Sendable {
                         let reach = simd_dot(p, direction)
                         if reach > extremes[best][k].0 { extremes[best][k] = (reach, p - heads[best]) }
                     }
+                    for (k, direction) in around.enumerated() {
+                        let reach = simd_dot(p, direction)
+                        if reach > hulls[best][k].0 { hulls[best][k] = (reach, p - heads[best]) }
+                    }
                 }
             }
         }
-        return (0..<bones).map { bone in
-            let length = simd_length(aims[bone] - heads[bone])
-            let probes = extremes[bone].filter { $0.0.isFinite }.map(\.1)
-            guard total[bone] >= 8 else {
-                return BoneBlob(offset: (aims[bone] - heads[bone]) * 0.5, radius: length * 0.5, probes: probes)
-            }
+        let shapes: [(offset: SIMD3<Float>, radius: Float)] = (0..<bones).map { bone in
+            guard total[bone] >= 8 else { return ((aims[bone] - heads[bone]) * 0.5, simd_length(aims[bone] - heads[bone]) * 0.5) }
             let mean = sum[bone] / total[bone]
             // RMS distance from the centroid ≈ radius for a closed surface.
             let variance = max(0, square[bone] / total[bone] - simd_length_squared(mean))
-            return BoneBlob(offset: mean - heads[bone], radius: sqrt(variance), probes: probes)
+            return (mean - heads[bone], sqrt(variance))
+        }
+        let skins = (0..<bones).map { bone in
+            bone == FighterBone.head.rawValue ? headSkin(vertices: vertices, count: count, indices: indices, bone: bone,
+                                                         center: heads[bone] + shapes[bone].offset) : []
+        }
+        return (0..<bones).map { bone in
+            let probes = extremes[bone].filter { $0.0.isFinite }.map(\.1)
+            let hull = hulls[bone].filter { $0.0.isFinite }.map(\.1)
+            return BoneBlob(offset: shapes[bone].offset, radius: shapes[bone].radius, probes: probes, hull: hull, skin: skins[bone])
         }
     }
+
+    /// The skin of the triangles `bone` dominates (every corner's heaviest weight): its
+    /// farthest crossing along the ray through each cube cell's centre from `center`.
+    /// Cells it leaves open (the cut down to the neck) are capped flat across the opening.
+    private static func headSkin(vertices: Data, count: Int, indices: Data, bone: Int, center: SIMD3<Float>) -> [Float] {
+        let n = skinGrid, cells = 6 * n * n
+        guard count > 0, indices.count >= 12 else { return [] }
+        var dominant = [Int](repeating: -1, count: count)
+        var points = [SIMD3<Float>](repeating: .zero, count: count)
+        vertices.withUnsafeBytes { buffer in
+            func float(_ offset: Int) -> Float { Float(bitPattern: UInt32(littleEndian: buffer.loadUnaligned(fromByteOffset: offset, as: UInt32.self))) }
+            for v in 0..<count {
+                var best = 0, weight = -Float.infinity
+                for lane in 0..<4 {
+                    let w = float(v * 60 + 36 + lane * 4)
+                    if w > weight { weight = w; best = Int(UInt16(littleEndian: buffer.loadUnaligned(fromByteOffset: v * 60 + 52 + lane * 2, as: UInt16.self))) }
+                }
+                dominant[v] = best
+                points[v] = SIMD3(float(v * 60), float(v * 60 + 4), float(v * 60 + 8)) - center
+            }
+        }
+        // Bin each triangle into the cells it covers (sampled densely enough to miss none
+        // whose centre ray it crosses), then cast only against a cell's own triangles.
+        var binned = [[SIMD3<Float>]](repeating: [], count: cells)
+        let spacing: Float = 0.004
+        indices.withUnsafeBytes { buffer in
+            for t in 0..<(indices.count / 12) {
+                let corner = (0..<3).map { Int(UInt32(littleEndian: buffer.loadUnaligned(fromByteOffset: t * 12 + $0 * 4, as: UInt32.self))) }
+                guard corner.allSatisfy({ $0 < count && dominant[$0] == bone }) else { continue }
+                let a = points[corner[0]], b = points[corner[1]], c = points[corner[2]]
+                let edge = max(simd_distance(a, b), simd_distance(b, c), simd_distance(c, a))
+                let steps = max(1, Int((edge / spacing).rounded(.up)))
+                var covered = Set<Int>()
+                for i in 0...steps {
+                    for j in 0...(steps - i) {
+                        let p = a + (b - a) * (Float(i) / Float(steps)) + (c - a) * (Float(j) / Float(steps))
+                        guard simd_length(p) > 1e-5 else { continue }
+                        let (face, u, v) = cubeFace(p)
+                        let x = min(n - 1, max(0, Int((u + 1) / 2 * Float(n)))), y = min(n - 1, max(0, Int((v + 1) / 2 * Float(n))))
+                        covered.insert(face * n * n + y * n + x)
+                    }
+                }
+                for cell in covered { binned[cell].append(contentsOf: [a, b, c]) }
+            }
+        }
+        var skin = [Float](repeating: -.infinity, count: cells)
+        for cell in 0..<cells {
+            let ray = cubeDirection(cell), triangles = binned[cell]
+            for k in stride(from: 0, to: triangles.count, by: 3) {
+                let a = triangles[k], e1 = triangles[k + 1] - a, e2 = triangles[k + 2] - a
+                let p = simd_cross(ray, e2), det = simd_dot(e1, p)
+                guard abs(det) > 1e-12 else { continue }
+                let u = simd_dot(-a, p) / det
+                guard u >= 0, u <= 1 else { continue }
+                let q = simd_cross(-a, e1), v = simd_dot(ray, q) / det
+                guard v >= 0, u + v <= 1 else { continue }
+                skin[cell] = max(skin[cell], simd_dot(e2, q) / det)
+            }
+        }
+        let open = skin.indices.filter { !skin[$0].isFinite }
+        guard open.count < cells else { return [] }
+        // Along a direction d a flat cap n·x = h lies at h / (n·d): its reciprocal is
+        // linear in d, so relaxing 1/r over the opening to the mean of its neighbours
+        // stretches a flat cap across it.
+        let directions = (0..<cells).map(cubeDirection)
+        var reciprocal = skin.map { $0.isFinite ? 1 / $0 : 0 }
+        let mean = reciprocal.reduce(0, +) / Float(cells - open.count)
+        for k in open { reciprocal[k] = mean }
+        let neighbours = open.map { k in
+            directions.indices.filter { $0 != k }
+                .sorted { simd_dot(directions[$0], directions[k]) > simd_dot(directions[$1], directions[k]) }.prefix(6)
+        }
+        for _ in 0..<200 {
+            for (e, k) in open.enumerated() { reciprocal[k] = neighbours[e].reduce(0) { $0 + reciprocal[$1] } / Float(neighbours[e].count) }
+        }
+        // No flesh to press into across the cut: the cap stands proud by a glove's bite.
+        for k in open { skin[k] = 1 / max(reciprocal[k], 1e-3) + capMargin }
+        return skin
+    }
+
+    /// How far the flat cap over a head's neck cut stands proud of the cut.
+    static let capMargin: Float = 0.04
 }
 
 func isFinite(_ v: SIMD3<Float>) -> Bool { v.x.isFinite && v.y.isFinite && v.z.isFinite }

@@ -405,6 +405,8 @@ struct Snapshot {
         var stretch: [Float]
         /// Per fighter: the most stretched stepping (airborne) leg.
         var swing: [Float]
+        /// Per fighter, per foot (left, right): mid release step (feet let go for a fall / get-up).
+        var releases: [[Bool]]
     }
 
     /// A punch arriving (landed / blocked / dodged / parried) at sample `index`.
@@ -451,6 +453,28 @@ struct Snapshot {
     let contactVerts: [[Int]]
     var engine: FightEngine
     let reducedMotion: Bool
+    /// Snapshot / close-up / filmstrip renders while the bout runs (the roster sweep only measures).
+    var renders = true
+    /// Debug tracing: `HAYMAKER_TRACE=a-b` (frames) and/or `HAYMAKER_TRACE_TAG=tag` or `tag@a-b,tag2@c-d`.
+    func traced(_ frame: Int) -> Bool {
+        let env = ProcessInfo.processInfo.environment
+        func within(_ text: Substring?) -> Bool {
+            guard let text else { return true }
+            let range = text.split(separator: "-").compactMap { Int($0) }
+            return range.count == 2 && (range[0]...range[1]).contains(frame)
+        }
+        guard let tags = env["HAYMAKER_TRACE_TAG"] else {
+            return env["HAYMAKER_TRACE"] != nil && within(env["HAYMAKER_TRACE"].map { Substring($0) })
+        }
+        return tags.split(separator: ",").contains { entry in
+            let parts = entry.split(separator: "@", maxSplits: 1)
+            guard parts.first.map(String.init) == tag else { return false }
+            return within(parts.count > 1 ? parts[1] : env["HAYMAKER_TRACE"].map { Substring($0) })
+        }
+    }
+
+    /// Which bout this is in the log (`HAYMAKER_TRACE_TAG` limits tracing to one bout).
+    var tag = ""
     private(set) var samples: [Sample] = []
     private(set) var contacts: [Contact] = []
     private(set) var hits: [Hit] = []
@@ -547,9 +571,9 @@ struct Snapshot {
                                   return "arm \(f2(model.lastMotion?.frame ?? 0)) lunge \(f2(d.lunge))×\(d.lungeMove) reach \(f2(d.reach)) aim \(f2(d.aim))"
                               },
                               stretch: [hero, rival].map { m in (0..<2).map { m.planter.phase($0) == .planted ? m.planter.stretch($0) : 0 }.max()! },
-                              swing: [hero, rival].map { m in (0..<2).map { m.planter.phase($0) == .stepping ? m.planter.stretch($0) : 0 }.max()! }))
-        if let range = ProcessInfo.processInfo.environment["HAYMAKER_TRACE"]?.split(separator: "-").compactMap({ Int($0) }), range.count == 2,
-           (range[0]...range[1]).contains(frame) {
+                              swing: [hero, rival].map { m in (0..<2).map { m.planter.phase($0) == .stepping ? m.planter.stretch($0) : 0 }.max()! },
+                              releases: [hero, rival].map { m in m.planter.feet.map { $0.phase == .stepping && $0.releasing } }))
+        if traced(frame) {
             for (name, model) in [("hero", hero), ("rival", rival)] {
                 let m = model.lastMotion
                 let other = name == "hero" ? rival : hero
@@ -564,6 +588,20 @@ struct Snapshot {
                         if d < clear + 0.05 { print("trace \(frame) \(name) \(hand) vs \(bone): dist \(f3(d)) clear \(f3(clear)) (radii \(f3(g.radius * model.scale)) \(f3(b.radius * other.scale)))") }
                     }
                 }
+                if ProcessInfo.processInfo.environment["HAYMAKER_TRACE_FEET"] != nil {
+                    for (k, foot) in model.planter.feet.enumerated() {
+                        print("feet \(frame) \(name) \(k == 0 ? "L" : "R") \(foot.phase) lock \(f3(foot.lock.x)),\(f3(foot.lock.y)) from \(f3(foot.from.x)),\(f3(foot.from.y)) to \(f3(foot.to.x)),\(f3(foot.to.y)) u \(f2(foot.elapsed / max(1e-4, foot.duration))) dur \(f2(foot.duration)) strained \(foot.strained) over \(foot.overreach) chase \(f2(foot.chase)) rel \(foot.releasing) stretch \(f2(foot.stretch))")
+                    }
+                }
+                if ProcessInfo.processInfo.environment["HAYMAKER_TRACE_ANIM"] != nil, let motion = model.lastMotion {
+                    let toStage = model.root.simdTransform
+                    let a = transformed(toStage, model.animated.joints(heads: model.rig.heads))
+                    let raw = transformed(toStage, model.animator.sample(motion).joints(heads: model.rig.heads))
+                    func v(_ p: SIMD3<Float>) -> String { "\(f3(p.x)),\(f3(p.y)),\(f3(p.z))" }
+                    print("anim \(frame) \(name) L \(v(a[FighterBone.leftHand.rawValue])) R \(v(a[FighterBone.rightHand.rawValue])) rawL \(v(raw[FighterBone.leftHand.rawValue])) rawR \(v(raw[FighterBone.rightHand.rawValue])) hips \(v(a[0]))")
+                }
+                let sj = samples.last!.joints[name == "hero" ? 0 : 1]
+                print("hands \(frame) \(name) L \(f3(sj[FighterBone.leftHand.rawValue].x)),\(f3(sj[FighterBone.leftHand.rawValue].y)),\(f3(sj[FighterBone.leftHand.rawValue].z)) R \(f3(sj[FighterBone.rightHand.rawValue].x)),\(f3(sj[FighterBone.rightHand.rawValue].y)),\(f3(sj[FighterBone.rightHand.rawValue].z)) aim \(f3(model.director.aim)) \(samples.last!.notes[name == "hero" ? 0 : 1])")
                 print("trace \(frame) \(name) \(samples.last!.states[name == "hero" ? 0 : 1]) root \(model.root.simdPosition) hips \(model.pose.hips) head \(model.blob(.head).center) clip \(m?.clip.rawValue ?? "-") f \(m.map { f2($0.frame) } ?? "-") key \(m?.key ?? 0) fade \(m.map { f2($0.fade) } ?? "-") warp \(m.map { "\($0.warp.yaw) \($0.warp.offset)" } ?? "-") lunge \(f2(model.director.lunge)) reach \(f2(model.director.reach)) spread \(f3(choreo.gloveSpread)) feet \(model.planter.phase(0)) \(f2(model.planter.stretch(0))) \(model.planter.phase(1)) \(f2(model.planter.stretch(1))) toes \(samples.last!.joints[name == "hero" ? 0 : 1][17]) \(samples.last!.joints[name == "hero" ? 0 : 1][21])")
             }
         }
@@ -753,6 +791,7 @@ struct Snapshot {
     }
 
     func closeup(by side: Combatant, move: Move, label: String) {
+        guard renders else { return }
         let a = model(side), d = model(side == .player ? .opponent : .player)
         let hand = choreo.spacing.hand[side]?[move] ?? .leftHand
         let point = (a.placed(a.blob(hand).center) + d.placed(d.blob(.head).center)) / 2
@@ -768,14 +807,14 @@ struct Snapshot {
     }
 
     func capture(_ label: String, side: Bool = false) {
-        guard snapshots[label] == nil else { return }
+        guard renders, snapshots[label] == nil else { return }
         snapshots[label] = Snapshot(image: shot(side: side), label: label)
     }
 
     func later(_ frames: Int, _ label: String) { delayed.append((frame + frames, label)) }
 
     func strip(_ name: String, offsets: [Int], side: Bool = true) {
-        guard !stripPlans.contains(where: { $0.name == name }) else { return }
+        guard renders, !stripPlans.contains(where: { $0.name == name }) else { return }
         stripPlans.append((name, frame, offsets, side))
         if offsets.contains(0) { strips[name, default: []].append(Snapshot(image: shot(side: side), label: "+0f \(stripCaption(name))")) }
     }
@@ -811,6 +850,7 @@ struct Snapshot {
                 if events.contains(where: { if case .rise(_, .player) = $0 { true } else { false } }) { jabOnRise = true }
             }
             report.check(done, "scenario intent \(intent) did not complete (\(ticks) ticks)")
+            intentLog.append("\(intent) \(done ? "" : "✗")\(ticks)")
             if engine.isOver { break }
         }
         if engine.isOver {
@@ -818,15 +858,50 @@ struct Snapshot {
         } else {
             // Let the last punch recover before the checks read it.
             for _ in 0..<60 where !engine.isOver { watch(step(.none)) }
+            // ...and end the recording between steps (a step cut off by the end can't be judged).
+            let stepping = { [self] in [hero, rival].contains { m in (0..<2).contains { m.planter.phase($0) == .stepping } } }
+            for _ in 0..<30 where !engine.isOver && stepping() { watch(step(.none)) }
         }
     }
 
     private var pressedFor: Int?
+    /// Each scripted intent and the ticks it took (✗ = timed out).
+    private(set) var intentLog: [String] = []
     /// Punches of the current `.combo` thrown so far, and the sample its first one started on.
     private var comboThrown = 0
     private(set) var comboStart: Int?
 
+    /// Consecutive frames the rival has stood idle (between its patterns).
+    private var rivalIdleFrames = 0
+    /// Patterns the harness slotted into a book that never throws them.
+    private(set) var guests: [String] = []
+
+    /// A scripted scenario needs a pattern this book never issues (Goldie never blocks,
+    /// Sylvie never uppercuts): once the rival has idled for its book's minimum gap,
+    /// commit a guest pattern exactly as the scheduler commits its own — timed like the
+    /// book's slowest punch (or a typical guard hold) — so every scenario runs on every rig.
+    private func guest(_ move: Move) {
+        guard !engine.book.sequence.contains(where: { $0.move == move }), engine.opponent.state == .idle,
+              engine.player.state == .idle, rivalIdleFrames >= max(engine.book.minGap, 12) else { return }
+        let punches = engine.book.sequence.filter { [.jab, .hook, .uppercut].contains($0.move) }
+        let entry = move == .block
+            ? PatternEntry(move: .block, tell: 36, impact: 54, recover: 20, staminaCost: 0, damage: 0)
+            : PatternEntry(move: move, tell: punches.map(\.tell).max() ?? 40, impact: punches.map(\.impact).max() ?? 14,
+                           recover: punches.map(\.recover).max() ?? 40, staminaCost: 0, damage: 12)
+        engine.opponent.state = .telling
+        engine.opponent.ticksInCurrentState = 0
+        engine.opponent.stateDuration = entry.tell
+        engine.opponent.currentMove = entry.move
+        engine.opponent.currentDamage = entry.damage
+        engine.oppActive = entry
+        guests.append("\(move.rawValue) @\(samples.count)")
+    }
+
     private func decide(_ intent: Intent) -> PlayerInput {
+        rivalIdleFrames = engine.opponent.state == .idle ? rivalIdleFrames + 1 : 0
+        // Keep both fighters standing through scenarios that aren't about finishing the bout.
+        if case .loseByKO = intent {} else { engine.player.hp = max(engine.player.hp, 50) }
+        if case .finishRival = intent {} else { engine.opponent.hp = max(engine.opponent.hp, 50) }
         let me = engine.player, them = engine.opponent
         let punching = [Move.jab, .hook, .uppercut].contains(them.currentMove)
         let remaining = them.stateDuration - them.ticksInCurrentState
@@ -838,6 +913,7 @@ struct Snapshot {
         switch intent {
         case let .takeHit(move):
             if let move, them.state == .attacking, them.currentMove != move, them.ticksInCurrentState == 0 { return press(.block) }
+            if let move { guest(move) }
             return .none
         case let .punch(move):
             guard me.state == .idle, [.idle, .recovering].contains(them.state) else { return .none }
@@ -850,6 +926,7 @@ struct Snapshot {
             if them.state == .attacking, punching, remaining == 3 { return press(.parry) }
         case .punchGuard:
             if them.state == .blocking, remaining >= 12 { return press(.jab) }
+            guest(.block)
         case .knockdownRival:
             engine.opponent.hp = max(engine.opponent.hp, 70)
             engine.player.stamina = engine.config.damage.maxStamina
@@ -894,7 +971,8 @@ struct Snapshot {
             case (.heroKnockdown, .rise(_, .player)): return true
             case (.finishRival, .boutEnd), (.loseByKO, .boutEnd): return true
             case let (.combo(moves), .landed(_, .player, move, _, _)), let (.combo(moves), .blocked(_, .player, move, _)),
-                 let (.combo(moves), .dodged(_, .player, move)), let (.combo(moves), .parried(_, .player, move)):
+                 let (.combo(moves), .dodged(_, .player, move)), let (.combo(moves), .parried(_, .player, move)),
+                 let (.combo(moves), .whiffed(_, .player, move)):
                 if comboThrown == moves.count, move == moves.last { return true }
             default: break
             }
@@ -1009,6 +1087,15 @@ enum MatchSceneTiming {
         // 3. Stance / retarget sanity on Mack.
         if let mack = rigs[.mack] {
             let motions = FighterMotionSet.shared(for: mack)
+            if ProcessInfo.processInfo.environment["HAYMAKER_CLIPSPEED"] != nil {
+                for id in [ClipID.jab, .hook, .uppercut] {
+                    guard let clip = motions[id] else { continue }
+                    let hand = FighterReach.punchingHand(motions, clip: id).rawValue
+                    let pts = (0..<clip.frameCount).map { FighterReach.pose(motions, id, frame: Float($0))!.joints(heads: motions.heads)[hand] }
+                    let sp = (0..<(clip.frameCount - 1)).map { simd_distance(pts[$0 + 1], pts[$0]) }
+                    print("clipspeed \(id) chamber \(clip.marker("chamber", 0)) contact \(clip.marker("contact", 0)) " + sp.enumerated().map { "\($0.offset):\(f3($0.element))" }.joined(separator: " "))
+                }
+            }
             if let idle = FighterReach.pose(motions, .idle, frame: 0) {
                 let left = FighterReach.blob(FighterBone.leftHand.rawValue, pose: idle, rig: mack).center
                 let right = FighterReach.blob(FighterBone.rightHand.rawValue, pose: idle, rig: mack).center
@@ -1120,10 +1207,11 @@ enum MatchSceneTiming {
 
         // 7. Scripted engine bout (Mack vs Bruiser/Baxter), checks and QA renders.
         report.log("\nscripted bout: Mack vs Bruiser (Baxter book, career config)")
+        var roster: [String: (bout: String, combo: String)] = [:]
         let bout = Bout(report: report, studio: studio, rival: .bruiser, book: .baxter, seed: 11)
-        bout.run([.takeHit(nil), .punch(.jab), .punch(.hook), .block, .punch(.uppercut), .dodge, .punchGuard, .parry,
-                  .takeHit(.uppercut), .knockdownRival, .heroKnockdown, .finishRival])
-        analyse(bout, report: report)
+        bout.tag = "bout"
+        bout.run(boutScript)
+        let mainSummary = analyse(bout, report: report)
         try renderHistory(bout, out: out)
         let order = ["idle (guard)", "rival jab tell", "rival jab contact", "rival hook tell", "rival hook contact", "rival hook blocked",
                      "rival uppercut tell", "rival uppercut contact", "hero jab contact", "hero hook contact", "hero uppercut contact",
@@ -1135,20 +1223,52 @@ enum MatchSceneTiming {
         try writeSheet(frames, columns: 6, cell: cell, title: "Mack vs Bruiser — match frames (game camera)", to: out.appendingPathComponent("match-frames.png"))
         try writeSheet(bout.closeups.map { ($0.image, $0.label) }, columns: 4, cell: CGSize(width: 420, height: 420),
                        title: "Mack vs Bruiser — punches arriving (side close-up at contact)", to: out.appendingPathComponent("contacts.png"))
-        for (name, shots) in bout.strips.sorted(by: { $0.key < $1.key }) {
-            let file = name.lowercased().map { $0.isLetter || $0.isNumber ? $0 : "-" }.reduce("") { $0 + String($1) }
-                .replacingOccurrences(of: "--", with: "-")
-            try writeSheet(shots.map { ($0.image, $0.label) }, columns: min(8, shots.count), cell: CGSize(width: 240, height: 320),
-                           title: "Filmstrip: \(name) (side camera)", to: out.appendingPathComponent("strip-\(file).png"))
-        }
+        try writeStrips(bout, prefix: "strip-", out: out)
         bout.remove()
 
         // 7b. A chained hero jab → hook → uppercut: each follow-up closes with a short step.
         let combo = Bout(report: report, studio: studio, rival: .bruiser, book: .baxter, seed: 11)
+        combo.tag = "combo"
         combo.run([.combo([.jab, .hook, .uppercut])])
-        analyse(combo, report: report, name: "combo")
+        roster["baxter"] = (mainSummary, analyse(combo, report: report, name: "combo"))
         try renderCombo(combo, out: out, report: report)
         combo.remove()
+
+        // 7c. Roster sweep: the same scripted bout and combo against every career opponent's
+        // own book (tell / impact / recovery windows) and rig. Baxter is the bout above.
+        for book in OpponentBook.careerRoster where book.id != "baxter" {
+            guard let key = book.character?.asset, let asset = FighterModelAsset(rawValue: key) else {
+                report.check(false, "career opponent \(book.id) has no fighter model")
+                continue
+            }
+            report.log("\nscripted bout: Mack vs \(asset.rawValue) (\(book.id) book)")
+            let sweep = Bout(report: report, studio: studio, rival: asset, book: book, seed: 11)
+            // The final boss gets the full match-frames sheet and filmstrips for review.
+            sweep.renders = book.id == "jaison"
+            sweep.tag = "bout-\(book.id)"
+            sweep.run(boutScript)
+            let summary = analyse(sweep, report: report, name: "bout-\(book.id)")
+            if sweep.renders {
+                let frames = sweep.snapshots.values.sorted { $0.label < $1.label }.map { ($0.image, $0.label) }
+                try writeSheet(frames, columns: 6, cell: cell, title: "Mack vs \(asset.rawValue) — match frames (game camera)",
+                               to: out.appendingPathComponent("match-frames-\(book.id).png"))
+                try writeStrips(sweep, prefix: "strip-\(book.id)-", out: out)
+                try renderHistory(sweep, out: out.appendingPathComponent(book.id, isDirectory: true))
+            }
+            sweep.remove()
+            let chain = Bout(report: report, studio: studio, rival: asset, book: book, seed: 11)
+            chain.renders = false
+            chain.tag = "combo-\(book.id)"
+            chain.run([.combo([.jab, .hook, .uppercut])])
+            roster[book.id] = (summary, analyse(chain, report: report, name: "combo-\(book.id)"))
+            chain.remove()
+        }
+        report.log("\nroster sweep (Mack vs each career opponent, own book and rig):")
+        for book in OpponentBook.careerRoster {
+            guard let line = roster[book.id] else { continue }
+            report.log("  \(book.id): bout \(line.bout)")
+            report.log("  \(String(repeating: " ", count: book.id.count)): combo \(line.combo)")
+        }
 
         // 8. The hero loses by KO: the fall stays down, the rival celebrates.
         let loss = Bout(report: report, studio: studio, rival: .bruiser, book: .baxter, seed: 5)
@@ -1195,7 +1315,10 @@ enum MatchSceneTiming {
     /// Pops are one-frame displacement spikes: a joint moving much further in one
     /// frame than in the frames either side (a snap the eye reads as a glitch).
     /// Peak velocity change is reported for context (fast punches legitimately accelerate hard).
-    @MainActor static func analyse(_ bout: Bout, report: Report, name: String = "bout") {
+    /// Runs every check on a recorded bout; returns a one-line summary for the roster table.
+    @discardableResult
+    @MainActor static func analyse(_ bout: Bout, report: Report, name: String = "bout") -> String {
+        let failuresBefore = report.failures.count
         let samples = bout.samples
         var pops: [(Float, String)] = []
         var peakAccel: [(Float, String)] = []
@@ -1208,6 +1331,10 @@ enum MatchSceneTiming {
                     let v0 = simd_distance(p[1], p[0]), v1 = simd_distance(p[2], p[1]), v2 = simd_distance(p[3], p[2])
                     let accel = simd_length((p[2] - p[1]) - (p[1] - p[0]))
                     if accel > worstHere.0 { worstHere = (accel, joint) }
+                    let popRatio = v1 / (0.04 + 2.5 * max(v0, v2))
+                    if popRatio > 0.8, ProcessInfo.processInfo.environment["HAYMAKER_POPS"] != nil {
+                        report.log("  near-pop \(f2(popRatio)) \(side == 0 ? "hero" : "rival") \(FighterSkeleton.names[joint]) frame \(t): \(f3(v0)) \(f3(v1)) \(f3(v2)); \(samples[t - 1].states[side]) → \(samples[t].states[side])")
+                    }
                     if v1 > 0.04 + 2.5 * max(v0, v2) {
                         pops.append((v1, "\(side == 0 ? "hero" : "rival") \(FighterSkeleton.names[joint]) frame \(t): moved \(f3(v1)) vs \(f3(v0))/\(f3(v2)) around it; \(samples[t - 1].states[side]) → \(samples[t].states[side])"))
                     }
@@ -1223,9 +1350,10 @@ enum MatchSceneTiming {
             }
         }
         footwork(bout, report: report, name: name)
+        releaseSteps(bout, report: report, name: name)
         legStretch(bout, report: report, name: name)
-        windups(bout, report: report, name: name)
-        stanceWidth(bout, report: report, name: name)
+        let windup = windups(bout, report: report, name: name)
+        let stance = stanceWidth(bout, report: report, name: name)
         report.log("\(name): \(samples.count) frames; \(pops.count) one-frame pops")
         for pop in pops.sorted(by: { $0.0 > $1.0 }).prefix(10) { report.log("  pop \(pop.1)") }
         report.log("\(name): largest per-frame velocity changes (units/frame²):")
@@ -1254,10 +1382,26 @@ enum MatchSceneTiming {
         retraction(bout, report: report, name: name)
         exchanges(bout, report: report, name: name)
         rising(bout, report: report, name: name)
+        let kinds = ["landed", "blocked", "dodged", "parried"].map { kind in "\(bout.hits.filter { $0.kind == kind }.count) \(kind)" }
+        let gaps = bout.contacts.filter { $0.label.contains("landed") }.map(\.gap).max() ?? 0
+        report.log("\(name): intents " + bout.intentLog.joined(separator: ", ")
+                   + (bout.guests.isEmpty ? "" : "; guest patterns (not in this book): " + bout.guests.joined(separator: ", ")))
+        return "\(samples.count) frames; \(kinds.joined(separator: " / ")); \(bout.knockdowns.count) knockdowns; "
+            + "windup max \(f3(windup.travel))/\(f3(windup.speed)) per frame; stance ≤ \(f2(stance))×; pops \(pops.count); "
+            + "worst landed gap \(f3(gaps)); glove-in-glove \(f3(bout.gloveClash)), in head \(f3(bout.headClash)); "
+            + "\(report.failures.count - failuresBefore) failures"
     }
 
     /// Thresholds for the exchange checks (scene units / frames at 60 Hz).
     enum ExchangeLimits {
+        /// A release step (fall / get-up) lands in a frame covering at most this × the
+        /// pace around it, and never moves faster than `releasePeak` × its mean pace.
+        static let releaseLanding: Float = 1.3
+        static let releasePeak: Float = 3.0
+        /// Release steps shorter than this (total toe travel) or landing frames under
+        /// `releaseLandingFloor` are too small to read as a jump.
+        static let releaseMinTravel: Float = 0.03
+        static let releaseLandingFloor: Float = 0.01
         /// Torso blobs (hips…chest) never closer than this while both stand.
         static let torsoGap: Float = 0.06
         /// Head centers never closer than this while both stand.
@@ -1515,7 +1659,8 @@ enum MatchSceneTiming {
     /// A punch closes distance with a short step: over each attack windup (from the
     /// frame before it through the contact frame) neither the root nor the hips
     /// travel more than `windupTravel` horizontally, nor faster than `windupSpeed`.
-    @MainActor static func windups(_ bout: Bout, report: Report, name: String) {
+    @discardableResult
+    @MainActor static func windups(_ bout: Bout, report: Report, name: String) -> (travel: Float, speed: Float) {
         let samples = bout.samples
         func xz(_ p: SIMD3<Float>) -> SIMD2<Float> { SIMD2(p.x, p.z) }
         var worst: [String: (travel: Float, speed: Float)] = [:]
@@ -1551,11 +1696,13 @@ enum MatchSceneTiming {
                    + worst.keys.sorted().map { "\($0) \(f3(worst[$0]!.travel))/\(f3(worst[$0]!.speed))" }.joined(separator: ", "))
         for line in over { report.log("  WINDUP \(line)") }
         report.check(over.isEmpty, "\(name): \(over.count) attack windups travel over \(f2(ExchangeLimits.windupTravel)) or faster than \(f2(ExchangeLimits.windupSpeed))/frame")
+        return (worst.values.map(\.travel).max() ?? 0, worst.values.map(\.speed).max() ?? 0)
     }
 
     /// The stance never goes wider than `stanceWidth` × the guard stance (idle frame 0)
     /// while the feet are planted.
-    @MainActor static func stanceWidth(_ bout: Bout, report: Report, name: String) {
+    @discardableResult
+    @MainActor static func stanceWidth(_ bout: Bout, report: Report, name: String) -> Float {
         let samples = bout.samples
         let guards: [Float] = [bout.hero, bout.rival].map { model in
             guard let idle = FighterReach.pose(model.motions, .idle, frame: 0) else { return 1 }
@@ -1587,6 +1734,7 @@ enum MatchSceneTiming {
             report.log("  WIDE \(e.fighter == 0 ? "hero" : "rival") \(e.start)-\(e.end) peak \(f2(e.peak)) from \(e.state)")
         }
         report.check(over == 0, "\(name): \(over) fighter-frames with the stance wider than \(f2(ExchangeLimits.stanceWidth))× the guard stance")
+        return worst.values.map(\.0).max() ?? 0
     }
 
     @MainActor static func footwork(_ bout: Bout, report: Report, name: String) {
@@ -1659,6 +1807,51 @@ enum MatchSceneTiming {
         report.check(violations.isEmpty, "\(name): \(violations.count) foot slides / short steps (see FOOT lines)")
     }
 
+    /// A foot let go for a fall or a get-up crossfades off its plant onto the clip's foot:
+    /// in the frame it lands the toe covers at most `ExchangeLimits.releaseLanding` × the
+    /// faster of the release's fastest earlier frame and the free foot's next frame (no
+    /// last-frame snap), and no frame more than `ExchangeLimits.releasePeak` × that pace.
+    @MainActor static func releaseSteps(_ bout: Bout, report: Report, name: String) {
+        let samples = bout.samples
+        guard samples.count > 2 else { return }
+        var count = 0, worstLanding: Float = 0, worstPeak: Float = 0
+        var violations: [(Float, String)] = []
+        for side in 0..<2 {
+            let who = side == 0 ? "hero" : "rival"
+            for (foot, toe) in [FighterBone.leftToeBase.rawValue, FighterBone.rightToeBase.rawValue].enumerated() {
+                func move(_ f: Int) -> Float {
+                    let a = samples[f - 1].joints[side][toe], b = samples[f].joints[side][toe]
+                    return simd_length(SIMD2(b.x - a.x, b.z - a.z))
+                }
+                var t = 1
+                while t < samples.count {
+                    guard samples[t].releases[side][foot] else { t += 1; continue }
+                    let start = t
+                    while t < samples.count, samples[t].releases[side][foot] { t += 1 }
+                    // `t` is the frame the foot lands (the planter frees it that frame).
+                    guard t + 1 < samples.count else { break }
+                    let moves = (start...t).map(move), after = move(t + 1)
+                    let total = moves.reduce(0, +)
+                    guard moves.count >= 3, total >= ExchangeLimits.releaseMinTravel else { continue }
+                    count += 1
+                    let pace = max(moves.dropLast().max() ?? 0, after, 1e-4)
+                    let landing = moves.last! / pace
+                    let peak = moves.dropLast().max()! / max(1e-4, total / Float(moves.count))
+                    worstLanding = max(worstLanding, landing)
+                    worstPeak = max(worstPeak, peak)
+                    if moves.last! > ExchangeLimits.releaseLandingFloor, landing > ExchangeLimits.releaseLanding || peak > ExchangeLimits.releasePeak {
+                        violations.append((landing, "\(who) \(FighterSkeleton.names[toe]) frames \(start)–\(t) (\(samples[start].states[side])): "
+                                           + "travel \(f3(total)), per frame \(moves.map(f3).joined(separator: " ")) | then \(f3(after)); "
+                                           + "landing \(f2(landing))× the pace around it, peak \(f2(peak))× the mean"))
+                    }
+                }
+            }
+        }
+        report.log("\(name): release steps — \(count) checked (landing frame ≤ \(f2(worstLanding))× the pace around it, fastest frame ≤ \(f2(worstPeak))× the mean)")
+        for item in violations.sorted(by: { $0.0 > $1.0 }).prefix(8) { report.log("  RELEASE \(item.1)") }
+        report.check(violations.isEmpty, "\(name): \(violations.count) release steps snap into their landing (see RELEASE lines)")
+    }
+
     /// After contact the punching glove must come back toward guard (chest space)
     /// within 0.3 s, and the aim must let go within ~0.1 s.
     @MainActor static func retraction(_ bout: Bout, report: Report, name: String) {
@@ -1691,6 +1884,19 @@ enum MatchSceneTiming {
         report.log("\(name): glove back within \(Int(AnimationTuning.retractedShare * 100))% of its travel after contact: " + parts.joined(separator: ", "))
     }
 
+    /// The scripted bout every opponent fights.
+    static let boutScript: [Bout.Intent] = [.takeHit(nil), .punch(.jab), .punch(.hook), .block, .punch(.uppercut), .dodge, .punchGuard,
+                                            .parry, .takeHit(.uppercut), .knockdownRival, .heroKnockdown, .finishRival]
+
+    @MainActor static func writeStrips(_ bout: Bout, prefix: String, out: URL) throws {
+        for (name, shots) in bout.strips.sorted(by: { $0.key < $1.key }) {
+            let file = name.lowercased().map { $0.isLetter || $0.isNumber ? $0 : "-" }.reduce("") { $0 + String($1) }
+                .replacingOccurrences(of: "--", with: "-")
+            try writeSheet(shots.map { ($0.image, $0.label) }, columns: min(8, shots.count), cell: CGSize(width: 240, height: 320),
+                           title: "Filmstrip: \(name) (side camera)", to: out.appendingPathComponent("\(prefix)\(file).png"))
+        }
+    }
+
     /// Every frame of the hero's chained punches, from the first windup to 20 frames after the last contact.
     @MainActor static func renderCombo(_ bout: Bout, out: URL, report: Report) throws {
         let samples = bout.samples
@@ -1716,6 +1922,7 @@ enum MatchSceneTiming {
     /// Dense per-frame filmstrips (0.6 s around contact) of each punch, and top-down +
     /// front (orthographic) exchanges, re-rendered from the recorded bout.
     @MainActor static func renderHistory(_ bout: Bout, out: URL) throws {
+        try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
         let samples = bout.samples
         for (attacker, who) in [(0, "hero"), (1, "rival")] {
             for move in [Move.jab, .hook, .uppercut] {

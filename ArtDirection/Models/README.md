@@ -72,10 +72,11 @@ Source OBJs are unchanged.
 
 `python3 scripts/test_fighter_clips.py` checks the clip library.
 
-On macOS with Xcode, `bash scripts/verify_fighter_rigs.sh [output-dir]` runs the real SceneKit loader and animator through scripted bouts for every fighter. It asserts:
+On macOS with Xcode, `bash scripts/verify_fighter_rigs.sh [output-dir]` runs the real SceneKit loader and animator through scripted bouts for every fighter. A roster sweep plays the scripted bout and the jab→hook→uppercut combo against every career opponent, each with their own rig and pattern book. Fast books such as Jaison's are therefore checked as well as Baxter's. It asserts:
 
 - no pose pops;
-- foot slide and leg stretch limits;
+- foot slide and leg stretch limits, with smoothly eased release steps into knockdowns;
+- windup travel and pace within limits, even when the engine's impact window is short;
 - glove-to-target contact;
 - no body interpenetration;
 - hit-reaction latency;
@@ -119,4 +120,4 @@ The rival's three-second knockdown: fall, taunt, get-up and back to guard.
 
 [`asset-report.md`](asset-report.md) lists per-rig payload, vertex/triangle counts, estimated GPU buffers and roster mapping. Regenerate with `python3 scripts/fighter_asset_report.py`. If a bundled rig is missing or malformed at runtime, `FighterRigNodes.load` logs once and falls back to Mack's rig (then to an invisible skeleton) rather than crashing. On-device frame times are not yet measured.
 
-Jaison’s source is the user-supplied `jaison.obj`, preserved byte-for-byte. It has 4,824 colored vertices and 9,644 triangle faces, with no external material references. Its runtime rig uses the shared 22-bone HMR2 format.
+Jaison’s source is the user-supplied `jaison.obj`. It has 4,824 colored vertices and 9,644 triangle faces, with no external material references. Its runtime rig uses the shared 22-bone HMR2 format. Positions, faces and body colours are unchanged from the supplied file; only the gloves were repainted. The generator had baked the reference art’s rim lights into them (gold on the right glove, blue on the left), so in game the right glove read as tan. The 336 vertices past the wrist (T-pose |x| ≥ 0.342) now match `jaison.png`: white cuffs up to |x| 0.388, then black leather gloves with soft highlights.
