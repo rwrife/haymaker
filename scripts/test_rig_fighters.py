@@ -70,7 +70,7 @@ class FighterAssetsTests(unittest.TestCase):
         self.assertEqual(pairs, {
             ('mack', 'mack'), ('goldie', 'goldie'), ('nico', 'nico'),
             ('atlas', 'atlas'), ('vera', 'vera'), ('duke', 'duke'),
-            ('sylvie', 'sylvie'), ('cassian', 'cassian'), ('baxter', 'bruiser'), ('jaison', 'jaison'),
+            ('sylvie', 'sylvie'), ('cassian', 'cassian'), ('baxter', 'bruiser'), ('jaison', 'jaison'), ('hunter', 'hunter'),
         })
         committed = set(subprocess.check_output(
             ['git', 'ls-files', 'Haymaker/Models/*.fighter'], cwd=ROOT, text=True

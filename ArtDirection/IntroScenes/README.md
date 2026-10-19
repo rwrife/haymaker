@@ -19,3 +19,7 @@ The original eight files are 1024 × 1536 RGBA PNGs, preserved byte-for-byte fro
 See [character backstories](../character-backstories.md) for character motivations, fighting identities, and sample intro dialogue. These supplied files are distinct from the earlier concept reference images in the parent directory.
 
 Jaison’s 1024 × 1536 supplied PNG is preserved byte-for-byte and bundled as `jaison-intro`. It is used with his walkout line, “Let’s get this sorted.”
+
+## Hunter Rowan Mercer — “Redline”
+
+User-supplied original character assets received October 19, 2026: `hunter.obj`, `hunter.png` (versus portrait), and `hunter-defeated.png` (bundled unchanged for victory results). The OBJ is rigged with the existing offline pipeline; runtime uses the generated `hunter.fighter`. No external stock assets.

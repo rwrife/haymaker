@@ -123,7 +123,7 @@ import HaymakerStore
         }
         precondition(ladder.ladderComplete && ladder.nextLadderBook == nil)
         let summary = ladder.ladderSummary
-        precondition(summary.bouts == 10 && summary.wins == 9)
+        precondition(summary.bouts == ladder.ladder.count + 1 && summary.wins == ladder.ladder.count)
         precondition(summary.score == expected.reduce(0) { $0 + $1.score.points })
         precondition(summary.landed == expected.reduce(0) { $0 + $1.playerStats.landed })
         precondition(summary.thrown == expected.reduce(0) { $0 + $1.playerStats.thrown })
@@ -131,12 +131,12 @@ import HaymakerStore
         precondition(summary.knockouts == expected.filter { $0.outcome == .playerWinByKO }.count)
         precondition(ladder.begin(.goldie, mode: .sparring))
         ladder.save(complete(.goldie))
-        precondition(!ladder.canCelebrateVictory && ladder.ladderSummary.bouts == 10)
+        precondition(!ladder.canCelebrateVictory && ladder.ladderSummary.bouts == expected.count)
         let savedCount = ladder.records.bouts.count
         precondition(ladder.newLadder())
         precondition(!ladder.ladderComplete && !ladder.canCelebrateVictory && ladder.ladderSummary.bouts == 0)
         precondition(ladder.nextLadderBook?.id == "goldie" && ladder.records.bouts.count == savedCount)
-        print("PASS: nine real wins complete the ladder only after a successful final save; sparring never ends career")
+        print("PASS: \(ladder.ladder.count) real wins complete the ladder only after a successful final save; sparring never ends career")
         print("PASS: finale totals include ladder losses, exclude older history and sparring; End game resets progress, not records")
     }
 }

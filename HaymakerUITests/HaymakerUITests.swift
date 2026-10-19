@@ -140,7 +140,8 @@ final class HaymakerUITests: XCTestCase {
         defer { XCUIDevice.shared.orientation = .portrait }
         XCTAssertTrue(app.buttons["bout.start"].waitForExistence(timeout: 5))
         app.buttons["bout.start"].tap()
-        let roster = ["goldie", "nico", "atlas", "vera", "duke", "sylvie", "cassian", "jaison", "baxter"]
+        let roster = ["goldie", "nico", "atlas", "vera", "duke", "sylvie", "cassian", "jaison", "hunter", "baxter"]
+        let bouts = roster.count + 1
         for (index, id) in roster.enumerated() {
             XCTAssertTrue(app.images["versus.portrait.\(id)"].waitForExistence(timeout: 5))
             dismissVersus(app)
@@ -175,7 +176,7 @@ final class HaymakerUITests: XCTestCase {
             settleOrientation(app, landscape: landscape)
             let endGame = app.buttons["career.endGame"]
             scrollToButton(endGame, in: app)
-            XCTAssertTrue(app.staticTexts["career.victory.wins"].label.contains("10/10"), "Final stats include the rematch")
+            XCTAssertTrue(app.staticTexts["career.victory.wins"].label.contains("\(bouts)/\(bouts)"), "Final stats include the rematch")
             let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
             shot.name = landscape ? "Career finale landscape" : "Career finale portrait"
             shot.lifetime = .keepAlways
@@ -188,7 +189,7 @@ final class HaymakerUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["career.status.goldie"].label, "Ready")
         XCTAssertFalse(app.buttons["career.start.nico"].isEnabled)
         app.buttons["records.open"].tap()
-        XCTAssertTrue(app.staticTexts["Career bouts 10"].waitForExistence(timeout: 5), "End game preserves the local ledger")
+        XCTAssertTrue(app.staticTexts["Career bouts \(bouts)"].waitForExistence(timeout: 5), "End game preserves the local ledger")
     }
 
     @MainActor
@@ -337,7 +338,7 @@ final class HaymakerUITests: XCTestCase {
         app.launch()
         app.buttons["career.open"].tap()
         let ladder = app.scrollViews["career.scroll"]
-        for id in ["goldie", "nico", "atlas", "vera", "duke", "sylvie", "cassian", "jaison", "baxter"] {
+        for id in ["goldie", "nico", "atlas", "vera", "duke", "sylvie", "cassian", "jaison", "hunter", "baxter"] {
             let spar = app.buttons["sparring.start.\(id)"]
             for _ in 0..<15 {
                 if spar.exists && spar.isHittable { break }

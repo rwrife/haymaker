@@ -8,7 +8,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[2]
 MODELS = ROOT / 'ArtDirection' / 'Models'
 RIGS = ROOT / 'ArtDirection' / 'Rigs'
-NAMES = ('mack', 'bruiser', 'goldie', 'nico', 'atlas', 'duke', 'sylvie', 'cassian', 'vera', 'jaison')
+NAMES = ('mack', 'bruiser', 'goldie', 'nico', 'atlas', 'duke', 'sylvie', 'cassian', 'vera', 'jaison', 'hunter')
 
 # Fixed 22-bone Mixamo order shared with the runtime and the clip library (see ArtDirection/Rigs/README.md).
 BONES = ('Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head',

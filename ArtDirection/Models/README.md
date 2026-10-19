@@ -121,3 +121,7 @@ The rival's three-second knockdown: fall, taunt, get-up and back to guard.
 [`asset-report.md`](asset-report.md) lists per-rig payload, vertex/triangle counts, estimated GPU buffers and roster mapping. Regenerate with `python3 scripts/fighter_asset_report.py`. If a bundled rig is missing or malformed at runtime, `FighterRigNodes.load` logs once and falls back to Mack's rig (then to an invisible skeleton) rather than crashing. On-device frame times are not yet measured.
 
 Jaison’s source is the user-supplied `jaison.obj`. It has 4,824 colored vertices and 9,644 triangle faces, with no external material references. Its runtime rig uses the shared 22-bone HMR2 format. Positions, faces and body colours are unchanged from the supplied file; only the gloves were repainted. The generator had baked the reference art’s rim lights into them (gold on the right glove, blue on the left), so in game the right glove read as tan. The 336 vertices past the wrist (T-pose |x| ≥ 0.342) now match `jaison.png`: white cuffs up to |x| 0.388, then black leather gloves with soft highlights.
+
+## Hunter Rowan Mercer — “Redline”
+
+User-supplied original character assets received October 19, 2026: `hunter.obj`, `hunter.png` (versus portrait), and `hunter-defeated.png` (bundled unchanged for victory results). The OBJ is rigged with the existing offline pipeline; runtime uses the generated `hunter.fighter`. No external stock assets.

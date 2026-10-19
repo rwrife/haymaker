@@ -4,7 +4,7 @@ import os
 
 /// Every fighter shares the same 22-bone Mixamo-style skeleton (HMR2).
 enum FighterModelAsset: String, CaseIterable, Sendable {
-    case mack, bruiser, goldie, nico, atlas, duke, sylvie, cassian, vera, jaison
+    case mack, bruiser, goldie, nico, atlas, duke, sylvie, cassian, vera, jaison, hunter
 }
 
 /// Fixed bone order shared by `.fighter` rigs and `fighter.clips`.
