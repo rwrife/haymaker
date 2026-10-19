@@ -314,24 +314,18 @@ struct BoneBlob: Sendable {
         // whose centre ray it crosses), then cast only against a cell's own triangles.
         var binned = [[SIMD3<Float>]](repeating: [], count: cells)
         let spacing: Float = 0.004
-        indices.withUnsafeBytes { buffer in
+        // Explicit closure signature and a typed helper: Xcode 26.0.1 (CI's pinned
+        // toolchain) can't type-check this loop's SIMD arithmetic inline in reasonable time.
+        indices.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) -> Void in
             for t in 0..<(indices.count / 12) {
-                let corner = (0..<3).map { Int(UInt32(littleEndian: buffer.loadUnaligned(fromByteOffset: t * 12 + $0 * 4, as: UInt32.self))) }
-                guard corner.allSatisfy({ $0 < count && dominant[$0] == bone }) else { continue }
-                let a = points[corner[0]], b = points[corner[1]], c = points[corner[2]]
-                let edge = max(simd_distance(a, b), simd_distance(b, c), simd_distance(c, a))
-                let steps = max(1, Int((edge / spacing).rounded(.up)))
-                var covered = Set<Int>()
-                for i in 0...steps {
-                    for j in 0...(steps - i) {
-                        let p = a + (b - a) * (Float(i) / Float(steps)) + (c - a) * (Float(j) / Float(steps))
-                        guard simd_length(p) > 1e-5 else { continue }
-                        let (face, u, v) = cubeFace(p)
-                        let x = min(n - 1, max(0, Int((u + 1) / 2 * Float(n)))), y = min(n - 1, max(0, Int((v + 1) / 2 * Float(n))))
-                        covered.insert(face * n * n + y * n + x)
-                    }
+                var corner: [Int] = []
+                for k in 0..<3 {
+                    let raw: UInt32 = buffer.loadUnaligned(fromByteOffset: t * 12 + k * 4, as: UInt32.self)
+                    corner.append(Int(UInt32(littleEndian: raw)))
                 }
-                for cell in covered { binned[cell].append(contentsOf: [a, b, c]) }
+                guard corner.allSatisfy({ (i: Int) -> Bool in i < count && dominant[i] == bone }) else { continue }
+                let a: SIMD3<Float> = points[corner[0]], b: SIMD3<Float> = points[corner[1]], c: SIMD3<Float> = points[corner[2]]
+                for cell in cellsCovered(a, b, c, grid: n, spacing: spacing) { binned[cell].append(contentsOf: [a, b, c]) }
             }
         }
         var skin = [Float](repeating: -.infinity, count: cells)
@@ -367,6 +361,30 @@ struct BoneBlob: Sendable {
         // No flesh to press into across the cut: the cap stands proud by a glove's bite.
         for k in open { skin[k] = 1 / max(reciprocal[k], 1e-3) + capMargin }
         return skin
+    }
+
+    /// The cube cells (`grid`² per face) whose centre rays triangle `a b c` may cross,
+    /// found by sampling it every `spacing` along its edges.
+    private static func cellsCovered(_ a: SIMD3<Float>, _ b: SIMD3<Float>, _ c: SIMD3<Float>, grid n: Int, spacing: Float) -> Set<Int> {
+        let edge: Float = max(simd_distance(a, b), simd_distance(b, c), simd_distance(c, a))
+        let steps: Int = max(1, Int((edge / spacing).rounded(.up)))
+        let ab: SIMD3<Float> = b - a, ac: SIMD3<Float> = c - a
+        let scale = Float(n)
+        var covered = Set<Int>()
+        for i in 0...steps {
+            let s: Float = Float(i) / Float(steps)
+            for j in 0...(steps - i) {
+                let r: Float = Float(j) / Float(steps)
+                var p: SIMD3<Float> = a + ab * s
+                p += ac * r
+                guard simd_length(p) > 1e-5 else { continue }
+                let (face, u, v) = cubeFace(p)
+                let x: Int = min(n - 1, max(0, Int((u + 1) / 2 * scale)))
+                let y: Int = min(n - 1, max(0, Int((v + 1) / 2 * scale)))
+                covered.insert(face * n * n + y * n + x)
+            }
+        }
+        return covered
     }
 
     /// How far the flat cap over a head's neck cut stands proud of the cut.
