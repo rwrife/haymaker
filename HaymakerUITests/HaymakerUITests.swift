@@ -5,7 +5,7 @@ final class HaymakerUITests: XCTestCase {
     func testBoutPlaythroughAndSettingsInspection() throws {
         XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
-        app.launchArguments += ["-haymakerUITestShortBout", "-haymakerUITestIsolatedStore", "-haymakerUITestJabEachTick"]
+        app.launchArguments += ["-haymakerUITestShortBout", "-haymakerUITestIsolatedStore", "-haymakerUITestJabEachTick", "-haymakerUITestStartPaused"]
         app.launch()
 
         // 1. Settings check: inspect colorblind cues and reduced motion toggles.
@@ -29,7 +29,7 @@ final class HaymakerUITests: XCTestCase {
         startButton.tap()
         dismissVersus(app)
 
-        // 3. Verify arena HUD elements.
+        // Inspect the HUD while paused so a short KO cannot remove it between AX queries.
         let clock = app.staticTexts["bout.clock"]
         XCTAssertTrue(clock.waitForExistence(timeout: 5), "Bout clock exists")
 
@@ -39,32 +39,21 @@ final class HaymakerUITests: XCTestCase {
         let jabButton = app.buttons["bout.jab"]
         XCTAssertTrue(jabButton.waitForExistence(timeout: 5), "One-thumb jab button exists")
 
-        // 4. Throw punches and verify at least one punch lands.
         let landedLabel = app.staticTexts["bout.landed"]
         XCTAssertTrue(landedLabel.waitForExistence(timeout: 5), "Landed punches counter exists")
+        let resume = app.buttons["bout.resume"]
+        XCTAssertTrue(resume.waitForExistence(timeout: 5))
+        resume.tap()
 
-        let punchDeadline = Date().addingTimeInterval(12)
-        var hasLanded = false
-        while Date() < punchDeadline {
-            if jabButton.isHittable {
-                jabButton.tap()
-            }
-            if landedLabel.exists,
-               let count = Int(landedLabel.label.split(separator: ":").last?.trimmingCharacters(in: .whitespaces) ?? ""),
-               count > 0 {
-                hasLanded = true
-                break
-            }
-            usleep(150_000)
-        }
-        XCTAssertTrue(hasLanded, "Player landed at least one punch during the bout")
-
-        // 5. Reach results card (short test bout completes in ~10 seconds).
+        // The deterministic driver submits real jabs; inspect their durable result, not a disappearing HUD.
         let resultsHeader = app.staticTexts["bout.results"]
-        // The engine clock finishes the bout. Do not query a disappearing jab
-        // control during the results transition (the Apple run exposed this race).
         XCTAssertTrue(resultsHeader.waitForExistence(timeout: 25),
                       "Bout ended and transitioned to the results card")
+        let finalLanded = app.staticTexts["results.landed"]
+        XCTAssertTrue(finalLanded.waitForExistence(timeout: 5))
+        let count = try XCTUnwrap(finalLanded.label.split(whereSeparator: { !$0.isNumber }).compactMap { Int($0) }.first,
+                                 "Results report a numeric landed-punch count")
+        XCTAssertGreaterThan(count, 0, "Player landed at least one punch during the bout")
         XCTAssertTrue(app.buttons["bout.again"].exists, "Fight again button is present on the results card")
     }
 
