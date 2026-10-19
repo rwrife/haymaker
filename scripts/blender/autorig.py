@@ -82,6 +82,15 @@ def rig(name, mack, cal, out):
     report.update(proxy_islands=len(islands), transfer_p99=round(float(np.percentile(dist, 99)), 5))
 
     ids, w = autorig_regions.skin_weights(V, faces, heads, aims, heat, notes, h)
+    if name == 'hunter':
+        # Hunter's narrow jaw leaves a few face vertices outside the generic jaw
+        # plane. Keep the central face/cranium rigid, matching the asset contract.
+        head, top = heads[5], aims[5]
+        length = top[1] - head[1]
+        core = (np.abs(V[:, 0]) < 0.4 * length) & ((V[:, 1] > head[1] + 0.6 * length) |
+                ((V[:, 1] > head[1] + 0.4 * length) & (V[:, 2] > head[2])))
+        ids[core] = (5, 0, 0, 0)
+        w[core] = (1, 0, 0, 0)
     bone_ids, weights = quantize(ids, w)
     write_skin(out / f'{name}.skin', heads, aims, bone_ids, weights)
     (out / f'{name}.joints.json').write_text(json.dumps(joints_doc(name, heads, aims, notes, report), indent=1) + '\n')
