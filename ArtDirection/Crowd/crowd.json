@@ -1,0 +1,58 @@
+{
+ "bodies": [
+  "casual-man",
+  "suit-man",
+  "casual-woman",
+  "business-woman"
+ ],
+ "looks": {
+  "tee-gray": "casual-man",
+  "polo-red": "casual-man",
+  "tee-green": "casual-man",
+  "suit-charcoal": "suit-man",
+  "suit-navy": "suit-man",
+  "suit-brown": "suit-man",
+  "tee-teal": "casual-woman",
+  "tee-yellow": "casual-woman",
+  "blazer-navy": "business-woman",
+  "blazer-burgundy": "business-woman"
+ },
+ "clips": {
+  "sit": "sit",
+  "sit_clap": "clap",
+  "sit_yell": "angry_01",
+  "cheer": "cheer"
+ },
+ "tripo": {
+  "bodies": {
+   "casual-man": {
+    "model": "920b2211-2547-40f4-b5da-133d362b1b4b",
+    "rig": "2b745732-0616-42a9-9a6d-d06039627a15",
+    "anim": "79dec401-0413-4dd7-89df-6b4bd891f350"
+   },
+   "suit-man": {
+    "model": "23216d7f-c866-4023-a176-b7ee47857463",
+    "rig": "513d9c5a-0c8d-4fa1-b409-ba4960fb868a",
+    "anim": "196fa082-dd7a-4b2a-99ac-b45e905b748c"
+   },
+   "casual-woman": {
+    "model": "bcc0560b-3f80-4671-9a89-027f4c4a0ed7",
+    "rig": "19d354b7-8259-4ae5-a13f-9539ac61cdc2",
+    "anim": "f9d74ef2-660a-4e9e-ba51-d2b66b8929d4"
+   },
+   "business-woman": {
+    "model": "8ed79a81-ca07-48a2-a364-2f93416b75a2",
+    "rig": "fd4865fe-4f50-48b4-a152-71a94d0590d0",
+    "anim": "b177c8ce-1778-42ea-b9f6-b7d924a4e9f7"
+   }
+  },
+  "textures": {
+   "polo-red": "b5f8dce5-a09d-4878-b500-40dff91e89cf",
+   "tee-green": "cf8bc4fd-b2ab-434e-a014-967288d6a6bb",
+   "suit-navy": "a98d1c18-7a57-4840-9aaf-d66b096d8224",
+   "suit-brown": "858f3d6d-b969-4d05-94ca-ec55ac1a1cb0",
+   "tee-yellow": "27699d2d-72b1-4568-bdf2-c2236b433351",
+   "blazer-burgundy": "ee71c8ca-f9d3-4332-8f5f-e962a11c7355"
+  }
+ }
+}
