@@ -3,7 +3,7 @@ Haymaker — Offline Arcade Boxing for iPhone
 Step into a boss-rush boxing game built for one-handed play. Each original opponent has a distinct rhythm and visible tells. Watch the windup, dodge or guard, and time your counter.
 
 WHAT YOU DO
-- Work through a career ladder of eight original opponents, from Goldie Voltage to final boss Bruiser Baxter. Each opponent has an authored move pattern.
+- Work through a career ladder of ten original opponents, from Goldie Voltage to final boss Bruiser Baxter. Each opponent has an authored move pattern.
 - Tap to jab and swipe for a hook, uppercut, dodge, or guard. Prefer buttons? Switch to the two-handed control layout.
 - Chase personal bests. Bout scores use landed punches, defense, damage, rounds, and time; records are derived from locally saved bouts.
 - Play Endless Sparring against a chosen opponent and track the rounds in your run.
