@@ -139,4 +139,4 @@ The built-app display gate checks both device families, all four iPad orientatio
 
 ## Fighter texture fidelity
 
-Mack, Goldie, Atlas, Duke and Vera use the detailed base-color textures from their supplied model exports, with UV seams preserved through skinning. The other six fighters retain vertex colors until textured exports are supplied. Neutral ambient fill and lighter haze preserve contrast. Rebuild textures with `python3 scripts/rig_fighters.py`; see [asset provenance and format](ArtDirection/Models/README.md#fighter-texture-fidelity) for validation and remaining material limitations.
+All eleven fighters use detailed base-color textures from the supplied model exports. UV seams preserve the existing rigs and contact geometry. OBJ's bottom-origin V coordinate is converted to the image's top-origin convention to keep faces, clothing and gloves correctly aligned. Neutral ambient fill and lighter haze preserve contrast. Rebuild textures with `python3 scripts/rig_fighters.py`; see [asset provenance and format](ArtDirection/Models/README.md#fighter-texture-fidelity), including the [iPad simulator preview](ArtDirection/Models/texture-ipad-preview.png).

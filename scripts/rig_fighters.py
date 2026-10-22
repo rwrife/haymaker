@@ -134,7 +134,9 @@ def texture_payload(name, models=MODELS):
                 u, v = uv[texcoord]
                 if not math.isfinite(u) or not math.isfinite(v):
                     raise ValueError(f'{name}: nonfinite UV')
-                vertices.append((vertex, u, v))
+                # OBJ UVs start at the bottom of the image; SceneKit's JPEG
+                # material sampling starts at the top. Convert exactly once.
+                vertices.append((vertex, u, 1.0 - v))
             indices.append(lookup[key])
         data = bytearray(struct.pack('<4sII', b'HMT1', len(vertices), len(indices)))
         for row in vertices:

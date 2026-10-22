@@ -245,7 +245,8 @@ final class HaymakerUITests: XCTestCase {
         XCTAssertTrue(app.buttons["career.open"].waitForExistence(timeout: 5))
         app.buttons["career.open"].tap()
         let ladder = app.scrollViews["career.scroll"]
-        for id in ["atlas", "duke"] {
+        // Capture every opponent with a supplied UV texture; Mack is on the title screen.
+        for id in ["goldie", "nico", "atlas", "vera", "duke", "sylvie", "cassian", "jaison", "hunter", "baxter"] {
             XCTAssertTrue(ladder.waitForExistence(timeout: 5))
             let spar = app.buttons["sparring.start.\(id)"]
             for _ in 0..<15 {

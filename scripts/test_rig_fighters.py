@@ -67,13 +67,10 @@ class FighterAssetsTests(unittest.TestCase):
             cls.assets[name] = (data, parse(data))
 
     def test_texture_seams_and_rebuild(self):
-        textured = {'mack', 'goldie', 'atlas', 'duke', 'vera'}
         for name in NAMES:
             with self.subTest(model=name):
                 payload = texture_payload(name)
-                if name not in textured:
-                    self.assertIsNone(payload)
-                    continue
+                self.assertIsNotNone(payload, f'{name} needs a textured source export')
                 uv, image = payload
                 self.assertEqual(uv, (ROOT/'Haymaker'/'Models'/f'{name}.fighteruv').read_bytes())
                 self.assertEqual(image, (ROOT/'Haymaker'/'Models'/f'{name}-basecolor.jpg').read_bytes())
@@ -90,6 +87,30 @@ class FighterAssetsTests(unittest.TestCase):
                 # Exact triangle correspondence: UV duplication cannot change the
                 # silhouette, winding, weights or original contact geometry.
                 self.assertEqual(tuple(rows[i][0] for i in indices), self.assets[name][1]['indices'])
+
+    def test_texture_coordinates_use_image_top_origin(self):
+        # Independent OBJ interpretation: match every triangle corner against
+        # the original UV, converting bottom-origin OBJ V to image row V.
+        for name in NAMES:
+            with self.subTest(model=name):
+                with zipfile.ZipFile(ROOT/'ArtDirection'/'Models'/f'{name}.zip') as archive:
+                    lines = archive.read(next(n for n in archive.namelist() if n.endswith('.obj'))).decode().splitlines()
+                uv = [tuple(map(float, line.split()[1:3])) for line in lines if line.startswith('vt ')]
+                expected = []
+                for line in lines:
+                    if line.startswith('f '):
+                        face = [tuple(int(x) - 1 for x in t.split('/')[:2]) for t in line.split()[1:]]
+                        for i in range(1, len(face) - 1):
+                            expected.extend((face[0], face[i], face[i + 1]))
+                raw = (ROOT/'Haymaker'/'Models'/f'{name}.fighteruv').read_bytes()
+                _, count, index_count = struct.unpack_from('<4sII', raw)
+                rows = list(struct.iter_unpack('<I2f', raw[12:12 + count * 12]))
+                indices = struct.unpack_from(f'<{index_count}I', raw, 12 + count * 12)
+                for index, (vertex, texcoord) in zip(indices, expected):
+                    source, u, v = rows[index]
+                    self.assertEqual(source, vertex)
+                    self.assertAlmostEqual(u, uv[texcoord][0], places=6)
+                    self.assertAlmostEqual(v, 1.0 - uv[texcoord][1], places=6)
 
     def test_texture_export_rejects_mismatched_source(self):
         with tempfile.TemporaryDirectory() as directory:
