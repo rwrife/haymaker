@@ -22,7 +22,7 @@ Jaison “Black Tie” Mercer joins career and sparring with his supplied model 
 
 ## Overview
 
-Haymaker is a single-player arcade boxing game for iPhone built in native Swift with a Metal-backed SceneKit 3D renderer for match gameplay and SwiftUI for everything around it. Every fight is a *boss fight*: an original opponent with a readable tell-driven move book (jabs, hooks, guards, feints), an exposure meter, and a rhythm the player learns. The core loop is short, one-handed, and score-attack friendly: pick a bout, read the telegraphs, land combos through the guard, dodge on the bell, and beat your own record.
+Haymaker is a single-player arcade boxing game for iPhone and iPad built in native Swift with a Metal-backed SceneKit 3D renderer for match gameplay and SwiftUI for everything around it. Every fight is a *boss fight*: an original opponent with a readable tell-driven move book (jabs, hooks, guards, feints), an exposure meter, and a rhythm the player learns. The core loop is short, one-handed, and score-attack friendly: pick a bout, read the telegraphs, land combos through the guard, dodge on the bell, and beat your own record.
 
 The pitch: **a pocket arcade boxing cabinet** — every opponent is a distinct pattern puzzle, every session ends in a personal record, and all of it lives on your phone.
 
@@ -68,7 +68,7 @@ The concept also maps naturally to the **iPhone Duo dual-screen** design target:
 ## Non-goals
 
 - No Flutter, React Native, Expo, Kotlin Multiplatform, .NET MAUI, Unity, or any cross-platform/hybrid framework — native Swift only.
-- No Android and no native iPad support (iPhone-only; iPad requires explicit user opt-in).
+- No Android support.
 - No accounts, cloud save, leaderboards, ads, IAP, or loot boxes; zero network at runtime.
 - No licensed fighters, gyms, footage, trademarks, or names of real boxers or game franchises; all characters and art are original.
 - No gambling/betting mechanics, no blood-gore realism, no medical/fitness claims.
@@ -76,7 +76,7 @@ The concept also maps naturally to the **iPhone Duo dual-screen** design target:
 
 ## Dual-screen (iPhone Duo) design target — build shape
 
-Full dual-screen/foldable SDK support does not exist yet. Haymaker therefore scaffolds and ships as a **standard native Swift iPhone app with iPad support disabled by default**. The dual-screen experience is a documented design target with a single migration seam, never a dependency on unavailable fold APIs:
+Full dual-screen/foldable SDK support does not exist yet. Haymaker therefore scaffolds and ships as a **standard native Swift iPhone and iPad app with native iPad support**. The dual-screen experience is a documented design target with a single migration seam, never a dependency on unavailable fold APIs:
 
 - **Battle split design target:** top/primary surface shows the opponent, tells, and the fight stage; the second surface becomes the persistent control deck — big one-thumb buttons, stamina, round clock, and read-hints — so the player never covers the fight to play it.
 - **Career split design target:** roster/records wall as a control surface while the detail pane shows the selected opponent's pattern breakdown.
@@ -91,7 +91,7 @@ Full dual-screen/foldable SDK support does not exist yet. Haymaker therefore sca
 
 ## iOS platform facts
 
-- Native Swift (SwiftUI shell + SpriteKit match scene), iPhone-only: `TARGETED_DEVICE_FAMILY = 1` in every app-target build configuration; built `UIDeviceFamily` must verify as `[1]` on an Apple build environment. Native iPad support is disabled; enabling it requires explicit user opt-in.
+- Native Swift (SwiftUI shell + SpriteKit match scene), iPhone and iPad: `TARGETED_DEVICE_FAMILY = "1,2"` in every app-target build configuration; built `UIDeviceFamily` must verify as `[1, 2]` on an Apple build environment. Native iPad support is enabled by explicit user request.
 - iOS 26-or-newer SDK required; pinned in `toolchain.json` (Xcode 26.0.1 / 17A400 / iOS SDK 26.0 / Swift 6 mode).
 - Bundle identifier: `com.infinityball.haymaker` (App Store Connect registration: `CREATED com.infinityball.haymaker`).
 - Signing/TestFlight: `.github/workflows/release.yml` (packaging issue) builds, signs, and publishes via the App Store Connect API using the repository Actions secrets `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8`, `ASC_TEAM_ID` — secret names only, values never logged.
@@ -99,9 +99,9 @@ Full dual-screen/foldable SDK support does not exist yet. Haymaker therefore sca
 
 ## Current status and milestones
 
-Early build-out: the repository now carries the native Swift project skeleton — `Haymaker.xcodeproj` (app target `Haymaker`), the pure-domain match-engine package `Packages/HaymakerKit` (pattern books, fixed-tick fight engine, damage state machine, deterministic scoring), and the persistence package `HaymakerStore` — plus the pinned CI contract gates (iOS 26 toolchain pin, iPhone-only pre/post-build, zero-network allowlist, native-only framework scan). A playable Metal-backed 3D scene now exists. No store archive or TestFlight binary has been verified.
+Early build-out: the repository now carries the native Swift project skeleton — `Haymaker.xcodeproj` (app target `Haymaker`), the pure-domain match-engine package `Packages/HaymakerKit` (pattern books, fixed-tick fight engine, damage state machine, deterministic scoring), and the persistence package `HaymakerStore` — plus the pinned CI contract gates (iOS 26 toolchain pin, iPhone and iPad pre/post-build, zero-network allowlist, native-only framework scan). A playable Metal-backed 3D scene now exists. No store archive or TestFlight binary has been verified.
 
-1. ✅ **M1** — Xcode project + pure-Swift HaymakerKit package + CI (iOS 26 pin, iPhone-only gate, zero-network gate). (issue #1)
+1. ✅ **M1** — Xcode project + pure-Swift HaymakerKit package + CI (iOS 26 pin, iPhone and iPad gate, zero-network gate). (issue #1)
 2. ✅ **M2** — Match engine core: data-driven pattern books (first two opponents), fixed-tick FightEngine with tell-window resolution, stamina/damage state machine with KO/three-count rules, deterministic scoring + personal-best model, 51 swift-testing cases (golden-seed fixtures, replay determinism, state tables). (issue #2)
 3. ✅ **M3 gameplay** — Metal-backed 3D fight scene + one-thumb controls + Bruiser Baxter playable.
 4. 🔜 **M4** — Career ladder (6 opponents), records ledger, stats derivations.
@@ -121,6 +121,10 @@ Early build-out: the repository now carries the native Swift project skeleton �
   bash scripts/check_zero_network.sh
   bash scripts/check_native_only.sh
   ```
-- CI on `macos-26` asserts the exact Xcode 26.0.1 (17A400) pin, iOS 26 SDK, `TARGETED_DEVICE_FAMILY = 1` pre- and post-build (`UIDeviceFamily == [1]` on the built app), the `com.infinityball.haymaker` bundle id, and privacy-manifest embedding.
+- CI on `macos-26` asserts the exact Xcode 26.0.1 (17A400) pin, iOS 26 SDK, `TARGETED_DEVICE_FAMILY = "1,2"` pre- and post-build (`UIDeviceFamily == [1, 2]` on the built app), the `com.infinityball.haymaker` bundle id, and privacy-manifest embedding.
 
 Hunter “Redline” Mercer joins the shuffled career ladder and is available in seeded sparring. His Closing Time pattern chains two jabs, a hook and a committed right, with a longer final recovery to punish overcommitment. His supplied portrait introduces the bout with “Try keeping up.” The defeat portrait is archived with the other future cut-scene art.
+
+## Adaptive screens
+
+Native iPad support uses the entire window for the Metal arena. Its vertical camera field of view reveals more of the arena as the window widens, without stretching fighters. Controls stay inside safe areas: two-handed controls reflow from two rows to one at 780 points of available width, with taller buttons in windows at least 600 points high. The control deck is capped at 960 points to keep buttons readable on large displays. Rotation and iPad window resizing update the layout automatically. These layouts also accommodate unusual phone aspect ratios; iPhone Duo hardware and separate fold surfaces remain unverified design targets.

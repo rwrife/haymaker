@@ -4,7 +4,7 @@ Instructions for AI coding agents (and humans) working in this repository. Read 
 
 ## Project at a glance
 
-- Native iPhone-only boss-rush arcade boxing game: Swift 6, SwiftUI shell, Metal/SceneKit arena. Local-first, no accounts, no network.
+- Native iPhone and iPad boss-rush arcade boxing game: Swift 6, SwiftUI shell, Metal/SceneKit arena. Local-first, no accounts, no network.
 - `Packages/HaymakerKit` — pure-Swift deterministic match engine. The engine is authoritative; keep gameplay logic here, not in views.
 - `Packages/HaymakerStore` — local persistence (SQLite via GRDB).
 - `Haymaker/` — the app target; `HaymakerUITests/` — simulator UI journeys.
@@ -13,7 +13,7 @@ Instructions for AI coding agents (and humans) working in this repository. Read 
 
 ## Hard constraints (CI enforces these)
 
-- iPhone only: `TARGETED_DEVICE_FAMILY = 1`. Do not add iPad support.
+- iPhone and iPad: `TARGETED_DEVICE_FAMILY = "1,2"`. Keep both device families enabled.
 - Bundle id stays `com.infinityball.haymaker`; the privacy manifest must stay embedded.
 - Zero network: no networking code or entitlements (`scripts/check_zero_network.sh`).
 - Native only: no Flutter, React Native, Unity, etc. (`scripts/check_native_only.sh`).
@@ -66,7 +66,7 @@ Engine changes need tests in `Packages/HaymakerKit/Tests`. Keep the engine deter
 CI runs on every PR with two jobs that must both pass:
 
 - `Linux package tests (swift test)`
-- `iOS build + iPhone-only + toolchain pin`
+- `iOS build + iPhone-only + toolchain pin` (legacy check name; now verifies iPhone and iPad)
 
 A PR is **clean** when all of the following hold:
 

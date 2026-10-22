@@ -70,7 +70,7 @@ struct ContentView: View {
                         VersusDialog(book: career.opponent, portrait: portrait, fight: beginFight, cancel: sessionReset)
                     } else {
                         if !session.engine.isOver || postBoutElapsed < MatchScene.resultsDelay {
-                            match(session, portrait: portrait)
+                            match(session, portrait: portrait, size: geometry.size)
                         }
                         if let countdown, !paused, !session.engine.isOver { countdownOverlay(countdown, portrait: portrait) }
                         else if let down = knockdownCount(session.engine), !paused, !session.engine.isOver { knockdownOverlay(down, portrait: portrait) }
@@ -272,7 +272,10 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
     }
 
-    private func match(_ session: FightSession, portrait: Bool) -> some View {
+    private func match(_ session: FightSession, portrait: Bool, size: CGSize) -> some View {
+        // Size, rather than device identity, also handles resized iPad windows.
+        let roomyControls = size.height >= 600
+        let wideControls = size.width >= 780
         let fight = session.engine
         return VStack(spacing: 0) {
             hud(fight, portrait: portrait)
@@ -322,9 +325,10 @@ struct ContentView: View {
                 }
                 stamina(fight)
                 if controlStyle == ControlStyle.oneThumb.rawValue {
-                    oneThumbControls(session, portrait: portrait)
-                } else { twoHandedControls(session, portrait: portrait) }
+                    oneThumbControls(session, portrait: roomyControls)
+                } else { twoHandedControls(session, portrait: roomyControls, wide: wideControls) }
             }
+            .frame(maxWidth: 960)
             .padding(portrait ? 14 : 10)
             .background(LinearGradient(colors: [RingStyle.ink.opacity(0.6), RingStyle.ink.opacity(0.96)], startPoint: .top, endPoint: .bottom), in: RoundedRectangle(cornerRadius: 14))
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(.white.opacity(0.13)))
@@ -427,18 +431,14 @@ struct ContentView: View {
         }
     }
 
-    private func twoHandedControls(_ session: FightSession, portrait: Bool) -> some View {
-        VStack(spacing: 7) {
-            HStack(spacing: 8) {
-                control("JAB", icon: "arrow.up.right", input: .jab, id: "bout.jab", session: session, color: RingStyle.gold)
-                control("HOOK", icon: "arrow.uturn.left", input: .hook, id: "bout.hook", session: session, color: RingStyle.gold)
-                control("UPPERCUT", icon: "arrow.up", input: .uppercut, id: "bout.uppercut", session: session, color: RingStyle.gold)
-            }
-            HStack(spacing: 8) {
-                control("GUARD", icon: "shield.fill", input: .block, id: "bout.guard", session: session)
-                control("DODGE", icon: "arrow.turn.up.left", input: .dodge, id: "bout.dodge", session: session, color: RingStyle.green)
-                control("PARRY", icon: "hand.raised.fill", input: .parry, id: "bout.parry", session: session)
-            }
+    private func twoHandedControls(_ session: FightSession, portrait: Bool, wide: Bool) -> some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: wide ? 6 : 3), spacing: 7) {
+            control("JAB", icon: "arrow.up.right", input: .jab, id: "bout.jab", session: session, color: RingStyle.gold, height: portrait ? 60 : 44)
+            control("HOOK", icon: "arrow.uturn.left", input: .hook, id: "bout.hook", session: session, color: RingStyle.gold, height: portrait ? 60 : 44)
+            control("UPPERCUT", icon: "arrow.up", input: .uppercut, id: "bout.uppercut", session: session, color: RingStyle.gold, height: portrait ? 60 : 44)
+            control("GUARD", icon: "shield.fill", input: .block, id: "bout.guard", session: session, height: portrait ? 60 : 44)
+            control("DODGE", icon: "arrow.turn.up.left", input: .dodge, id: "bout.dodge", session: session, color: RingStyle.green, height: portrait ? 60 : 44)
+            control("PARRY", icon: "hand.raised.fill", input: .parry, id: "bout.parry", session: session, height: portrait ? 60 : 44)
         }
     }
 
@@ -447,7 +447,7 @@ struct ContentView: View {
             VStack(spacing: 3) {
                 HStack(spacing: 4) {
                     Image(systemName: icon).font(.system(size: 13, weight: .bold))
-                    Text(title).font(RingStyle.type(16))
+                    Text(title).font(RingStyle.type(16)).lineLimit(1).minimumScaleFactor(0.7)
                 }
                 if let hint, height > 50 { Text(hint).font(.system(size: 6, weight: .heavy)).tracking(0.4).foregroundStyle(.white.opacity(0.45)) }
             }

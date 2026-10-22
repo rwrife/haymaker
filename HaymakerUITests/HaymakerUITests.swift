@@ -2,6 +2,26 @@ import XCTest
 
 final class HaymakerUITests: XCTestCase {
     @MainActor
+    func testAdaptiveControlsStayInsideWindowAfterRotation() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-haymakerUITestIsolatedStore", "-controlStyle", "Two hands"]
+        app.launch()
+        defer { XCUIDevice.shared.orientation = .portrait }
+        app.buttons["bout.start"].tap()
+        dismissVersus(app)
+        for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {
+            XCUIDevice.shared.orientation = orientation
+            for id in ["bout.jab", "bout.hook", "bout.uppercut", "bout.guard", "bout.dodge", "bout.parry"] {
+                let button = app.buttons[id]
+                XCTAssertTrue(button.waitForExistence(timeout: 5))
+                XCTAssertTrue(button.isHittable, id)
+                XCTAssertGreaterThanOrEqual(button.frame.height, 44, id)
+                XCTAssertTrue(app.windows.firstMatch.frame.contains(button.frame), id)
+            }
+        }
+    }
+
+    @MainActor
     func testBoutPlaythroughAndSettingsInspection() throws {
         XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()

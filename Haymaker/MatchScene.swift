@@ -49,6 +49,7 @@ import HaymakerKit
         stage.addChildNode(rival.root)
         stage.addChildNode(hero.root)
         camera.camera = SCNCamera()
+        camera.camera?.projectionDirection = .vertical
         camera.camera?.fieldOfView = 48
         camera.camera?.zNear = 0.1
         camera.camera?.zFar = 60
