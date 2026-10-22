@@ -43,3 +43,7 @@ The user supplied `jaison.obj`, `jaison.png`, and the original Jaison Elias Merc
 ## Hunter Rowan Mercer — “Redline”
 
 User-supplied original character assets received October 19, 2026: `hunter.obj`, `hunter.png` (versus portrait), and `hunter-defeated.png` (bundled unchanged for victory results). The OBJ is rigged with the existing offline pipeline; runtime uses the generated `hunter.fighter`. No external stock assets.
+
+## Fighter texture fidelity
+
+The Mack, Goldie, Atlas, Duke and Vera base-color JPEGs bundled in `Haymaker/Models` are extracted byte-for-byte from the user-supplied ZIPs in `ArtDirection/Models`. Their `.fighteruv` mappings preserve the original UV seams and use the existing rig weights. No external or generated artwork was added. See [model pipeline details](Models/README.md#fighter-texture-fidelity).

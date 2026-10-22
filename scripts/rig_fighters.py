@@ -3,7 +3,8 @@
 
 Joint fitting and skin weighting happen offline in Blender (scripts/blender/autorig.py), which writes
 ArtDirection/Rigs/<name>.skin. This packer needs no Blender or numpy, so CI rebuilds every committed
-`.fighter` byte-for-byte from the committed OBJ + sidecar. See ArtDirection/Rigs/README.md.
+`.fighter` byte-for-byte from the committed OBJ + sidecar. Optional supplied ZIPs also
+produce HMT1 UV-seam mappings and byte-exact base-color images. See ArtDirection/Rigs/README.md.
 
 HMR2 (little endian): header "HMR2", u32 vertexCount, u32 indexCount, u32 boneCount (22);
 22 x {i32 parent, f32 head[3], f32 aim[3]}; vertexCount x {f32 pos[3], f32 normal[3], f32 rgb[3],
@@ -13,6 +14,7 @@ import argparse
 import json
 import math
 import struct
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -99,11 +101,59 @@ def pack(name, models=MODELS, rigs=RIGS):
     return bytes(data)
 
 
+def texture_payload(name, models=MODELS):
+    """Preserve UV seams from supplied exports; reject mismatched geometry.
+
+    HMT1: header + render vertex count + index count; (source vertex, u, v)
+    records followed by triangle indices. Rig/contact geometry remains HMR2.
+    """
+    archive = Path(models) / f'{name}.zip'
+    if not archive.exists():
+        return None
+    positions, _, triangles = read_obj(Path(models) / f'{name}.obj')
+    with zipfile.ZipFile(archive) as source:
+        obj = next(n for n in source.namelist() if n.endswith('.obj'))
+        lines = source.read(obj).decode().splitlines()
+        exported = [tuple(map(float, l.split()[1:4])) for l in lines if l.startswith('v ')]
+        if exported != positions:
+            raise ValueError(f'{name}: textured export positions differ from rig source')
+        uv = [tuple(map(float, l.split()[1:3])) for l in lines if l.startswith('vt ')]
+        corners = []
+        for line in lines:
+            if line.startswith('f '):
+                face = [tuple(int(x) - 1 for x in t.split('/')[:2]) for t in line.split()[1:]]
+                for i in range(1, len(face) - 1):
+                    corners.extend((face[0], face[i], face[i + 1]))
+        if [v for v, _ in corners] != triangles:
+            raise ValueError(f'{name}: textured export topology differs from rig source')
+        vertices, lookup, indices = [], {}, []
+        for vertex, texcoord in corners:
+            key = (vertex, texcoord)
+            if key not in lookup:
+                lookup[key] = len(vertices)
+                u, v = uv[texcoord]
+                if not math.isfinite(u) or not math.isfinite(v):
+                    raise ValueError(f'{name}: nonfinite UV')
+                vertices.append((vertex, u, v))
+            indices.append(lookup[key])
+        data = bytearray(struct.pack('<4sII', b'HMT1', len(vertices), len(indices)))
+        for row in vertices:
+            data.extend(struct.pack('<I2f', *row))
+        data.extend(struct.pack(f'<{len(indices)}I', *indices))
+        mtl = source.read(next(n for n in source.namelist() if n.endswith('.mtl'))).decode()
+        image = next(l.split(maxsplit=1)[1] for l in mtl.splitlines() if l.startswith('map_Kd '))
+        return bytes(data), source.read(image)
+
+
 def build(name, output, models=MODELS, rigs=RIGS):
     data = pack(name, models, rigs)
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     (output / f'{name}.fighter').write_bytes(data)
+    texture = texture_payload(name, models)
+    if texture is not None:
+        (output / f'{name}.fighteruv').write_bytes(texture[0])
+        (output / f'{name}-basecolor.jpg').write_bytes(texture[1])
     vertices, indices, bones = struct.unpack_from('<III', data, 4)
     return dict(name=name, vertices=vertices, triangles=indices // 3, bones=bones)
 
