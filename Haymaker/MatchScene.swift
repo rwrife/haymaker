@@ -21,16 +21,11 @@ import HaymakerKit
     private var lastRender: CFTimeInterval?
     private var effects: [(node: SCNNode, expires: Double)] = []
     private var cameraFollow = SIMD3<Float>(repeating: 0)
-    private struct Spectator {
-        let torso: SCNNode
-        let head: SCNNode
-        let arms: [SCNNode]
-        let phase: Float
-        let tempo: Float
-        let enthusiastic: Bool
-    }
-    private var spectators: [Spectator] = []
+    private var spectators: [CrowdMember] = []
     private var flashNodes: [SCNNode] = []
+    /// 0…1: lifts with heavy blows and knockdowns, eases back between exchanges.
+    private var excitement: Float = 0
+    private var lastCrowdTime: Float?
 
     private var titleScreen: Bool
     private var careerVictory = false
@@ -92,6 +87,8 @@ import HaymakerKit
         lastRender = nil
         shake = 0
         cameraFollow = .zero
+        excitement = 0.15
+        lastCrowdTime = nil
         animateCrowd(time: 0, reducedMotion: true)
         choreographer.reset()
         choreographer.restPose()
@@ -127,6 +124,7 @@ import HaymakerKit
         hero.poseTitle(time: time, reducedMotion: reducedMotion)
         hero.root.position = SCNVector3(0, 0, portrait ? 0.85 : 0.55)
         hero.root.eulerAngles.y = .pi / 9
+        animateCrowd(time: Float(time), reducedMotion: reducedMotion)
         SCNTransaction.commit()
     }
 
@@ -139,6 +137,9 @@ import HaymakerKit
         hero.resetMotion()
         hero.root.eulerAngles.y = .pi / 9
         layout(portrait: portrait)
+        excitement = 1
+        lastCrowdTime = nil
+        for person in spectators { person.erupt() }
         renderCareerVictory(time: 0, reducedMotion: reducedMotion)
     }
 
@@ -175,8 +176,11 @@ import HaymakerKit
             case let .impact(strong, counter):
                 shake = max(shake, counter ? 0.085 : 0.045)
                 impact(at: position, strong: strong)
+                if strong || counter { excitement = min(1, excitement + (counter ? 0.2 : 0.12)) }
             case .knockdown:
                 shake = max(shake, 0.07)
+                excitement = 1
+                for person in spectators { person.erupt() }
             case .dodge, .parry:
                 trail(at: position)
             case .blocked:
@@ -210,22 +214,13 @@ import HaymakerKit
     }
 
     private func animateCrowd(time t: Float, reducedMotion: Bool) {
+        // The presentation clock restarts each bout; treat a jump back as a fresh start.
+        let dt = lastCrowdTime.map { t >= $0 ? min(0.25, t - $0) : 0 } ?? 0
+        lastCrowdTime = t
+        excitement = max(0.15, excitement - dt * 0.05)
         for person in spectators {
-            let beat = t * person.tempo + person.phase
-            let movement: Float = reducedMotion ? 0 : 1
-            person.torso.eulerAngles.z = sin(beat * 0.7) * 0.045 * movement
-            person.torso.eulerAngles.x = sin(beat * 0.43) * 0.055 * movement
-            person.head.eulerAngles.y = sin(beat * 0.51) * 0.22 * movement
-            person.head.eulerAngles.x = sin(beat * 1.3) * 0.07 * movement
-            // Only a few spectators cheer at once; everyone has a distinct
-            // tempo and phase, keeping the stands from moving in unison.
-            let cheer = pow(max(0, sin(beat * 0.38)), 6)
-            for (side, arm) in person.arms.enumerated() {
-                let direction: Float = side == 0 ? -1 : 1
-                let lift: Float = person.enthusiastic ? 1.55 : 0.45
-                arm.eulerAngles.z = direction * (0.16 + movement * (cheer * lift + sin(beat * 1.7) * 0.08))
-                arm.eulerAngles.x = -0.12 - cheer * 0.3 * movement
-            }
+            person.paused = reducedMotion
+            if !reducedMotion { person.update(dt: dt, excitement: excitement) }
         }
         for flash in flashNodes { flash.isHidden = true }
         guard !reducedMotion, !flashNodes.isEmpty else { return }
@@ -301,47 +296,50 @@ import HaymakerKit
         arenaWall.materials = [wallMaterial]
         stage.addChildNode(node(arenaWall, at: SCNVector3(0, 4, -2)))
         let seating = material(.init(red: 0.018, green: 0.028, blue: 0.052, alpha: 1), roughness: 1)
-        let skinTones: [UIColor] = [.init(red: 0.48, green: 0.30, blue: 0.21, alpha: 1), .init(red: 0.69, green: 0.48, blue: 0.32, alpha: 1), .init(red: 0.3, green: 0.17, blue: 0.12, alpha: 1)]
-        let headGeometry = SCNSphere(radius: 0.13)
-        headGeometry.segmentCount = 8
-        let shirtColors: [UIColor] = [.init(red: 0.2, green: 0.3, blue: 0.4, alpha: 1), .init(red: 0.4, green: 0.09, blue: 0.08, alpha: 1), .init(red: 0.5, green: 0.39, blue: 0.1, alpha: 1), .init(red: 0.08, green: 0.2, blue: 0.16, alpha: 1)]
-        let heads = skinTones.map { color -> SCNGeometry in let g = headGeometry.copy() as! SCNGeometry; let m = material(color); m.emission.contents = color; m.emission.intensity = 0.1; g.materials = [m]; return g }
-        let bodies = shirtColors.map { color -> SCNGeometry in let g = SCNCapsule(capRadius: 0.15, height: 0.43); g.radialSegmentCount = 6; let m = material(color); m.emission.contents = color; m.emission.intensity = 0.1; g.materials = [m]; return g }
+        let benchMaterial = material(.init(red: 0.05, green: 0.06, blue: 0.09, alpha: 1), roughness: 0.9)
         let flashTexture = Self.mistPuff()
+        // Tripo3D fans (issue #42): life-size next to the fighters, seated on stepped benches.
+        // Each body is scaled so its seated pelvis lands on the bench, which also gives a natural
+        // spread of heights between the four bodies.
+        let crowd = CrowdBodyAssets.all() ?? []
+        let rowRise: Float = 0.62, rowDepth: Float = 1.18, benchHeight: Float = 0.55, pitch: Float = 0.82
+        var index = 0
         for row in 0..<6 {
-            let z = -6.3 - Float(row) * 1.18
-            let y = Float(row) * 0.62
-            let terrace = SCNBox(width: 27, height: 0.45, length: 1.1, chamferRadius: 0)
-            terrace.materials = [seating]
-            stage.addChildNode(node(terrace, at: SCNVector3(0, y - 0.32, z)))
-            for column in 0..<42 {
-                let x = Float(column) * 0.59 - 12.1
-                let index = row * 42 + column
-                let seat = SCNNode()
-                seat.position = SCNVector3(x, y + 0.08, z)
-                // Small variations in build and posture break up identical rows.
-                let stature = 0.91 + Float((index * 17) % 11) * 0.018
-                seat.scale = SCNVector3(stature, stature, stature)
-                seat.eulerAngles.y = atan2(-x, -z) * 0.45
-                stage.addChildNode(seat)
-                let torso = SCNNode()
-                seat.addChildNode(torso)
-                torso.addChildNode(node(bodies[index % bodies.count], at: SCNVector3(0, 0.19, 0)))
-                let head = node(heads[index % heads.count], at: SCNVector3(0, 0.48, 0))
-                torso.addChildNode(head)
-                var arms: [SCNNode] = []
-                for side: Float in [-1, 1] {
-                    let shoulder = SCNNode()
-                    shoulder.position = SCNVector3(side * 0.14, 0.32, 0)
-                    let arm = segment(from: SCNVector3(0, 0, 0), to: SCNVector3(side * 0.04, -0.27, 0.10), radius: 0.044, material: heads[index % heads.count].firstMaterial!)
-                    shoulder.addChildNode(arm)
-                    torso.addChildNode(shoulder)
-                    arms.append(shoulder)
-                }
-                spectators.append(Spectator(torso: torso, head: head, arms: arms,
-                    phase: Float((index * 137) % 631) / 100,
-                    tempo: 0.72 + Float((index * 31) % 71) / 100,
-                    enthusiastic: index % 5 == 0))
+            let z = -6.3 - Float(row) * rowDepth
+            let ground = Float(row) * rowRise - 0.1
+            let tread = SCNBox(width: 29, height: 0.45, length: CGFloat(rowDepth), chamferRadius: 0)
+            tread.materials = [seating]
+            stage.addChildNode(node(tread, at: SCNVector3(0, ground - 0.225, z)))
+            let bench = SCNBox(width: 29, height: CGFloat(benchHeight), length: 0.72, chamferRadius: 0.03)
+            bench.materials = [benchMaterial]
+            stage.addChildNode(node(bench, at: SCNVector3(0, ground + benchHeight / 2, z - 0.42)))
+            // Top row stays empty under the trusses; lower rows widen with depth to fill the
+            // landscape frame. Portrait only ever sees the middle few seats of each row.
+            guard row < 5, !crowd.isEmpty else { continue }
+            let depth: Float = z + 2   // arena wall tube is centred at z = -2, radius 14
+            let wallReach: Float = (196 - depth * depth).squareRoot() - 0.7
+            let half: Float = min(9 + Float(row) * 0.7, wallReach)
+            let seats = Int(half * 2 / pitch)
+            for column in 0..<seats {
+                defer { index += 1 }
+                var hash = UInt64(index) &* 0x9E37_79B9_7F4A_7C15 &+ 0x2545_F491_4F6C_DD1D
+                hash ^= hash >> 29
+                // About one seat in nine stays empty, like a real house.
+                guard hash % 9 != 0 else { continue }
+                let assets = crowd[Int((hash >> 8) % UInt64(crowd.count))]
+                let look = Int((hash >> 16) % UInt64(assets.body.looks.count))
+                let person = CrowdMember(assets: assets, look: look, seed: hash)
+                let jitter: Float = (Float((hash >> 24) % 100) / 100 - 0.5) * 0.12
+                let x: Float = -half + (Float(column) + 0.5) * pitch + jitter
+                let stature: Float = 0.97 + Float((hash >> 32) % 7) * 0.01
+                let scale: Float = benchHeight / assets.data.seat * stature
+                let turn: Float = (Float((hash >> 40) % 100) / 100 - 0.5) * 0.2
+                person.root.simdScale = SIMD3<Float>(repeating: scale)
+                person.root.simdPosition = SIMD3<Float>(x, ground + benchHeight - assets.data.seat * scale, z - 0.25)
+                // Face the ring, like the old crowd, with a little individual variation.
+                person.root.eulerAngles.y = atan2(-x, -z) * 0.45 + turn
+                stage.addChildNode(person.root)
+                spectators.append(person)
                 if index % 11 == 0 {
                     let flashMaterial = SCNMaterial()
                     flashMaterial.lightingModel = .constant
@@ -352,10 +350,10 @@ import HaymakerKit
                     flashMaterial.writesToDepthBuffer = false
                     let plane = SCNPlane(width: 0.42, height: 0.42)
                     plane.materials = [flashMaterial]
-                    let flash = node(plane, at: SCNVector3(0.19, 0.42, 0.20))
+                    let flash = node(plane, at: SCNVector3(x + 0.2, ground + 1.25, z + 0.1))
                     flash.constraints = [SCNBillboardConstraint()]
                     flash.isHidden = true
-                    torso.addChildNode(flash)
+                    stage.addChildNode(flash)
                     flashNodes.append(flash)
                 }
             }
@@ -363,11 +361,12 @@ import HaymakerKit
         for x: Float in [-7, 7] {
             let banner = SCNBox(width: 1.2, height: 4, length: 0.04, chamferRadius: 0)
             banner.materials = [material(.init(red: 0.025, green: 0.065, blue: 0.13, alpha: 1))]
-            stage.addChildNode(node(banner, at: SCNVector3(x, 5.3, -9.4)))
+            // Behind the last row so standing fans never clip through the banners.
+            stage.addChildNode(node(banner, at: SCNVector3(x, 5.8, -13.3)))
             let emblem = SCNText(string: "H", extrusionDepth: 0.01)
             emblem.font = UIFont(name: "AvenirNext-HeavyItalic", size: 1.1)
             emblem.materials = [material(.init(red: 0.83, green: 0.57, blue: 0.2, alpha: 1), metal: 0.8)]
-            stage.addChildNode(node(emblem, at: SCNVector3(x - 0.43, 4.9, -9.34)))
+            stage.addChildNode(node(emblem, at: SCNVector3(x - 0.43, 5.4, -13.24)))
         }
         let trussMaterial = material(.init(white: 0.16, alpha: 1), metal: 0.8)
         for z: Float in [-5, -9] {

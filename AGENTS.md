@@ -54,6 +54,7 @@ bash scripts/check_zero_network.sh
 bash scripts/check_native_only.sh
 python3 scripts/test_rig_fighters.py                  # when touching fighter assets or rigs
 python3 scripts/test_fighter_clips.py                 # when touching fighter.clips or the clip extractor
+python3 scripts/test_crowd.py                         # when touching crowd assets or scripts/build_crowd.py
 ```
 
 The iOS build and simulator UI journey need macOS with Xcode and only run in CI on the pinned toolchain. If you can't run them locally, rely on the PR build.

@@ -32,7 +32,7 @@ The eleven supplied OBJ sculpts in `ArtDirection/Models` are the character sourc
 - **Animation.** The motion comes from [Mixamo](https://www.mixamo.com) boxing animations. They were downloaded on Mack's sculpt, then baked by `scripts/blender/extract_clips.py` into the shared clip library `Haymaker/Models/fighter.clips` (see [`Animations`](Animations/README.md)). Mixamo's licence lets the animations ship in a game but not be redistributed as raw files, so only the derived bake is committed. The FBX downloads stay outside the repository.
 - **Runtime.** `Haymaker/FighterRig.swift`, `FighterAnimator.swift`, `FootPlanting.swift` and `BoutChoreographer.swift` play the clips on the SceneKit skeletons. They handle cross-fades, foot planting, punch aim and fighter spacing.
 
-The ring, crowd, lights and impact particles remain native scene geometry in `Haymaker/MatchScene.swift`. All eleven story characters now have supplied source models.
+The ring, lights and impact particles remain native scene geometry in `Haymaker/MatchScene.swift`. The crowd is ten rigged, animated spectators generated with the Tripo3D API; see [`Crowd`](Crowd/README.md) for the prompts' task IDs, pipeline, cost and format. All eleven story characters now have supplied source models.
 
 The meshes use Y-up coordinates in meters, smooth vertex normals, and a mobile polygon budget. Materials are applied in the native scene, and animation comes from the bundled clip library. The app requires no Blender installation.
 
