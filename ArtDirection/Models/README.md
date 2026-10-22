@@ -169,3 +169,13 @@ python3 scripts/rig_fighters.py hunter
 Bruiser in a live bout on the iPhone 18 Pro / iOS 27.0 simulator:
 
 ![Bruiser's recovered texture in the real simulator bout](texture-bruiser-preview.png)
+
+### Full-roster simulator validation
+
+The iPhone 18 Pro / iOS 27.0 simulator completed live sparring bouts against all ten opponents with the final texture assets. Every saved bout screenshot was visually inspected for skin, clothing and glove placement. Mack's title screen also passed the portrait/landscape journey, and the iPad mini (A17 Pro) simulator was updated to the complete build. Local verification used the installed Xcode 27.1 at the user's explicit request; the CI Xcode 26.0.1 pin is unchanged.
+
+Host verification passed 81 engine tests, six store tests, the session adapter checks, 12 fighter asset tests, six display contract checks, and the native-only/zero-network gates. Runtime additions for the six recovered exports total 13.29 MiB of JPEG and UV sidecars; original `.fighter` geometry, skin weights and animation clips are byte-identical.
+
+![Hunter with the supplied texture in a live simulator bout](texture-hunter-preview.png)
+
+![Jaison with the supplied texture in a live simulator bout](texture-jaison-preview.png)
