@@ -46,4 +46,4 @@ User-supplied original character assets received October 19, 2026: `hunter.obj`,
 
 ## Fighter texture fidelity
 
-The Mack, Goldie, Atlas, Duke and Vera base-color JPEGs bundled in `Haymaker/Models` are extracted byte-for-byte from the user-supplied ZIPs in `ArtDirection/Models`. Their `.fighteruv` mappings preserve the original UV seams and use the existing rig weights. No external or generated artwork was added. See [model pipeline details](Models/README.md#fighter-texture-fidelity).
+All eleven fighters now have bundled base-color textures and UV seam mappings. Mack, Goldie, Atlas, Duke and Vera use their original supplied OBJ/material ZIPs. Bruiser, Hunter, Jaison, Nico, Sylvie and Cassian use derived OBJ/material ZIPs recovered from the user-supplied textured FBXs received October 21, 2026. The JPEG images are preserved byte-for-byte. Existing rig geometry and animation are unchanged. Simulator previews are captured from the actual app. No external or generated artwork was added. See [model pipeline details and FBX provenance](Models/README.md#fighter-texture-fidelity).

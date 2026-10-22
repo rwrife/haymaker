@@ -23,8 +23,8 @@ jobs:
         run: swift --version
       - name: Run HaymakerKit package tests
         run: swift test --package-path Packages/HaymakerKit
-      - name: Install SQLite development headers
-        run: apt-get update -qq && apt-get install -y libsqlite3-dev
+      - name: Install SQLite development headers and Python asset-test runtime
+        run: apt-get update -qq && apt-get install -y libsqlite3-dev python3
       - name: Run HaymakerStore package tests
         # Ubuntu's SQLite omits the optional snapshot API; DatabaseQueue does not use it.
         run: swift test --package-path Packages/HaymakerStore -Xswiftc -DGRDBCUSTOMSQLITE

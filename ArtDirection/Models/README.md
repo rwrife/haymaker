@@ -128,6 +128,44 @@ User-supplied original character assets received October 19, 2026: `hunter.obj`,
 
 ## Fighter texture fidelity
 
-Mack, Goldie, Atlas, Duke and Vera now use the original base-color JPEGs from their supplied model ZIP archives. `python3 scripts/rig_fighters.py` verifies exact position and face correspondence, then generates `.fighteruv` seam mappings and `-basecolor.jpg` images alongside the unchanged `.fighter` rigs. UV seams duplicate render vertices with identical normals and skin weights; contact geometry stays unchanged. Textured meshes use white vertex colors to avoid multiplying the original paint into the texture a second time. The other six fighters retain their supplied vertex colors because no UV texture export is available for them. No new external art or generated detail is introduced.
+All eleven fighters use the original base-color JPEGs from supplied model exports. `python3 scripts/rig_fighters.py` verifies exact position and face correspondence, then generates `.fighteruv` seam mappings and `-basecolor.jpg` images alongside the unchanged `.fighter` rigs. UV seams duplicate render vertices with identical normals and skin weights; contact geometry stays unchanged. Textured meshes use white vertex colors to avoid multiplying the original paint into the texture a second time. The vertex-colored mesh remains available as a fallback if texture resources are missing or malformed. No new external art or generated detail is introduced.
 
-The renderer uses mipmapped, anisotropic texture filtering, neutral ambient fill and reduced arena haze/bloom to preserve surface contrast. Source exports contain base color only; authored normal and roughness maps remain future asset work. Missing or malformed UV sidecars retain the vertex-colored mesh. Run `python3 scripts/test_rig_fighters.py` to check byte-exact texture regeneration, UV seams and triangle correspondence as well as rig integrity. Device appearance and frame time still need verification on the pinned Xcode/iOS lane and physical hardware.
+The renderer uses mipmapped, anisotropic texture filtering, neutral ambient fill and reduced arena haze/bloom to preserve surface contrast. The runtime currently consumes base color; additional material maps supplied for Jaison are not yet wired into this pipeline. Missing or malformed UV sidecars retain the vertex-colored mesh. Run `python3 scripts/test_rig_fighters.py` to check byte-exact texture regeneration, UV seams and triangle correspondence as well as rig integrity. Local simulator appearance is verified below; pinned-toolchain CI and physical-device frame times remain separate checks.
+
+### Texture orientation verification
+
+HMT1 coordinates use the image's top-left origin: `u = OBJ.u`, `v = 1 - OBJ.v`. Copying OBJ's bottom-origin V directly into the SceneKit image mapping places skin and clothing fragments on unrelated surfaces. The exporter applies the conversion once; runtime materials must not flip it again. The regression suite compares every exported triangle corner with the original OBJ UV using this convention.
+
+The corrected title screen was built and run on the iPad mini (A17 Pro) simulator with iOS 27.0 / installed Xcode 27.1, by explicit user request. This is supplemental simulator evidence; the Xcode 26.0.1 CI pin is unchanged.
+
+![Mack with corrected texture orientation in the iPad simulator](texture-ipad-preview.png)
+
+### Bruiser textured source
+
+Bruiser's `bruiser.zip` is a derived OBJ/MTL/JPEG export from the user-supplied `tripo_convert_4c5eb2b5-4259-4541-92eb-0dcc141f0134.fbx` and its `bruiser_basecolor.JPEG`, received October 21, 2026. Blender 5.2.1 recovered the FBX per-corner UVs. After converting Blender's imported Z-up positions to the existing Y-up OBJ coordinates `(x, z, -y)`, all 10,962 vertices matched uniquely within 0.000002 source units (maximum error 0.000001051). All 21,421 triangles matched by vertex identity. The derived OBJ uses the existing rig source's exact positions, vertex order and triangle winding with the corresponding FBX UVs; the JPEG is byte-exact. The `.fighter` rig, skin weights and animations are unchanged. `scripts/rig_fighters.py` rebuilds the runtime UV sidecar and texture from this archive, and the regression suite checks topology and image-origin conversion.
+
+### Remaining FBX texture sources
+
+Hunter, Jaison, Nico, Sylvie and Cassian were supplied October 21, 2026, alongside their original base-color images:
+
+| Fighter | Supplied FBX conversion ID | Vertices | Polygons |
+| --- | --- | ---: | ---: |
+| Hunter | `bf0e14e7-2fa1-405f-b4ee-e941a4a99aec` | 5,316 | 10,435 |
+| Jaison | `24b20659-6ee8-41a7-a00e-ef96e363b83a` | 4,824 | 9,644 |
+| Nico | `8d57a32d-fe28-49de-9801-f4499a9d0e14` | 10,864 | 21,095 |
+| Sylvie | `41ad7a54-fd45-4ec3-b3d7-ab0da4c70c2d` | 21,038 | 22,438 |
+| Cassian | `8a54768e-8454-4de6-a8a0-001473405b2d` | 21,215 | 23,190 |
+
+`scripts/blender/recover_fighter_texture.py` recovers the supplied FBX's per-corner UVs onto the exact existing OBJ vertex/polygon order. Every vertex must match within 0.000002 source units; coincident positions are resolved through mesh connectivity, then the full polygon identity and bijection are checked. The maximum observed position error for these five exports is below 0.000000876 source units. It rejects mismatched meshes rather than guessing a UV transfer. The resulting `<fighter>.zip` archives contain the canonical OBJ, MTL and byte-exact source JPEG, so runtime regeneration remains deterministic and needs no Blender. Jaison's new texture retains the baked warm/cool highlights in the supplied base-color image, replacing the earlier vertex-only glove repaint.
+
+To recover an export again:
+
+```sh
+blender --background --python scripts/blender/recover_fighter_texture.py -- \
+  --name hunter --fbx /path/to/source.fbx --basecolor /path/to/hunter_basecolor.JPEG
+python3 scripts/rig_fighters.py hunter
+```
+
+Bruiser in a live bout on the iPhone 18 Pro / iOS 27.0 simulator:
+
+![Bruiser's recovered texture in the real simulator bout](texture-bruiser-preview.png)
