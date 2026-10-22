@@ -20,5 +20,5 @@ xcrun swiftc -O -parse-as-library -I "$work" -L "$work" -lHaymakerKit \
   Haymaker/BoxerModel.swift Haymaker/FootPlanting.swift Haymaker/BoutChoreographer.swift scripts/verify_fighter_rigs.swift \
   -o "$work/verify"
 # The loaders read Bundle.main, which for a command-line tool is the binary's folder.
-cp "$assets"/*.fighter "$assets"/fighter.clips "$work/"
+cp "$assets"/*.fighter "$assets"/fighter.clips "$assets"/*.fighteruv "$assets"/*-basecolor.jpg "$work/"
 DYLD_LIBRARY_PATH="$work" "$work/verify" "$out"

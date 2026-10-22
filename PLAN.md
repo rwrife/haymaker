@@ -75,3 +75,5 @@ Rules:
 Restate explicitly for executors: no Flutter, React Native, Expo, Kotlin Multiplatform, .NET MAUI, or Unity anywhere; no Android; no accounts/cloud/ads/IAP; no licensed names or assets; no betting; no medical/fitness claims; no multiplayer in MVP.
 
 Adaptive display support: native iPhone/iPad families, full-window arena with vertical field of view, and width/height-driven control reflow. No fold-specific APIs or gameplay engine changes.
+
+Fighter rendering preserves the HMR2 rig/contact format. Optional HMT1 `.fighteruv` sidecars duplicate render vertices at UV seams, copying each original vertex's normals and bone weights, and pair with bundled source base-color JPEGs. Vertex-colored rigs remain the fallback and serve fighters without a supplied textured export. Asset generation checks source position/topology correspondence before exporting the sidecars.

@@ -125,3 +125,9 @@ Jaison’s source is the user-supplied `jaison.obj`. It has 4,824 colored vertic
 ## Hunter Rowan Mercer — “Redline”
 
 User-supplied original character assets received October 19, 2026: `hunter.obj`, `hunter.png` (versus portrait), and `hunter-defeated.png` (bundled unchanged for victory results). The OBJ is rigged with the existing offline pipeline; runtime uses the generated `hunter.fighter`. No external stock assets.
+
+## Fighter texture fidelity
+
+Mack, Goldie, Atlas, Duke and Vera now use the original base-color JPEGs from their supplied model ZIP archives. `python3 scripts/rig_fighters.py` verifies exact position and face correspondence, then generates `.fighteruv` seam mappings and `-basecolor.jpg` images alongside the unchanged `.fighter` rigs. UV seams duplicate render vertices with identical normals and skin weights; contact geometry stays unchanged. Textured meshes use white vertex colors to avoid multiplying the original paint into the texture a second time. The other six fighters retain their supplied vertex colors because no UV texture export is available for them. No new external art or generated detail is introduced.
+
+The renderer uses mipmapped, anisotropic texture filtering, neutral ambient fill and reduced arena haze/bloom to preserve surface contrast. Source exports contain base color only; authored normal and roughness maps remain future asset work. Missing or malformed UV sidecars retain the vertex-colored mesh. Run `python3 scripts/test_rig_fighters.py` to check byte-exact texture regeneration, UV seams and triangle correspondence as well as rig integrity. Device appearance and frame time still need verification on the pinned Xcode/iOS lane and physical hardware.

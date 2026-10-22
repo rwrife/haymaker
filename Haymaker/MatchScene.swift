@@ -40,7 +40,7 @@ import HaymakerKit
         scene.fogEndDistance = 30
         scene.fogDensityExponent = 1.4
         scene.lightingEnvironment.contents = reflectionEnvironment()
-        scene.lightingEnvironment.intensity = 0.38
+        scene.lightingEnvironment.intensity = 0.22
         scene.rootNode.addChildNode(stage)
         buildRing()
         buildStadium()
@@ -55,7 +55,7 @@ import HaymakerKit
         camera.camera?.zFar = 60
         camera.camera?.wantsHDR = true
         camera.camera?.exposureOffset = -0.65
-        camera.camera?.bloomIntensity = 0.12
+        camera.camera?.bloomIntensity = 0.05
         camera.camera?.bloomThreshold = 2.2
         camera.camera?.bloomBlurRadius = 5
         camera.camera?.vignettingIntensity = 0.65
@@ -389,8 +389,8 @@ import HaymakerKit
         let ambient = SCNNode()
         ambient.light = SCNLight()
         ambient.light?.type = .ambient
-        ambient.light?.color = UIColor(red: 0.3, green: 0.36, blue: 0.52, alpha: 1)
-        ambient.light?.intensity = 330
+        ambient.light?.color = UIColor(white: 1, alpha: 1)
+        ambient.light?.intensity = 90
         scene.rootNode.addChildNode(ambient)
         spotlight(at: SCNVector3(-3, 6, 4), color: .init(red: 1, green: 0.87, blue: 0.68, alpha: 1), intensity: 780, shadows: true)
         spotlight(at: SCNVector3(4, 5, -3), color: .init(red: 0.38, green: 0.62, blue: 1, alpha: 1), intensity: 620, shadows: false)
@@ -455,14 +455,14 @@ import HaymakerKit
         // Ground bank: hugs the canvas and the apron, keeps the fighters clear.
         let ground = SCNNode()
         ground.position = SCNVector3(0, 0.45, -1.5)
-        ground.addParticleSystem(system(SCNBox(width: 20, height: 0.5, length: 16, chamferRadius: 0), rate: 3.2, life: 16, size: 4.2, alpha: 0.075,
+        ground.addParticleSystem(system(SCNBox(width: 20, height: 0.5, length: 16, chamferRadius: 0), rate: 3.2, life: 16, size: 4.2, alpha: 0.025,
                                         tint: UIColor(red: 0.62, green: 0.7, blue: 0.82, alpha: 1), drift: SCNVector3(1, 0, 0.25)))
         mist.addChildNode(ground)
 
         // Rafter haze: lit by the truss fixtures, thickest behind the ring.
         let rafters = SCNNode()
         rafters.position = SCNVector3(0, 3.6, -7)
-        rafters.addParticleSystem(system(SCNBox(width: 24, height: 4, length: 8, chamferRadius: 0), rate: 2.4, life: 20, size: 7, alpha: 0.06,
+        rafters.addParticleSystem(system(SCNBox(width: 24, height: 4, length: 8, chamferRadius: 0), rate: 2.4, life: 20, size: 7, alpha: 0.025,
                                          tint: UIColor(red: 0.5, green: 0.62, blue: 0.82, alpha: 1), drift: SCNVector3(-1, 0.05, 0.1)))
         mist.addChildNode(rafters)
         stage.addChildNode(mist)

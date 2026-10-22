@@ -136,3 +136,7 @@ After upgrading from an iPhone-only build, iPadOS may restore Haymaker in a narr
 This was verified with the existing universal build on an iPad mini (A17 Pro) simulator running iPadOS 27: the narrow title window expanded to fill the display. This is simulator evidence, not a physical-device or pinned-toolchain build claim. Apple's [iPad multitasking instructions](https://support.apple.com/en-us/125309) describe the system's full-screen controls.
 
 The built-app display gate checks both device families, all four iPad orientations, a launch-screen declaration, and absence of the fixed-size `UIRequiresFullScreen` compatibility mode. Run `python3 scripts/test_device_families.py` for its regression checks. Do not add `UIRequiresFullScreen` as a workaround for a restored narrow window; see Apple's [iPad compatibility-mode migration guidance](https://developer.apple.com/documentation/technotes/tn3192-migrating-your-app-from-the-deprecated-uirequiresfullscreen-key).
+
+## Fighter texture fidelity
+
+Mack, Goldie, Atlas, Duke and Vera use the detailed base-color textures from their supplied model exports, with UV seams preserved through skinning. The other six fighters retain vertex colors until textured exports are supplied. Neutral ambient fill and lighter haze preserve contrast. Rebuild textures with `python3 scripts/rig_fighters.py`; see [asset provenance and format](ArtDirection/Models/README.md#fighter-texture-fidelity) for validation and remaining material limitations.

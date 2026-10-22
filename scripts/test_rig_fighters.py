@@ -7,8 +7,11 @@ import re
 import struct
 import subprocess
 import unittest
+import tempfile
+import zipfile
+from pathlib import Path
 
-from rig_fighters import BONES, NAMES, ROOT, pack
+from rig_fighters import BONES, NAMES, ROOT, pack, texture_payload
 
 B = {name: i for i, name in enumerate(BONES)}
 # Spec parent table (independent copy, so a packer edit cannot silently change the contract).
@@ -62,6 +65,44 @@ class FighterAssetsTests(unittest.TestCase):
         for name in NAMES:
             data = pack(name)
             cls.assets[name] = (data, parse(data))
+
+    def test_texture_seams_and_rebuild(self):
+        textured = {'mack', 'goldie', 'atlas', 'duke', 'vera'}
+        for name in NAMES:
+            with self.subTest(model=name):
+                payload = texture_payload(name)
+                if name not in textured:
+                    self.assertIsNone(payload)
+                    continue
+                uv, image = payload
+                self.assertEqual(uv, (ROOT/'Haymaker'/'Models'/f'{name}.fighteruv').read_bytes())
+                self.assertEqual(image, (ROOT/'Haymaker'/'Models'/f'{name}-basecolor.jpg').read_bytes())
+                self.assertTrue(image.startswith(b'\xff\xd8'))
+                magic, count, index_count = struct.unpack_from('<4sII', uv)
+                self.assertEqual(magic, b'HMT1')
+                self.assertGreater(count, self.assets[name][1]['count'])  # preserve UV seams
+                self.assertEqual(index_count, self.assets[name][1]['index_count'])
+                self.assertEqual(len(uv), 12 + count * 12 + index_count * 4)
+                rows = list(struct.iter_unpack('<I2f', uv[12:12 + count * 12]))
+                indices = struct.unpack_from(f'<{index_count}I', uv, 12 + count * 12)
+                self.assertLess(max(indices), count)
+                self.assertTrue(all(math.isfinite(u) and math.isfinite(v) for _, u, v in rows))
+                # Exact triangle correspondence: UV duplication cannot change the
+                # silhouette, winding, weights or original contact geometry.
+                self.assertEqual(tuple(rows[i][0] for i in indices), self.assets[name][1]['indices'])
+
+    def test_texture_export_rejects_mismatched_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            (path/'test.obj').write_text('v 0 0 0 1 1 1\nv 1 0 0 1 1 1\nv 0 1 0 1 1 1\nf 1 2 3\n')
+            with zipfile.ZipFile(path/'test.zip', 'w') as archive:
+                archive.writestr('test.obj', 'v 0 0 1\nv 1 0 0\nv 0 1 0\n')
+            with self.assertRaisesRegex(ValueError, 'positions differ'):
+                texture_payload('test', path)
+            with zipfile.ZipFile(path/'test.zip', 'w') as archive:
+                archive.writestr('test.obj', 'v 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0 0\nf 3/1 2/1 1/1\n')
+            with self.assertRaisesRegex(ValueError, 'topology differs'):
+                texture_payload('test', path)
 
     def test_roster_asset_contract(self):
         roster = (ROOT/'Packages'/'HaymakerKit'/'Sources'/'HaymakerKit'/'CharacterRoster.swift').read_text()

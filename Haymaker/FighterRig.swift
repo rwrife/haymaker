@@ -402,6 +402,54 @@ struct BoneBlob: Sendable {
 
 func isFinite(_ v: SIMD3<Float>) -> Bool { v.x.isFinite && v.y.isFinite && v.z.isFinite }
 
+/// Optional render mesh with duplicated UV seams. Copies the original skin weights
+/// and normals, leaving the authoritative contact mesh and animation rig unchanged.
+struct FighterTextureMesh {
+    let vertices: Data
+    let coordinates: Data
+    let indices: Data
+    let count: Int
+
+    static func parse(_ raw: Data, rig: FighterRigData) throws -> FighterTextureMesh {
+        let reader = BinaryReader(data: raw)
+        guard raw.count >= 12, raw.prefix(4) == Data("HMT1".utf8) else {
+            throw FighterAssetError.invalid("texture mesh header")
+        }
+        let count = Int(try reader.u32(4)), indexCount = Int(try reader.u32(8))
+        let indexStart = 12 + count * 12
+        guard count > 0, indexCount == rig.indexCount,
+              raw.count == indexStart + indexCount * 4 else {
+            throw FighterAssetError.invalid("texture mesh size")
+        }
+        var vertices = Data(), coordinates = Data()
+        for v in 0..<count {
+            let offset = 12 + v * 12
+            let source = Int(try reader.u32(offset))
+            guard source < rig.vertexCount,
+                  (try reader.f32(offset + 4)).isFinite,
+                  (try reader.f32(offset + 8)).isFinite else {
+                throw FighterAssetError.invalid("texture mesh vertex")
+            }
+            var row = rig.vertices.subdata(in: source * 60..<(source + 1) * 60)
+            // Texture provides albedo; multiplying by the old vertex paint would
+            // apply its baked shading twice. Keep the color source neutral.
+            for lane in 0..<3 {
+                var white = Float(1).bitPattern.littleEndian
+                withUnsafeBytes(of: &white) { row.replaceSubrange(24 + lane * 4..<28 + lane * 4, with: $0) }
+            }
+            vertices.append(row)
+            coordinates.append(raw.subdata(in: offset + 4..<offset + 12))
+        }
+        for i in 0..<indexCount {
+            guard try reader.u32(indexStart + i * 4) < UInt32(count) else {
+                throw FighterAssetError.invalid("texture mesh index")
+            }
+        }
+        return FighterTextureMesh(vertices: vertices, coordinates: coordinates,
+                                  indices: raw.subdata(in: indexStart..<raw.count), count: count)
+    }
+}
+
 /// SceneKit nodes for one rig: 22 bone nodes in a hierarchy (identity rest
 /// orientation, offsets head − parentHead) plus the skinned mesh.
 @MainActor struct FighterRigNodes {
@@ -410,7 +458,7 @@ func isFinite(_ v: SIMD3<Float>) -> Bool { v.x.isFinite && v.y.isFinite && v.z.i
     let skeleton: SCNNode
     let mesh: SCNNode
 
-    init(_ data: FighterRigData) {
+    init(_ data: FighterRigData, bundle: Bundle = .main) {
         self.data = data
         let skeleton = SCNNode()
         skeleton.name = "skeleton"
@@ -429,16 +477,43 @@ func isFinite(_ v: SIMD3<Float>) -> Bool { v.x.isFinite && v.y.isFinite && v.z.i
         let mesh = SCNNode()
         mesh.name = "skinnedMesh"
         if data.vertexCount > 0 {
-            let vertexCount = data.vertexCount
+            var texture: FighterTextureMesh?
+            var basecolor: URL?
+            if let uv = bundle.url(forResource: data.name, withExtension: "fighteruv"),
+               let image = bundle.url(forResource: "\(data.name)-basecolor", withExtension: "jpg") {
+                do {
+                    texture = try FighterTextureMesh.parse(Data(contentsOf: uv), rig: data)
+                    basecolor = image
+                } catch {
+                    fighterLog.error("Invalid texture for \(data.name): \(String(describing: error))")
+                }
+            }
+            let vertexCount = texture?.count ?? data.vertexCount
+            let renderVertices = texture?.vertices ?? data.vertices
+            let renderIndices = texture?.indices ?? data.indices
             func source(_ semantic: SCNGeometrySource.Semantic, _ offset: Int) -> SCNGeometrySource {
-                SCNGeometrySource(data: data.vertices, semantic: semantic, vectorCount: vertexCount, usesFloatComponents: true,
+                SCNGeometrySource(data: renderVertices, semantic: semantic, vectorCount: vertexCount, usesFloatComponents: true,
                                   componentsPerVector: 3, bytesPerComponent: 4, dataOffset: offset, dataStride: 60)
             }
-            let element = SCNGeometryElement(data: data.indices, primitiveType: .triangles, primitiveCount: data.indexCount / 3, bytesPerIndex: 4)
-            let geometry = SCNGeometry(sources: [source(.vertex, 0), source(.normal, 12), source(.color, 24)], elements: [element])
+            let element = SCNGeometryElement(data: renderIndices, primitiveType: .triangles, primitiveCount: data.indexCount / 3, bytesPerIndex: 4)
+            var sources = [source(.vertex, 0), source(.normal, 12), source(.color, 24)]
+            if let texture {
+                sources.append(SCNGeometrySource(data: texture.coordinates, semantic: .texcoord,
+                    vectorCount: vertexCount, usesFloatComponents: true, componentsPerVector: 2,
+                    bytesPerComponent: 4, dataOffset: 0, dataStride: 8))
+            }
+            let geometry = SCNGeometry(sources: sources, elements: [element])
             let material = SCNMaterial()
             material.lightingModel = .physicallyBased
-            material.diffuse.contents = UIColor.white
+            if let basecolor {
+                material.diffuse.contents = basecolor
+            } else {
+                material.diffuse.contents = UIColor.white
+            }
+            material.diffuse.minificationFilter = .linear
+            material.diffuse.magnificationFilter = .linear
+            material.diffuse.mipFilter = .linear
+            material.diffuse.maxAnisotropy = 8
             material.roughness.contents = 0.65
             geometry.materials = [material]
             mesh.geometry = geometry
@@ -446,7 +521,7 @@ func isFinite(_ v: SIMD3<Float>) -> Bool { v.x.isFinite && v.y.isFinite && v.z.i
             // can silently yield a nil skinner even when geometry renders.
             var weights = [Float](repeating: 0, count: vertexCount * 4)
             var indices = [UInt16](repeating: 0, count: vertexCount * 4)
-            data.vertices.withUnsafeBytes { buffer in
+            renderVertices.withUnsafeBytes { buffer in
                 for v in 0..<vertexCount {
                     for lane in 0..<4 {
                         weights[v * 4 + lane] = Float(bitPattern: UInt32(littleEndian: buffer.loadUnaligned(fromByteOffset: v * 60 + 36 + lane * 4, as: UInt32.self)))
@@ -475,14 +550,14 @@ func isFinite(_ v: SIMD3<Float>) -> Bool { v.x.isFinite && v.y.isFinite && v.z.i
 
     static func load(_ asset: FighterModelAsset, bundle: Bundle = .main) -> FighterRigNodes {
         do {
-            return FighterRigNodes(try FighterRigData.load(asset, bundle: bundle))
+            return FighterRigNodes(try FighterRigData.load(asset, bundle: bundle), bundle: bundle)
         } catch {
             if reportedFailures.insert(asset).inserted {
                 fighterLog.error("Fighter rig \(asset.rawValue, privacy: .public) failed, using a fallback: \(String(describing: error), privacy: .public)")
             }
         }
         if asset != .mack, let mack = try? FighterRigData.load(.mack, bundle: bundle) {
-            return FighterRigNodes(mack)
+            return FighterRigNodes(mack, bundle: bundle)
         }
         return FighterRigNodes(.skeletonOnly(from: FighterClipLibrary.shared))
     }
