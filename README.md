@@ -128,3 +128,11 @@ Hunter “Redline” Mercer joins the shuffled career ladder and is available in
 ## Adaptive screens
 
 Native iPad support uses the entire window for the Metal arena. Its vertical camera field of view reveals more of the arena as the window widens, without stretching fighters. Controls stay inside safe areas: two-handed controls reflow from two rows to one at 780 points of available width, with taller buttons in windows at least 600 points high. The control deck is capped at 960 points to keep buttons readable on large displays. Rotation and iPad window resizing update the layout automatically. These layouts also accommodate unusual phone aspect ratios; iPhone Duo hardware and separate fold surfaces remain unverified design targets.
+
+### Making an existing iPad window full screen
+
+After upgrading from an iPhone-only build, iPadOS may restore Haymaker in a narrow window even though the installed app supports iPad. If you can see the iPad wallpaper beside the rounded app window, open the iPad window menu and select **Enter Full Screen** (or **Window → Enter Full Screen** from the menu bar). The arena and controls adapt to the expanded window immediately; reinstalling the app or deleting records is unnecessary. iPadOS owns the restored window size, so native iPad support alone does not force a full-screen launch.
+
+This was verified with the existing universal build on an iPad mini (A17 Pro) simulator running iPadOS 27: the narrow title window expanded to fill the display. This is simulator evidence, not a physical-device or pinned-toolchain build claim. Apple's [iPad multitasking instructions](https://support.apple.com/en-us/125309) describe the system's full-screen controls.
+
+The built-app display gate checks both device families, all four iPad orientations, a launch-screen declaration, and absence of the fixed-size `UIRequiresFullScreen` compatibility mode. Run `python3 scripts/test_device_families.py` for its regression checks. Do not add `UIRequiresFullScreen` as a workaround for a restored narrow window; see Apple's [iPad compatibility-mode migration guidance](https://developer.apple.com/documentation/technotes/tn3192-migrating-your-app-from-the-deprecated-uirequiresfullscreen-key).
