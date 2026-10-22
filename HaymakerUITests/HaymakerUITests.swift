@@ -9,8 +9,17 @@ final class HaymakerUITests: XCTestCase {
         defer { XCUIDevice.shared.orientation = .portrait }
         app.buttons["bout.start"].tap()
         dismissVersus(app)
-        for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {
-            XCUIDevice.shared.orientation = orientation
+        // The opening 3-2-1 countdown is modal: controls exist but cannot be
+        // hit until the bell (CI run 39717086927). Wait for the bell via the
+        // jab button's hittability, not a fixed sleep, then check the layout.
+        let jab = app.buttons["bout.jab"]
+        XCTAssertTrue(jab.waitForExistence(timeout: 5))
+        let bellDeadline = Date().addingTimeInterval(15)
+        while !jab.isHittable, Date() < bellDeadline {
+            Thread.sleep(forTimeInterval: 0.25)
+        }
+        for landscape in [false, true] {
+            settleOrientation(app, landscape: landscape)
             for id in ["bout.jab", "bout.hook", "bout.uppercut", "bout.guard", "bout.dodge", "bout.parry"] {
                 let button = app.buttons[id]
                 XCTAssertTrue(button.waitForExistence(timeout: 5))

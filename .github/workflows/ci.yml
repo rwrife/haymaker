@@ -37,7 +37,9 @@ jobs:
       - name: Native-only framework gate
         run: bash scripts/check_native_only.sh
       - name: Fighter assets and texture seam regression tests
-        run: python3 scripts/test_rig_fighters.py
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          python3 scripts/test_rig_fighters.py
       - name: iPad display contract regression tests
         run: python3 scripts/test_device_families.py
       - name: Gitignore keeps signing material out
