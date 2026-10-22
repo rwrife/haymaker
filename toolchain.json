@@ -7,14 +7,25 @@
   "deployment_target": "26.0",
   "swift_language_mode": "6",
   "bundle_identifier": "com.infinityball.haymaker",
-  "targeted_device_family": "1",
-  "native_ipad_support": false,
+  "targeted_device_family": "1,2",
+  "native_ipad_support": true,
   "network_allowlist": [],
   "implementation": "native-swift",
-  "ui_frameworks_allowed": ["SwiftUI", "SpriteKit", "UIKit"],
-  "ui_frameworks_prohibited": ["Flutter", "React Native", "Expo", "Kotlin Multiplatform", ".NET MAUI", "Unity"],
+  "ui_frameworks_allowed": [
+    "SwiftUI",
+    "SpriteKit",
+    "UIKit"
+  ],
+  "ui_frameworks_prohibited": [
+    "Flutter",
+    "React Native",
+    "Expo",
+    "Kotlin Multiplatform",
+    ".NET MAUI",
+    "Unity"
+  ],
   "schema": "tool-lab/toolchain/v1",
   "platform": "ios",
-  "device_family": "iphone-only",
-  "notes": "Native iPhone-only game. CI must assert TARGETED_DEVICE_FAMILY=1 and verify the exact bundle identifier and iOS 26+ SDK contract. Match gameplay uses SpriteKit; shell UI uses SwiftUI; gameplay logic lives in the pure-Swift HaymakerKit package."
+  "device_family": "iphone-and-ipad",
+  "notes": "Native iPhone and iPad game with a full-screen Metal/SceneKit arena and adaptive SwiftUI controls. CI verifies both device families, the bundle identifier, and the pinned toolchain."
 }

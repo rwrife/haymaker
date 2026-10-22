@@ -101,25 +101,10 @@ jobs:
       - name: Native-only framework gate
         run: bash scripts/check_native_only.sh
 
-      - name: iPhone-only pre-build assertion
+      - name: iPhone and iPad pre-build assertion
         run: |
           set -euo pipefail
-          echo "--- asserting TARGETED_DEVICE_FAMILY = 1 in Haymaker.xcodeproj ---"
-          grep -q "TARGETED_DEVICE_FAMILY = 1;" Haymaker.xcodeproj/project.pbxproj \
-            || { echo "::error::TARGETED_DEVICE_FAMILY = 1 missing from project"; exit 1; }
-          if grep -q "TARGETED_DEVICE_FAMILY = 1,2;" Haymaker.xcodeproj/project.pbxproj; then
-            echo "::error::iPad family (1,2) found — iPhone-only directive violated"
-            exit 1
-          fi
-          # Every explicit TARGETED_DEVICE_FAMILY setting must be exactly 1.
-          bad=$(grep -E "TARGETED_DEVICE_FAMILY = [^1;]" Haymaker.xcodeproj/project.pbxproj || true)
-          if [ -n "$bad" ]; then
-            echo "::error::Non-iPhone TARGETED_DEVICE_FAMILY values found:"
-            echo "$bad"
-            exit 1
-          fi
-          count=$(grep -c "TARGETED_DEVICE_FAMILY = 1;" Haymaker.xcodeproj/project.pbxproj)
-          echo "TARGETED_DEVICE_FAMILY = 1 asserted in $count places"
+          python3 scripts/check_device_families.py
 
       - name: Verify fighter asset topology, weights, and reproducible exports
         run: python3 scripts/test_rig_fighters.py
@@ -183,20 +168,13 @@ jobs:
             -derivedDataPath DerivedData \
             build
 
-      - name: iPhone-only post-build assertion (built Info.plist)
+      - name: iPhone + iPad post-build assertion (built Info.plist)
         run: |
           set -euo pipefail
           APP=$(find DerivedData/Build/Products -maxdepth 2 -name "Haymaker.app" -type d | head -1)
           [ -n "$APP" ] || { echo "::error::built app not found"; exit 1; }
           echo "Checking $APP/Info.plist"
-          fam=$(plutil -extract UIDeviceFamily xml1 -o - "$APP/Info.plist" \
-                | grep -c "<integer>1</integer>")
-          [ "$fam" = "1" ] || { echo "::error::UIDeviceFamily is not [1]: $(plutil -extract UIDeviceFamily xml1 -o - "$APP/Info.plist")"; exit 1; }
-          if plutil -extract UIDeviceFamily xml1 -o - "$APP/Info.plist" | grep -q "<integer>2</integer>"; then
-            echo "::error::built app declares iPad (UIDeviceFamily contains 2)"
-            exit 1
-          fi
-          echo "Built app UIDeviceFamily == [1]: PASS"
+          python3 scripts/check_device_families.py "$APP/Info.plist"
           bundle_id=$(plutil -extract CFBundleIdentifier raw -o - "$APP/Info.plist")
           [ "$bundle_id" = "com.infinityball.haymaker" ] \
             || { echo "::error::bundle id is $bundle_id"; exit 1; }

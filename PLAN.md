@@ -2,16 +2,16 @@
 
 ## Scope
 
-Haymaker is a single-player, offline, boss-rush arcade boxing game for iPhone (native Swift). MVP = 6-opponent career ladder + endless sparring + local records + backup/export, playable one-handed, deterministic seeded fights, zero network. Dual-screen battle layout is a documented design target behind one layout seam (iPhone Duo focus); it is not implemented or claimed until fold APIs exist.
+Haymaker is a single-player, offline, boss-rush arcade boxing game for iPhone and iPad (native Swift). MVP = 6-opponent career ladder + endless sparring + local records + backup/export, playable one-handed, deterministic seeded fights, zero network. Dual-screen battle layout is a documented design target behind one layout seam (iPhone Duo focus); it is not implemented or claimed until fold APIs exist.
 
-Out of scope (explicit): accounts, cloud save, multiplayer, ads/IAP/loot, licensed/trademarked boxers or franchise assets, betting, Android, native iPad support, fitness/medical claims, video capture, camera/mic.
+Out of scope (explicit): accounts, cloud save, multiplayer, ads/IAP/loot, licensed/trademarked boxers or franchise assets, betting, Android, fitness/medical claims, video capture, camera/mic.
 
 ## Architecture
 
 ```
 Haymaker.xcodeproj (M1)
 ├── App/                      SwiftUI shell: career, records, settings, results
-│   └── FightWorkspaceLayout  single seam: today single-screen; future two-surface split
+│   └── FightWorkspaceLayout  single seam: adaptive single-window sizing; future two-surface split
 ├── MatchScene/               SpriteKit view + actor sprites + HUD bindings (thin)
 ├── Packages/HaymakerKit/     pure Swift 6 package (no UIKit/SpriteKit imports)
 │   ├── PatternBook           per-opponent telegraph sequences, seed-driven scheduler
@@ -37,12 +37,12 @@ Rules:
 | SpriteKit (match) | First-party 2D game framework on iOS 26; physics-light, deterministic update loop, no third-party engine dependency. |
 | GRDB (SQLite) | Proven fleet data layer with versioned migrations + fixture DB pattern. |
 | Xcode 26.0.1 (17A400) / iOS SDK 26 pin | Fleet toolchain contract in `toolchain.json`, enforced by CI. |
-| iPhone-only (`TARGETED_DEVICE_FAMILY = 1`) | Fleet policy: Native iPad support is disabled; enabling it requires explicit user opt-in. User directive; simplifies build + submission. |
+| iPhone and iPad (`TARGETED_DEVICE_FAMILY = "1,2"`) | Fleet policy: Native iPad support is enabled by explicit user request. User directive; simplifies build + submission. |
 | Bundle `com.infinityball.haymaker` | Fleet `com.infinityball.` prefix convention; registered in ASC. |
 
 ## Milestones and dependency order
 
-1. ✅ **M1 Skeleton + CI** (#1) — done: `Haymaker.xcodeproj` (app target, bundle `com.infinityball.haymaker`, `TARGETED_DEVICE_FAMILY = 1` in all configurations), `Packages/HaymakerKit` (pure Swift 6) + `Packages/HaymakerStore` stub packages with swift-testing suites, macos-26 CI with exact Xcode 26.0.1 (17A400) pin, iOS 26 SDK assert, iPhone-only pre/post-build gates, zero-network gate, native-only framework scan. Everything else depends on this.
+1. ✅ **M1 Skeleton + CI** (#1) — done: `Haymaker.xcodeproj` (app target, bundle `com.infinityball.haymaker`, `TARGETED_DEVICE_FAMILY = "1,2"` in all configurations), `Packages/HaymakerKit` (pure Swift 6) + `Packages/HaymakerStore` stub packages with swift-testing suites, macos-26 CI with exact Xcode 26.0.1 (17A400) pin, iOS 26 SDK assert, iPhone and iPad pre/post-build gates, zero-network gate, native-only framework scan. Everything else depends on this.
 2. ✅ **M2 Engine core** (#2) — done: data-driven `PatternBook` (Twitch + Anvil authored), fixed-tick integer `FightEngine` (round clock, guard/dodge/parry/jab/hook/uppercut resolution, tell-window hit/whiff/counter outcomes, replay with captured config/book + seed + input log), `DamageModel` stamina/damage state machine with named KD/KO states and three-count rule, deterministic `Scoring` + personal-best comparison. 51 swift-testing cases passed on Linux and the pinned macOS CI lane. Depends on M1 (merged).
 3. **M3 Playable fight** (#3) — SpriteKit scene, one-thumb controls, one opponent end-to-end, hit-feedback, round flow. Depends on M2.
 4. **M4 Career + records** (#4) — 6-opponent ladder, endless sparring, append-only ledger, PB derivations, results cards. Depends on M2 (UI needs M3).
@@ -54,7 +54,7 @@ Rules:
 - **HaymakerKit:** swift-testing suites on Linux CI + macOS lane: scheduler determinism (same seed → same sequence), tell-window resolution tables, damage/stamina state transitions, scoring, backup codec round-trips.
 - **HaymakerStore:** migration tests with committed fixture DB.
 - **UI/gameplay:** XCUITest journeys on pinned macOS runner (launch → start bout → land punches → results card → records visible). Simulator evidence only — never claimed as real-device or iPhone Duo compatibility.
-- **Contract gates:** iPhone-only (`UIDeviceFamily == [1]` post-build), bundle-ID assert, zero-network allowlist grep.
+- **Contract gates:** iPhone and iPad (`UIDeviceFamily == [1, 2]` post-build), bundle-ID assert, zero-network allowlist grep.
 - Honesty rule: Linux CI green ≠ the game compiles on Apple; the Apple lane is authoritative for SpriteKit/UIKit code.
 
 ## Packaging / distribution
@@ -72,4 +72,6 @@ Rules:
 
 ## Non-goals
 
-Restate explicitly for executors: no Flutter, React Native, Expo, Kotlin Multiplatform, .NET MAUI, or Unity anywhere; no Android; no native iPad support; no accounts/cloud/ads/IAP; no licensed names or assets; no betting; no medical/fitness claims; no multiplayer in MVP.
+Restate explicitly for executors: no Flutter, React Native, Expo, Kotlin Multiplatform, .NET MAUI, or Unity anywhere; no Android; no accounts/cloud/ads/IAP; no licensed names or assets; no betting; no medical/fitness claims; no multiplayer in MVP.
+
+Adaptive display support: native iPhone/iPad families, full-window arena with vertical field of view, and width/height-driven control reflow. No fold-specific APIs or gameplay engine changes.
