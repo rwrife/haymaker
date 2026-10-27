@@ -1,20 +1,19 @@
-Haymaker — Offline Arcade Boxing for iPhone
+Haymaker — Offline Arcade Boxing for iPhone and iPad
 
-Step into a boss-rush boxing game built for one-handed play. Each original opponent has a distinct rhythm and visible tells. Watch the windup, dodge or guard, and time your counter.
+Face a boss-rush of original fighters. Read each opponent's windup, dodge or guard, and time your counter. Play one-handed with taps and swipes, or choose a two-handed button layout.
 
 WHAT YOU DO
-- Work through a career ladder of ten original opponents, from Goldie Voltage to final boss Bruiser Baxter. Each opponent has an authored move pattern.
-- Tap to jab and swipe for a hook, uppercut, dodge, or guard. Prefer buttons? Switch to the two-handed control layout.
-- Chase personal bests. Bout scores use landed punches, defense, damage, rounds, and time; records are derived from locally saved bouts.
-- Play Endless Sparring against a chosen opponent and track the rounds in your run.
+- Fight through a career ladder of ten original opponents. The first nine change order each ladder; Bruiser Baxter waits at the end.
+- Tap for a jab; swipe for a hook, uppercut, dodge, or guard. Practice against a chosen opponent in sparring rounds.
+- Review saved bouts and personal bests on the records screen. Scores account for landed punches, defense, damage, rounds, and time.
 
 BUILT AROUND THE FIGHT
-- Seeded fights follow the same pattern when given the same inputs. There are no random fight outcomes, energy timers, or pay-to-progress mechanics.
-- Original 3D fighters face off in an arena rendered on your iPhone.
-- No account, cloud save, multiplayer, ads, in-app purchases, loot boxes, or network connection is needed for play.
+- Seeded fights give the same result for the same inputs. There are no energy timers or pay-to-progress mechanics.
+- Original 3D fighters face off in a Metal-rendered arena.
+- Play offline without an account, cloud save, multiplayer, ads, in-app purchases, or loot boxes.
 
 YOUR CORNER
-- Career progress, bout records, and control settings stay on your iPhone.
+- Career progress, bout records, and control settings stay on your device.
 - Settings include high-contrast tell cues, reduced motion, and a haptics toggle. Match controls and menus have accessibility labels.
 
 Haymaker is a game, not a fitness or medical program. Its fighters and artwork are original; it does not depict real boxers or boxing franchises.
