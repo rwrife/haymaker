@@ -52,12 +52,15 @@ func test_portrait_framing() -> void:
 		var texture: Texture2D = load("res://assets/portraits/" + filename)
 		check(texture != null, "portrait is bundled: " + filename)
 		for panel_size in [Vector2(300, 340), Vector2(360, 520), Vector2(382, 300), Vector2(640, 200)]:
-			var drawn: Rect2 = main.portrait_draw_rect(panel_size, texture.get_size())
-			var upper := Rect2(drawn.position, Vector2(drawn.size.x, drawn.size.y * 0.3))
-			check(Rect2(Vector2.ZERO, panel_size).grow(0.01).encloses(upper),
-				"entire upper 30% remains visible: " + filename)
-			check(drawn.position.x >= -0.01 and drawn.end.x <= panel_size.x + 0.01,
-				"no sideways portrait clipping: " + filename)
+			for zoom in [main.PORTRAIT_ZOOM_START, main.PORTRAIT_ZOOM_END]:
+				var drawn: Rect2 = main.portrait_draw_rect(panel_size, texture.get_size(), zoom)
+				var h: Rect2 = main.PORTRAIT_HEAD
+				var head := Rect2(drawn.position + h.position * drawn.size, h.size * drawn.size)
+				check(Rect2(Vector2.ZERO, panel_size).grow(0.01).encloses(head), "head region remains visible: " + filename)
+				check((drawn.position.x <= 0.01 and drawn.end.x >= panel_size.x - 0.01)
+					or absf(drawn.get_center().x - panel_size.x / 2.0) < 0.01, "portrait covers the width or is centred: " + filename)
+				var fit := minf(panel_size.x / texture.get_size().x, panel_size.y / (texture.get_size().y * 0.3))
+				check(drawn.size.x >= texture.get_size().x * fit * 1.3, "portrait zooms in on the head: " + filename)
 func winning_bout(book: OpponentBook) -> Dictionary:
 	return {"mode": "career", "result": {"opponentID": book.id, "outcome": HM.Outcome.PLAYER_WIN_BY_KO,
 		"score": {"points": 2691}, "roundsCompleted": 1, "ticksElapsed": 500,

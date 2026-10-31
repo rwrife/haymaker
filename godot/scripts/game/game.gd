@@ -228,8 +228,8 @@ func fight_attributes() -> Dictionary:
 	return progression.player if mode == "career" else Attributes.zero()
 
 
-func unspent_points() -> int:
-	return progression.unspent
+func prize_tokens() -> int:
+	return progression.tokens
 
 
 func can_spend(attribute: String) -> bool:
@@ -243,7 +243,7 @@ func spend(attribute: String) -> bool:
 # MARK: - Bouts
 
 func begin(book: OpponentBook, p_mode: String) -> bool:
-	if has_unsaved_result or (p_mode == "career" and (not history_loaded or progression.unspent > 0)):
+	if has_unsaved_result or (p_mode == "career" and not history_loaded):
 		return false
 	opponent = book
 	mode = p_mode

@@ -40,6 +40,9 @@ func focused() -> String:
 	var f = root.gui_get_focus_owner()
 	return "" if f == null or not ("text" in f) else f.text
 
+func shows(text: String) -> bool:
+	return main.ui.find_children("*", "Label", true, false).any(func(l): return l.is_visible_in_tree() and l.text.contains(text))
+
 func _run() -> void:
 	await wait(0.3)
 	await joy(JOY_BUTTON_A)
@@ -85,12 +88,15 @@ func _run() -> void:
 		"playerStats": {"landed": 9, "thrown": 9, "counters": 4}}}]
 	game._ladder_start = 0
 	game.saved = true
+	game.progression.tokens = 1
 	main.engine.phase = HM.Phase.OVER
 	main.engine.outcome = HM.Outcome.PLAYER_WIN_BY_KO
 	main.post_bout_elapsed = Arena.RESULTS_DELAY
 	main.replay_matches = true
 	await wait(0.1)
 	check(focused().begins_with("NEXT FIGHT"), "win focuses Next fight instead of Rematch")
+	check(shows("FIGHT PRIZE TOKENS  1") and shows("FIGHTER STATS"), "win screen shows prize tokens and fighter stats")
+	check(not (main._refs.primary as Button).disabled, "unspent tokens never lock Next fight")
 	var primary: Button = main._refs.primary
 	check(primary.get_index() == 0 and primary.get_parent().get_child(1).text == "REMATCH",
 		"Next fight appears before secondary Rematch")
@@ -98,5 +104,7 @@ func _run() -> void:
 	await wait(0.1)
 	check(main.showing_versus and game.opponent.id != defeated.id, "A on Next fight opens the next introduction")
 	check(focused().contains("RING THE BELL"), "next introduction focuses ring the bell")
+	check(shows("CHALLENGER STATS"), "versus shows the challenger stats")
+	check(game.prize_tokens() == 1, "tokens carry into the next fight unspent")
 	print("%d input failures" % fails)
 	quit(1 if fails > 0 else 0)

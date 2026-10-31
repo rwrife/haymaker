@@ -229,12 +229,12 @@ func test_progression() -> void:
 	var p := Attributes.Progression.new()
 	var ids := OpponentBook.authored_ladder().map(func(b): return b.id)
 	p.record_win(ids.slice(1), 42)
-	expect(p.unspent == 1 and Attributes.is_zero(p.attributes_for(ids[0])), "win awards one point")
+	expect(p.tokens == 1 and Attributes.is_zero(p.attributes_for(ids[0])), "win awards one token")
 	for id in ids.slice(1):
 		expect(Attributes.total(p.attributes_for(id)) == 1, "remaining %s trained" % id)
 	expect(p.spend("speed") and not p.spend("power"), "spend once")
 	p.record_win([], 43)
-	expect(p.unspent == 0, "final win awards nothing")
+	expect(p.tokens == 0, "final win awards nothing")
 	var x := Attributes.Progression.new()
 	var y := Attributes.Progression.new()
 	for r in 20:
@@ -243,9 +243,9 @@ func test_progression() -> void:
 	var capped := Attributes.Progression.new()
 	capped.player = Attributes.make(5, 5, 4)
 	capped.record_win(["x"], 1)
-	expect(capped.unspent == 1 and not capped.spend("power") and capped.spend("speed"), "spend skips maxed")
+	expect(capped.tokens == 1 and not capped.spend("power") and capped.spend("speed"), "spend skips maxed")
 	capped.record_win(["x"], 2)
-	expect(capped.unspent == 0, "maxed fighter forfeits")
+	expect(capped.tokens == 0, "maxed fighter forfeits")
 
 	# UI-test journey: the jab-each-tick driver must still beat the trained
 	# authored ladder in 600-tick bouts while spending power, dexterity, speed in turn.
@@ -263,5 +263,5 @@ func test_progression() -> void:
 		expect(HM.is_player_win(int(result.outcome)), "jab driver beats trained %s %s" % [ladder[i].id, str(run.attributes_for(ladder[i].id))])
 		var remaining := ids.slice(i + 1)
 		run.record_win(remaining, 0x7EA12026 + ladder.size() - remaining.size())
-	expect(run.unspent == 0 and Attributes.total(run.player) == ladder.size() - 1, "player trained every bout")
+	expect(run.tokens == 0 and Attributes.total(run.player) == ladder.size() - 1, "player trained every bout")
 	expect(Attributes.total(run.attributes_for("baxter")) == ladder.size() - 1, "final boss trained after every win")
