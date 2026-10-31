@@ -1,0 +1,8 @@
+# Godot editor cache and local exports
+.godot/
+builds/
+*.apk
+*.aab
+*.idsig
+*.pck
+*.tmp

@@ -1,0 +1,36 @@
+; Engine configuration file.
+; Haymaker — Godot port for Windows and Android.
+
+config_version=5
+
+[application]
+
+config/name="Haymaker"
+config/description="Boss-rush arcade boxing. Read the tell. Land the counter."
+config/version="1.0"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "Mobile")
+boot_splash/bg_color=Color(0.025, 0.04, 0.075, 1)
+boot_splash/show_image=false
+config/icon="res://icon.png"
+
+[autoload]
+
+Game="*res://scripts/game/game.gd"
+
+[display]
+
+window/size/viewport_width=430
+window/size/viewport_height=430
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=6
+
+[rendering]
+
+renderer/rendering_method="mobile"
+textures/vram_compression/import_etc2_astc=true
+anti_aliasing/quality/msaa_3d=2
+environment/defaults/default_clear_color=Color(0.014, 0.023, 0.047, 1)

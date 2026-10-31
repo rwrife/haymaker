@@ -4,7 +4,7 @@
 
 Haymaker is a single-player, offline, boss-rush arcade boxing game for iPhone and iPad (native Swift). MVP = 6-opponent career ladder + endless sparring + local records + backup/export, playable one-handed, deterministic seeded fights, zero network. Dual-screen battle layout is a documented design target behind one layout seam (iPhone Duo focus); it is not implemented or claimed until fold APIs exist.
 
-Out of scope (explicit): accounts, cloud save, multiplayer, ads/IAP/loot, licensed/trademarked boxers or franchise assets, betting, Android, fitness/medical claims, video capture, camera/mic.
+Out of scope (explicit): accounts, cloud save, multiplayer, ads/IAP/loot, licensed/trademarked boxers or franchise assets, betting, Android in the iOS app (Windows/Android come only from the separate Godot port), fitness/medical claims, video capture, camera/mic.
 
 ## Architecture
 
@@ -27,6 +27,7 @@ Rules:
 - Fight outcomes are a pure function of (seed, player inputs) — replayable, testable, cheat-checkable.
 - Append-only bout ledger; records are derived, never edited.
 - Zero network by construction; CI grep gate enforces the empty allowlist.
+- The Godot port (`godot/`) mirrors this split: `scripts/engine/` is a deterministic GDScript port of HaymakerKit verified against its golden fixture, `scripts/arena/` renders from the same binary fighter/crowd assets, and `scripts/game/` is the shell. It targets Windows and Android only and shares no code with the iOS target.
 - Victory presentation stays in the app: defeated portraits share the versus top-30% crop; the career finale loops Mack's bundled victory clip without advancing the completed engine. Finale stats derive only from saved career bouts on the current ladder, and End game resets ladder progress while preserving the append-only ledger.
 
 ## Technology choices and rationale
@@ -72,7 +73,7 @@ Rules:
 
 ## Non-goals
 
-Restate explicitly for executors: no Flutter, React Native, Expo, Kotlin Multiplatform, .NET MAUI, or Unity anywhere; no Android; no accounts/cloud/ads/IAP; no licensed names or assets; no betting; no medical/fitness claims; no multiplayer in MVP.
+Restate explicitly for executors: no Flutter, React Native, Expo, Kotlin Multiplatform, .NET MAUI, or Unity in the iOS app; Android and Windows only through the separate Godot port; no accounts/cloud/ads/IAP; no licensed names or assets; no betting; no medical/fitness claims; no multiplayer in MVP.
 
 Adaptive display support: native iPhone/iPad families, full-window arena with vertical field of view, and width/height-driven control reflow. No fold-specific APIs or gameplay engine changes.
 
