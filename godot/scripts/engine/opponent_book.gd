@@ -116,6 +116,11 @@ static func _ticks(value: int, factor: float, floor_value: int) -> int:
 	return maxi(int(roundf(float(value) * factor)), mini(value, floor_value))
 
 
+## Copy of this book with challenger attributes applied after ladder scaling.
+func boosted(attributes: Dictionary) -> OpponentBook:
+	return Attributes.boost_book(self, attributes)
+
+
 static func ladder_stages(order: Array) -> Array:
 	var last := maxi(order.size() - 1, 1)
 	var out := []

@@ -29,7 +29,19 @@ class Config:
 	var knockdown_ticks := 180
 	var block_reduction := 8
 	var parry_window := 6
+	var player_table: Dictionary = PLAYER_TABLE.duplicate(true)
 
+	func copy() -> Config:
+		var c := Config.new()
+		for p in get_property_list():
+			if p.usage & PROPERTY_USAGE_SCRIPT_VARIABLE:
+				c.set(p.name, get(p.name))
+		c.player_table = player_table.duplicate(true)
+		return c
+
+	## Copy of this config with the player's attributes applied; zero is an identity.
+	func boosted(attributes: Dictionary) -> Config:
+		return Attributes.boost_config(self, attributes)
 	func total_fight_ticks() -> int:
 		return rounds * round_ticks + (rounds - 1) * maxi(0, rest_ticks)
 
@@ -192,7 +204,7 @@ func _start_player_action(input: int) -> void:
 	match input:
 		HM.Cmd.JAB, HM.Cmd.HOOK, HM.Cmd.UPPERCUT:
 			var move := HM.input_as_move(input)
-			var timing: Dictionary = PLAYER_TABLE[move]
+			var timing: Dictionary = config.player_table[move]
 			player.current_move = move
 			player_stats.thrown += 1
 			if player.stamina < timing.stamina:
@@ -350,8 +362,8 @@ func _resolve_player_phase() -> void:
 
 
 func _player_recover() -> int:
-	if PLAYER_TABLE.has(player.current_move):
-		return PLAYER_TABLE[player.current_move].recover
+	if config.player_table.has(player.current_move):
+		return config.player_table[player.current_move].recover
 	return config.whiff_recover_ticks
 
 

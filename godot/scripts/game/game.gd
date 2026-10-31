@@ -26,6 +26,9 @@ var has_unsaved_result := false
 var _ladder_start := 0
 var _pending = null
 var _records_path := RECORDS_PATH
+## This ladder's attribute progression; in memory only, reset with a new ladder.
+var progression := Attributes.Progression.new()
+var _progression_seed := 0
 
 
 func _ready() -> void:
@@ -34,6 +37,7 @@ func _ready() -> void:
 	_load_settings()
 	ladder = OpponentBook.authored_ladder() if _records_path == "" else OpponentBook.random_ladder()
 	opponent = ladder[0]
+	_progression_seed = _make_progression_seed()
 	reload_history()
 
 
@@ -204,13 +208,42 @@ func new_ladder() -> bool:
 		return false
 	ladder = OpponentBook.authored_ladder() if _records_path == "" else OpponentBook.random_ladder()
 	_ladder_start = bouts.size()
+	progression = Attributes.Progression.new()
+	_progression_seed = _make_progression_seed()
 	return true
+
+
+## Random challenger training each ladder; the isolated store gets a fixed seed.
+func _make_progression_seed() -> int:
+	return 0x7EA12026 if _records_path == "" else randi()
+
+
+## The book actually fought: career bouts face the challenger's trained attributes.
+func fight_book() -> OpponentBook:
+	return opponent.boosted(progression.attributes_for(opponent.id)) if mode == "career" else opponent
+
+
+## Career bouts use the player's trained attributes; sparring stays a level field.
+func fight_attributes() -> Dictionary:
+	return progression.player if mode == "career" else Attributes.zero()
+
+
+func unspent_points() -> int:
+	return progression.unspent
+
+
+func can_spend(attribute: String) -> bool:
+	return progression.can_spend(attribute)
+
+
+func spend(attribute: String) -> bool:
+	return progression.spend(attribute)
 
 
 # MARK: - Bouts
 
 func begin(book: OpponentBook, p_mode: String) -> bool:
-	if has_unsaved_result or (p_mode == "career" and not history_loaded):
+	if has_unsaved_result or (p_mode == "career" and (not history_loaded or progression.unspent > 0)):
 		return false
 	opponent = book
 	mode = p_mode
@@ -240,7 +273,7 @@ func bout_seed() -> int:
 
 func make_engine() -> FightEngine:
 	var config := FightEngine.Config.sparring() if mode == "sparring" else FightEngine.Config.career()
-	return FightEngine.new(config, bout_seed(), opponent)
+	return FightEngine.new(config.boosted(fight_attributes()), bout_seed(), fight_book())
 
 
 func save(engine: FightEngine, input_log: Array) -> void:
@@ -254,12 +287,18 @@ func save(engine: FightEngine, input_log: Array) -> void:
 			int(result.ticksElapsed), best_entry)
 		_pending = {"id": _uuid(), "mode": mode, "runID": run_id if mode == "sparring" else null,
 			"runRound": run_round if mode == "sparring" else null, "result": result}
+	var won: Dictionary = _pending
+	var first_ladder_win: bool = mode == "career" and HM.is_player_win(outcome_of(won)) \
+		and ladder.any(func(b): return b.id == won.result.opponentID) and not is_beaten(won.result.opponentID)
 	if not _append(_pending):
 		return
 	bouts.append(_pending)
 	saved = true
 	has_unsaved_result = false
 	error = ""
+	if first_ladder_win:
+		var remaining := ladder.map(func(b): return b.id).filter(func(id): return not is_beaten(id))
+		progression.record_win(remaining, _progression_seed + ladder.size() - remaining.size())
 
 
 static func _uuid() -> String:

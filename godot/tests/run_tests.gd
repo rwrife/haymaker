@@ -42,6 +42,7 @@ func _init() -> void:
 	test_scoring()
 	test_stamina()
 	test_roster_playable()
+	test_progression()
 	print("%d checks, %d failures" % [checks, failures])
 	quit(1 if failures > 0 else 0)
 
@@ -194,3 +195,73 @@ func test_roster_playable() -> void:
 	# Career config: a jab every 20 ticks should finish the bout within cap.
 	var career := FightEngine.simulate(FightEngine.Config.career(), 0xCAFE2026, OpponentBook.goldie(), [])
 	expect(career.ticksElapsed > 0, "career runs")
+
+func test_progression() -> void:
+	var base := FightEngine.Config.make()
+	var same := base.boosted(Attributes.zero())
+	expect(same.dodge_ticks == base.dodge_ticks and same.parry_window == base.parry_window
+		and same.player_table == base.player_table, "zero attributes keep config")
+	for book in OpponentBook.authored_ladder():
+		expect(book.boosted(Attributes.zero()) == book, "zero attributes keep %s" % book.id)
+	var a := Attributes.make(9, -2, 3)
+	expect(a == {"power": 5, "dexterity": 0, "speed": 3}, "attributes clamp")
+	var power: Dictionary = base.boosted(Attributes.make(5)).player_table
+	expect(power[HM.Move.JAB].damage == 12 and power[HM.Move.HOOK].damage == 21 and power[HM.Move.UPPERCUT].damage == 33, "power damage")
+	var speed: Dictionary = base.boosted(Attributes.make(0, 0, 5)).player_table
+	expect(speed[HM.Move.JAB].windup == 3 and speed[HM.Move.JAB].recover == 5, "speed jab")
+	expect(speed[HM.Move.UPPERCUT].windup == 7 and speed[HM.Move.UPPERCUT].recover == 12, "speed uppercut")
+	var dex := base.boosted(Attributes.make(0, 5))
+	expect(dex.dodge_ticks == 12 and dex.block_hold_ticks == 36 and dex.parry_window == 9, "dex windows")
+	expect(dex.player_table[HM.Move.JAB].stamina == 3 and dex.player_table[HM.Move.UPPERCUT].stamina == 8, "dex stamina")
+	expect(base.player_table[HM.Move.JAB].damage == 8, "boost leaves source config alone")
+	var book: OpponentBook = OpponentBook.authored_ladder()[5]
+	var strong := book.boosted(Attributes.make(5, 5, 5))
+	for i in book.sequence.size():
+		var o: Dictionary = book.sequence[i]
+		var n: Dictionary = strong.sequence[i]
+		expect(n.damage >= o.damage and (o.damage == 0 or n.damage > o.damage), "opponent power")
+		expect(n.tell <= o.tell and n.tell >= mini(o.tell, OpponentBook.MIN_TELL), "opponent tell floor")
+		expect(n.recover <= o.recover and n.recover >= mini(o.recover, OpponentBook.MIN_RECOVER), "opponent recover floor")
+		var defensive: bool = o.move == HM.Move.BLOCK or o.move == HM.Move.DODGE
+		expect(n.impact > o.impact if defensive else n.impact == o.impact, "opponent guard hold")
+	expect(strong.min_gap <= book.min_gap and strong.gap_spread <= book.gap_spread, "opponent gaps")
+
+	var p := Attributes.Progression.new()
+	var ids := OpponentBook.authored_ladder().map(func(b): return b.id)
+	p.record_win(ids.slice(1), 42)
+	expect(p.unspent == 1 and Attributes.is_zero(p.attributes_for(ids[0])), "win awards one point")
+	for id in ids.slice(1):
+		expect(Attributes.total(p.attributes_for(id)) == 1, "remaining %s trained" % id)
+	expect(p.spend("speed") and not p.spend("power"), "spend once")
+	p.record_win([], 43)
+	expect(p.unspent == 0, "final win awards nothing")
+	var x := Attributes.Progression.new()
+	var y := Attributes.Progression.new()
+	for r in 20:
+		expect(x.record_win(["x", "y"], r) == y.record_win(["x", "y"], r), "seeded training")
+	expect(x.attributes_for("x") == Attributes.make(5, 5, 5) and x.record_win(["x"], 99).is_empty(), "training caps")
+	var capped := Attributes.Progression.new()
+	capped.player = Attributes.make(5, 5, 4)
+	capped.record_win(["x"], 1)
+	expect(capped.unspent == 1 and not capped.spend("power") and capped.spend("speed"), "spend skips maxed")
+	capped.record_win(["x"], 2)
+	expect(capped.unspent == 0, "maxed fighter forfeits")
+
+	# UI-test journey: the jab-each-tick driver must still beat the trained
+	# authored ladder in 600-tick bouts while spending power, dexterity, speed in turn.
+	var ladder := OpponentBook.authored_ladder()
+	var run := Attributes.Progression.new()
+	var jabs := []
+	jabs.resize(8000)
+	jabs.fill(HM.Cmd.JAB)
+	for i in ladder.size():
+		if i > 0:
+			expect(run.spend(Attributes.ALL[(i - 1) % 3]), "spend before bout %d" % i)
+		var fought: OpponentBook = ladder[i].boosted(run.attributes_for(ladder[i].id))
+		var config := FightEngine.Config.make(1, 600, 0).boosted(run.player)
+		var result := FightEngine.simulate(config, 0xCAFE2026, fought, jabs)
+		expect(HM.is_player_win(int(result.outcome)), "jab driver beats trained %s %s" % [ladder[i].id, str(run.attributes_for(ladder[i].id))])
+		var remaining := ids.slice(i + 1)
+		run.record_win(remaining, 0x7EA12026 + ladder.size() - remaining.size())
+	expect(run.unspent == 0 and Attributes.total(run.player) == ladder.size() - 1, "player trained every bout")
+	expect(Attributes.total(run.attributes_for("baxter")) == ladder.size() - 1, "final boss trained after every win")
