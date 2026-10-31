@@ -72,7 +72,9 @@ Source OBJs are unchanged.
 
 `python3 scripts/test_fighter_clips.py` checks the clip library.
 
-On macOS with Xcode, `bash scripts/verify_fighter_rigs.sh [output-dir]` runs the real SceneKit loader and animator through scripted bouts for every fighter. A roster sweep plays the scripted bout and the jab→hook→uppercut combo against every career opponent, each with their own rig and pattern book. Fast books such as Jaison's are therefore checked as well as Baxter's. It asserts:
+For current runtime verification, run the Godot game and inspect fighter animation, contact and textures in its arena. The following legacy render probe and screenshots document historical asset verification only; they are not maintenance instructions or evidence of a Godot export.
+
+The legacy `scripts/verify_fighter_rigs.sh` probe exercised scripted bouts and punch combinations for every fighter. It checked:
 
 - no pose pops;
 - foot slide and leg stretch limits, with smoothly eased release steps into knockdowns;
@@ -82,7 +84,7 @@ On macOS with Xcode, `bash scripts/verify_fighter_rigs.sh [output-dir]` runs the
 - hit-reaction latency;
 - the knockdown get-up reaching guard on the engine's rise tick.
 
-It also renders guard grids, per-frame filmstrips and match frames into the output directory (default `build/fighter-qa`).
+It produced guard grids, per-frame filmstrips and match frames.
 
 Known limits of linear-blend skinning:
 
@@ -91,9 +93,9 @@ Known limits of linear-blend skinning:
 
 Both are brief and clamped by the runtime.
 
-## Rendered verification
+## Historical rendered verification
 
-These renders come from `bash scripts/verify_fighter_rigs.sh`.
+These archived renders came from the legacy `scripts/verify_fighter_rigs.sh` probe, not Godot.
 
 Guard pose (idle frame 0). Top row, left to right: Mack, Bruiser, Goldie, Nico, Atlas. Bottom row: Duke, Sylvie, Cassian, Vera, Jaison.
 
@@ -118,7 +120,7 @@ The rival's three-second knockdown: fall, taunt, get-up and back to guard.
 
 ## Size and performance report
 
-[`asset-report.md`](asset-report.md) lists per-rig payload, vertex/triangle counts, estimated GPU buffers and roster mapping. Regenerate with `python3 scripts/fighter_asset_report.py`. If a bundled rig is missing or malformed at runtime, `FighterRigNodes.load` logs once and falls back to Mack's rig (then to an invisible skeleton) rather than crashing. On-device frame times are not yet measured.
+[`asset-report.md`](asset-report.md) lists per-rig payload, vertex/triangle counts, estimated GPU buffers and roster mapping. Regenerate with `python3 scripts/fighter_asset_report.py`. Godot loads runtime rigs through `godot/scripts/arena/fighter_assets.gd`; validate missing/malformed asset behavior in that runtime. On-device frame times are not yet measured.
 
 Jaison’s source is the user-supplied `jaison.obj`. It has 4,824 colored vertices and 9,644 triangle faces, with no external material references. Its runtime rig uses the shared 22-bone HMR2 format. Positions, faces and body colours are unchanged from the supplied file; only the gloves were repainted. The generator had baked the reference art’s rim lights into them (gold on the right glove, blue on the left), so in game the right glove read as tan. The 336 vertices past the wrist (T-pose |x| ≥ 0.342) now match `jaison.png`: white cuffs up to |x| 0.388, then black leather gloves with soft highlights.
 
@@ -130,13 +132,13 @@ User-supplied original character assets received October 19, 2026: `hunter.obj`,
 
 All eleven fighters use the original base-color JPEGs from supplied model exports. `python3 scripts/rig_fighters.py` verifies exact position and face correspondence, then generates `.fighteruv` seam mappings and `-basecolor.jpg` images alongside the unchanged `.fighter` rigs. UV seams duplicate render vertices with identical normals and skin weights; contact geometry stays unchanged. Textured meshes use white vertex colors to avoid multiplying the original paint into the texture a second time. The vertex-colored mesh remains available as a fallback if texture resources are missing or malformed. No new external art or generated detail is introduced.
 
-The renderer uses mipmapped, anisotropic texture filtering, neutral ambient fill and reduced arena haze/bloom to preserve surface contrast. The runtime currently consumes base color; additional material maps supplied for Jaison are not yet wired into this pipeline. Missing or malformed UV sidecars retain the vertex-colored mesh. Run `python3 scripts/test_rig_fighters.py` to check byte-exact texture regeneration, UV seams and triangle correspondence as well as rig integrity. Local simulator appearance is verified below; pinned-toolchain CI and physical-device frame times remain separate checks.
+The runtime consumes base color; additional material maps supplied for Jaison are not yet wired into this pipeline. Missing or malformed UV sidecars retain the vertex-colored mesh. Run `python3 scripts/test_rig_fighters.py` to check byte-exact texture regeneration, UV seams and triangle correspondence as well as rig integrity. The simulator screenshots below are historical asset evidence, not current Godot validation or physical-device performance measurements.
 
 ### Texture orientation verification
 
-HMT1 coordinates use the image's top-left origin: `u = OBJ.u`, `v = 1 - OBJ.v`. Copying OBJ's bottom-origin V directly into the SceneKit image mapping places skin and clothing fragments on unrelated surfaces. The exporter applies the conversion once; runtime materials must not flip it again. The regression suite compares every exported triangle corner with the original OBJ UV using this convention.
+HMT1 coordinates use the image's top-left origin: `u = OBJ.u`, `v = 1 - OBJ.v`. Incorrect image-origin mapping places skin and clothing fragments on unrelated surfaces. The exporter applies the conversion once; runtime materials must not flip it again. The regression suite compares every exported triangle corner with the original OBJ UV using this convention.
 
-The corrected title screen was built and run on the iPad mini (A17 Pro) simulator with iOS 27.0 / installed Xcode 27.1, by explicit user request. This is supplemental simulator evidence; the Xcode 26.0.1 CI pin is unchanged.
+The legacy title screen was built and run on the iPad mini (A17 Pro) simulator with iOS 27.0 / Xcode 27.1. This archived screenshot does not verify the planned Godot iOS export.
 
 ![Mack with corrected texture orientation in the iPad simulator](texture-ipad-preview.png)
 
@@ -170,9 +172,9 @@ Bruiser in a live bout on the iPhone 18 Pro / iOS 27.0 simulator:
 
 ![Bruiser's recovered texture in the real simulator bout](texture-bruiser-preview.png)
 
-### Full-roster simulator validation
+### Historical full-roster simulator validation
 
-The iPhone 18 Pro / iOS 27.0 simulator completed live sparring bouts against all ten opponents with the final texture assets. Every saved bout screenshot was visually inspected for skin, clothing and glove placement. Mack's title screen also passed the portrait/landscape journey, and the iPad mini (A17 Pro) simulator was updated to the complete build. Local verification used the installed Xcode 27.1 at the user's explicit request; the CI Xcode 26.0.1 pin is unchanged.
+The legacy game completed live sparring bouts against all ten opponents on the iPhone 18 Pro / iOS 27.0 simulator with the final texture assets. Every saved bout screenshot was visually inspected for skin, clothing and glove placement. Mack's title screen also passed the portrait/landscape journey, and the iPad mini (A17 Pro) simulator was updated to that build. These are historical results, not requirements to maintain or rebuild the legacy game.
 
 Host verification passed 81 engine tests, six store tests, the session adapter checks, 12 fighter asset tests, six display contract checks, and the native-only/zero-network gates. Runtime additions for the six recovered exports total 13.29 MiB of JPEG and UV sidecars; original `.fighter` geometry, skin weights and animation clips are byte-identical.
 

@@ -32,7 +32,8 @@ Each spectator picks a clip, holds it for a random time and crossfades to the ne
    - `Haymaker/Models/crowd-<look>.jpg` (512 px, 30–46 KB each)
 
    The bake is byte-for-byte reproducible.
-6. **Check** (`python3 scripts/test_crowd.py`, stdlib, runs in CI): verifies the format, triangle budget, weights, UVs and bind pose. It also CPU-skins every clip to confirm seated pelvis height, standing feet on the floor, facing direction, loop seams and quaternion continuity. It also checks that the Swift look list matches `crowd.json`.
+6. **Check** (`python3 scripts/test_crowd.py`, stdlib): verifies the format, triangle budget, weights, UVs and bind pose. It also CPU-skins every clip to confirm seated pelvis height, standing feet on the floor, facing direction, loop seams and quaternion continuity. The existing suite also contains a legacy roster comparison; it is not a requirement to maintain a second game.
+7. **Stage for Godot:** copy the generated `.crowd` and `crowd-<look>.jpg` files from the tooling's `Haymaker/Models/` output into `godot/assets/models/`.
 
 `crowd.json` records the prompts' outputs as Tripo task IDs (`tripo.bodies`, `tripo.textures`) for provenance.
 
@@ -54,4 +55,4 @@ Bone order: `Root, Hips, Spine, Spine1, Spine2, Neck, Head, LeftShoulder, LeftAr
 
 ## Runtime
 
-`Haymaker/CrowdModel.swift` parses the assets once. It shares one geometry per look, the skinning buffers, and one looping `SCNAnimation` per bone per clip across every spectator, so each spectator only adds nodes and animation players. `MatchScene.buildStadium()` fills five stepped rows (105 fans, with one seat in nine left empty). Rows widen with depth inside the arena wall, and the sixth row is an empty bench under the trusses. If any crowd asset fails to load, the error is logged once and the stands stay empty rather than crashing.
+`godot/scripts/arena/crowd.gd` parses the CRW1 assets, caches meshes per look and shares each body's AnimationLibrary across spectator skeletons. The Godot arena creates the stepped stands and 105 fans. Crowd assets and textures are loaded from `godot/assets/models/`; crowd randomness stays separate from the deterministic match engine.

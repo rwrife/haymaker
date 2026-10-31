@@ -1,165 +1,106 @@
 # Haymaker
 
-**Haymaker is a local-first iPhone boss-rush arcade boxing game: read telegraphed opponent patterns, throw one-thumb combos, and climb an original fighter career — with a dual-screen battle layout as the design target — no accounts, no cloud.**
+**Haymaker is a Godot-only, local-first boss-rush arcade boxing game: read telegraphed opponent patterns, throw one-thumb combos, and climb an original fighter career — no accounts, no cloud.**
 
-Public repo under the Auto Tool Lab program (`auto-tool-lab`). M1 (skeleton + CI contract gates), M2 (pure-Swift match engine in `Packages/HaymakerKit`), and the playable Metal arena have landed; career persistence and release automation remain later milestones. The pinned Apple CI lane verifies a simulator app build, not a store artifact or physical-device run.
+The authoritative game is `godot/`, using Godot 4.7.2. Windows and Android export presets are available. iPhone and iPad will be supported through Godot's iOS export from the same project, not a separate native game. An iOS export preset and verified store build are not available yet.
 
-## Playable Metal arena
+## Playable arena
 
-The app opens on Mack shadowboxing, with a career ladder and seeded sparring against ten story opponents: Goldie Voltage, Nico “Nightshift” Navarro, Atlas “Undertow” Reed, Vera Velvet, Duke Doubletake, Sylvie “Slipstream” Sloane, Cassian “Saint” Sterling, Jaison “Black Tie” Mercer, Hunter “Redline” Mercer, and final boss Bruiser Baxter. The career ladder is reshuffled each session: the first nine opponents appear in random order, Bruiser Baxter always closes it, and early opponents are passive and easy to hit, and each bout after is more aggressive and harder (shorter gaps, tells and recoveries, heavier hits). After a win, the results screen shows the defeated opponent's portrait, zoomed into the top 30% of the image, with **Rematch** and **Next fight** underneath. The next opponent stays a surprise until their versus introduction. All ten opponents have bundled defeated portraits. Each bout uses the matching supplied model and an authored fighting rhythm based on the character bio. Sylvie's evasive patterns slip punches before a quick reply.
+The game opens on Mack shadowboxing, with a career ladder and seeded sparring against ten story opponents: Goldie Voltage, Nico “Nightshift” Navarro, Atlas “Undertow” Reed, Vera Velvet, Duke Doubletake, Sylvie “Slipstream” Sloane, Cassian “Saint” Sterling, Jaison “Black Tie” Mercer, Hunter “Redline” Mercer, and final boss Bruiser Baxter. The first nine opponents are shuffled each session; Bruiser always closes the ladder. Early opponents are passive and easy to hit, and each later bout is more aggressive and harder, with shorter tells and recoveries and heavier hits.
 
-Beating the entire ladder opens a separate victory screen: Mack repeats his victory animation in the arena behind a fighter-stats dialog. The totals cover the current ladder's career bouts, including rematches and losses, but exclude sparring and earlier ladders: score, wins/bouts, landed/thrown punches, accuracy, knockouts and counters. **End game** returns to the shadowboxing title screen and starts a fresh ladder without deleting local records. Reduced Motion shows Mack holding a still victory pose instead. The finale waits until the final win is saved; a failed save keeps the retry action available.
+Before every bout, rematch and sparring round, a versus dialog shows the opponent's portrait cropped to the top 30%, their fighting identity and an intimidation line. The clock and controls wait for **Ring the bell**. After a win, the results screen shows the matching defeated portrait with **Rematch** and **Next fight**. The next opponent stays a surprise until their introduction.
 
-Before every bout, rematch, and sparring round, a versus dialog shows a close-up cropped to the top 30% of the supplied character PNG, their fighting identity, and a character-specific intimidation line. The clock and controls stay frozen until **Ring the bell**. The dialog supports portrait, landscape, VoiceOver, and scrolling at larger text sizes; closing it returns without starting a bout.
+Each fighter uses their supplied model and an authored rhythm based on their bio. Sylvie slips punches before a quick reply. Jaison uses precision counters and The Final Fitting hook–uppercut sequence, with “Let’s get this sorted.” as his walkout line. Hunter's Closing Time chains two jabs, a hook and a committed right with a longer final recovery; his introduction says “Try keeping up.”
 
-The arena and articulated fighters are real meshes rendered through Metal. The deterministic engine remains authoritative. Historical prototype books and recorded bouts remain available for replay and records, while the ten-opponent story ladder has its own progression.
+Completing the ladder opens a victory screen with Mack's looping victory animation and fighter statistics: score, wins/bouts, landed/thrown punches, accuracy, knockouts and counters. Totals include rematches and losses on the current ladder but exclude sparring and earlier ladders. **End game** returns to the title screen and starts a fresh ladder without deleting local records. Reduced Motion uses a still victory pose. The finale waits until the final win is saved; a failed save keeps the retry action available.
 
-The supplied character sculpts replace the prototype fighters. Mack and the selected opponent are used in each bout. All eleven models in `Haymaker/Models` are skinned to one shared Mixamo-compatible 22-bone skeleton (`HMR2`), with rigid gloves, boots and head. They all play one motion-capture clip library, `Haymaker/Models/fighter.clips`, baked from Mixamo boxing animations. It covers guard idle, jab, hook, uppercut, blocks, slips, head and body hit reactions, knockdown, get-up, victory and the title-screen warm-up. The runtime cross-fades between clips. The legs and arms run on separate clocks, so short engine windups speed up the punch rather than rushing the footwork. Feet stay planted between deliberate steps. Punches are steered onto the target only until contact and then snap back to guard. The fighters keep boxing distance, so gloves land without bodies passing through each other. A knockdown lasts three seconds: the fighter falls, the opponent taunts with both gloves raised, and the downed fighter is back in guard as the 3-2-1 count ends. After a knockout the finish and celebration play out before the results card. Reduced motion suppresses the ambient movement while keeping strikes readable. Pack the rigs with `python3 scripts/rig_fighters.py`; no external art tool is needed for that. Blender is only needed to re-fit skin weights or re-bake clips (see [`ArtDirection/Rigs`](ArtDirection/Rigs/README.md) and [`ArtDirection/Animations`](ArtDirection/Animations/README.md)). Run `python3 scripts/test_rig_fighters.py` and `python3 scripts/test_fighter_clips.py` for asset checks. The stands hold 105 rigged spectators generated with Tripo3D: four ~5,000-triangle bodies in ten outfits (casual tees and polos, business suits and blazers). Each one sits, claps, yells or stands up to cheer on its own random schedule, and the crowd rises with heavy blows and knockdowns. See [`ArtDirection/Crowd`](ArtDirection/Crowd/README.md); `python3 scripts/test_crowd.py` checks those assets. On macOS with full Xcode, `bash scripts/verify_fighter_rigs.sh` runs the animation checks and renders contact sheets. The supplied intro PNGs are bundled as versus portraits; the 3D arena uses the rigged models. See `ArtDirection/README.md` for asset provenance and prompts.
+The Godot arena uses real 3D meshes and an authoritative deterministic engine. All eleven fighters share the Mixamo-compatible 22-bone HMR2 skeleton and a motion-capture library covering guard idle, punches, blocks, slips, hit reactions, knockdown, get-up, victory and warm-up. The runtime cross-fades clips, separates arm and footwork timing, plants feet, steers punches until contact and preserves boxing distance. Knockdowns last three seconds, with a fall, opponent taunt and return to guard. The knockout and celebration play before the results card.
 
-Earlier validation for the eight-opponent story roster and versus flow: 60 domain tests, 5 store tests, and simulator UI playthroughs covering all eight introductions, pre-fight waiting, rematches, sparring, settings, punches, records, both orientations and paused timing. Native-only and zero-network gates pass. Local verification uses Xcode 27 / iOS 27 simulator; the repository's separate pinned CI toolchain remains unchanged. Physical-device frame rate has not been measured.
-
-Jaison “Black Tie” Mercer joins career and sparring with his supplied model and portrait, Vera-trained precision counters, and The Final Fitting hook–uppercut sequence. His walkout line is “Let’s get this sorted.” The story roster extends the deterministic engine and introduction checks.
+The stands hold 105 rigged spectators: four Tripo3D-generated bodies in ten outfits. Independent schedules drive sitting, clapping, yelling and cheering; heavy blows and knockdowns excite the crowd without affecting fight randomness. Reduced Motion pauses ambient crowd movement.
 
 ## Overview
 
-Haymaker is a single-player arcade boxing game for iPhone and iPad built in native Swift with a Metal-backed SceneKit 3D renderer for match gameplay and SwiftUI for everything around it. Every fight is a *boss fight*: an original opponent with a readable tell-driven move book (jabs, hooks, guards, feints), an exposure meter, and a rhythm the player learns. The core loop is short, one-handed, and score-attack friendly: pick a bout, read the telegraphs, land combos through the guard, dodge on the bell, and beat your own record.
+Every fight is a boss fight: an original opponent with readable tells, guards, feints and a rhythm to learn. The core loop is short, one-handed and score-attack friendly: pick a bout, read the telegraphs, land combos, dodge and beat your own record.
 
-The pitch: **a pocket arcade boxing cabinet** — every opponent is a distinct pattern puzzle, every session ends in a personal record, and all of it lives on your phone.
+The pitch is **a pocket arcade boxing cabinet** with skill-based 2–5 minute sessions, honest local records and no live-service grind.
 
-## Motivation
+### Features
 
-Chart-topping casual arcade games prove the appetite for one-thumb, session-short, progression-driven play, but most hide their depth behind energy systems, accounts, or ad loops. Readable arcade boxing is a pure expression of "learn the tell, execute the counter," and that genre is nearly extinct on mobile in a modern, privacy-first form. Haymaker builds an original boss-rush boxing loop as a deterministic, offline arcade game with honest local records.
+- Ten-opponent career boss rush and seeded Endless Sparring.
+- Deterministic GDScript match engine: fixed ticks, pattern scheduler, tell windows, damage/stamina state machine and scoring.
+- One-thumb and two-handed control layouts, on-screen buttons and swipe controls.
+- Godot 3D arena with articulated fighters, cinematic lighting, hit feedback and round flow.
+- Local per-opponent records and career stats derived from an append-only bout ledger.
+- Settings for control style, colorblind tell cues, haptics and reduced motion.
+- Portrait/landscape layouts and resizable desktop windows.
 
-The concept also maps naturally to the **iPhone Duo dual-screen** design target: opponent and fight read on one screen, player, stamina, and the big one-thumb control surface on the other (see the dual-screen section).
+Backup/restore, CSV export, a platform accessibility pass and iOS distribution remain planned work; see [`PLAN.md`](PLAN.md).
 
-## Target users
+### Non-goals
 
-- Players who want quick, skill-based arcade sessions (2–5 minutes) on one thumb.
-- Fans of pattern-reading boss fights and score attack without live-service grind.
-- People who want a game with zero network, zero accounts, zero ads.
+- No separately maintained platform-specific game; all platforms use Godot.
+- No accounts, cloud save, leaderboards, ads, IAP, loot boxes or runtime networking.
+- No licensed fighters, gyms, footage, trademarks or names of real boxers or game franchises; all characters and art are original.
+- No gambling, blood-gore realism, medical/fitness claims or online multiplayer in the MVP.
 
-## Concrete use cases
+## Controls and screens
 
-1. **Queue hop:** launch, tap the current career bout, play a 3-round fight, see the record board, close the app.
-2. **Pattern practice:** replay a single opponent in Endless Sparring with the tell replay hints on, chasing a faster KO.
-3. **Personal best chase:** compare today's run against the stored per-opponent bests (round, time, hit ratios) — all local.
-4. **Career night:** fight the full roster ladder in one sitting with between-bout stat summaries.
+Desktop opens in a centered 16:9 window at 80% of the screen; F11 toggles full screen. Resizing switches the UI between portrait and landscape layouts.
 
-## How to use / intended end-to-end workflow
+| Input | Fight controls | Menus |
+|---|---|---|
+| Keyboard | Space/J jab; Left/A/K hook; Up/W/I uppercut; Right/D/L dodge; Down/S guard; Shift/P parry; Esc pause | Arrows move focus; Enter/Space select; Esc back |
+| Gamepad | A jab; X hook; Y uppercut; B dodge; LB/LT guard; RB/RT parry; Start pause. D-pad also throws hook, uppercut, dodge and guard | D-pad/left stick move focus; A select; B back |
+| Touch/mouse | On-screen one-thumb/two-handed controls and swipes | On-screen menu controls |
 
-1. First launch: pick a fighter name and difficulty preset (no account, no sign-in).
-2. Career mode: bout ladder of original opponents with escalating pattern complexity.
-3. In-bout: dodge/guard gestures or buttons, jab/hook/uppercut combo taps, stamina and opponent-tell meters always visible.
-4. Bout end: results card with deterministic scoring (landed punch ratio, damage, round, time), saved locally; new personal bests marked.
-5. Records wall: per-opponent bests, career stats, unlocked sparring presets.
-6. Settings: controls layout, accessibility options, sound, and backup/export.
+Fight buttons do not take focus, so a punch cannot activate a menu button. Dual-screen/foldable battle layouts remain a design target: fight stage on one surface and controls on another. No special hardware compatibility is claimed.
 
-## MVP feature list
+## Privacy and local storage
 
-- Career boss-rush: 10 story opponents, each with a distinct telegraph pattern book and matching portrait/model.
-- Deterministic match engine in pure Swift (HaymakerKit package): pattern scheduler, tell windows, damage/stamina state machine — same input seed, same fight.
-- One-thumb control scheme (tap combos + swipe guard/dodge) with a secondary two-handed scheme.
-- Metal-backed 3D match scene with articulated fighters, cinematic lighting, hit feedback, and round flow.
-- Endless Sparring mode (single-opponent loop with seeded patterns).
-- Local records: per-opponent bests and career stats, append-only ledger, unknown-safe display (never invents missing history).
-- Versioned JSON backup + CSV stats export via the Files app; restore with preview.
-- Accessibility: large controls, colorblind-safe tell cues, haptics toggle, reduced motion, VoiceOver labels on shell UI.
+There are no server calls, analytics, ads, trackers or accounts. The Android preset disables Internet and network-state permissions and requests only vibration.
 
-## Non-goals
+Records are appended to `user://bouts.jsonl`; settings use `user://settings.cfg`. No camera, microphone, contacts, location or health access is requested. Any future backup/export must be user-initiated and file-based.
 
-- The iOS/iPadOS app stays native Swift — no Flutter, React Native, Expo, Kotlin Multiplatform, .NET MAUI, Unity, or other cross-platform/hybrid framework inside it.
-- Windows and Android come only from the separate Godot port in `godot/` (see below), added by explicit user request; it never ships code into the iOS target.
-- No accounts, cloud save, leaderboards, ads, IAP, or loot boxes; zero network at runtime.
-- No licensed fighters, gyms, footage, trademarks, or names of real boxers or game franchises; all characters and art are original.
-- No gambling/betting mechanics, no blood-gore realism, no medical/fitness claims.
-- No online multiplayer versus mode in the MVP.
+The package/bundle identifier remains `com.infinityball.haymaker`. Signing material and credentials must stay outside the repository.
 
-## Dual-screen (iPhone Duo) design target — build shape
+## Development and builds
 
-Full dual-screen/foldable SDK support does not exist yet. Haymaker therefore scaffolds and ships as a **standard native Swift iPhone and iPad app with native iPad support**. The dual-screen experience is a documented design target with a single migration seam, never a dependency on unavailable fold APIs:
+Install Godot 4.7.2 and matching export templates for builds. Open `godot/project.godot` in the editor, or run:
 
-- **Battle split design target:** top/primary surface shows the opponent, tells, and the fight stage; the second surface becomes the persistent control deck — big one-thumb buttons, stamina, round clock, and read-hints — so the player never covers the fight to play it.
-- **Career split design target:** roster/records wall as a control surface while the detail pane shows the selected opponent's pattern breakdown.
-- **Migration seam:** a single `FightWorkspaceLayout` adapter decides single-screen vs spanned/two-surface layouts. Today it always resolves to the single-screen layout. When Apple ships fold/dual-screen APIs, only this seam changes. No iPhone Duo hardware compatibility is claimed until real API + device evidence exists.
-
-## Privacy, permissions, and data storage
-
-- **Zero network.** No server calls, no analytics, no ads, no trackers. A CI contract gate enforces an empty network allowlist (`toolchain.json: network_allowlist = []`).
-- Data lives on-device (local SQLite via GRDB + app container). No accounts, no sign-in, no push notifications beyond optional local round/rest reminders if ever added (opt-in).
-- Backups are user-initiated files (JSON archive, CSV export) shared via the system share sheet; nothing leaves the device unless the user exports it.
-- No camera, microphone, contacts, location, or health permissions are requested. Motion input (if added post-MVP) is opt-in and never recorded.
-
-## iOS platform facts
-
-- Native Swift (SwiftUI shell + SpriteKit match scene), iPhone and iPad: `TARGETED_DEVICE_FAMILY = "1,2"` in every app-target build configuration; built `UIDeviceFamily` must verify as `[1, 2]` on an Apple build environment. Native iPad support is enabled by explicit user request.
-- iOS 26-or-newer SDK required; pinned in `toolchain.json` (Xcode 26.0.1 / 17A400 / iOS SDK 26.0 / Swift 6 mode).
-- Bundle identifier: `com.infinityball.haymaker` (App Store Connect registration: `CREATED com.infinityball.haymaker`).
-- Signing/TestFlight: `.github/workflows/release.yml` (packaging issue) builds, signs, and publishes via the App Store Connect API using the repository Actions secrets `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8`, `ASC_TEAM_ID` — secret names only, values never logged.
-- App Store listing copy lives in `AppStore/description.txt`; a real generated icon will live at `AppStore/icon.png` (see backlog — placeholder icons and false "generated" claims are prohibited).
-
-## Current status and milestones
-
-Early build-out: the repository now carries the native Swift project skeleton — `Haymaker.xcodeproj` (app target `Haymaker`), the pure-domain match-engine package `Packages/HaymakerKit` (pattern books, fixed-tick fight engine, damage state machine, deterministic scoring), and the persistence package `HaymakerStore` — plus the pinned CI contract gates (iOS 26 toolchain pin, iPhone and iPad pre/post-build, zero-network allowlist, native-only framework scan). A playable Metal-backed 3D scene now exists. No store archive or TestFlight binary has been verified.
-
-1. ✅ **M1** — Xcode project + pure-Swift HaymakerKit package + CI (iOS 26 pin, iPhone and iPad gate, zero-network gate). (issue #1)
-2. ✅ **M2** — Match engine core: data-driven pattern books (first two opponents), fixed-tick FightEngine with tell-window resolution, stamina/damage state machine with KO/three-count rules, deterministic scoring + personal-best model, 51 swift-testing cases (golden-seed fixtures, replay determinism, state tables). (issue #2)
-3. ✅ **M3 gameplay** — Metal-backed 3D fight scene + one-thumb controls + Bruiser Baxter playable.
-4. 🔜 **M4** — Career ladder (6 opponents), records ledger, stats derivations.
-5. 🔜 **M5** — Backup/restore, CSV export, accessibility pass, `FightWorkspaceLayout` dual-screen seam (design target).
-6. 🔜 **M6** — App Store copy finalization, generated icon wired into the asset catalog, TestFlight publish Action.
-
-## Windows and Android (Godot port)
-
-`godot/` is a separate Godot 4.7 project that ports the game to Windows and Android so it looks and plays like the iOS build. The iOS app is untouched and remains the reference implementation.
-
-- **Engine:** `godot/scripts/engine/` is a line-for-line GDScript port of HaymakerKit (`FightEngine`, `OpponentBook`, scoring, seeded RNG). It uses the same integer fixed tick, so a seed and input log produce the same fight on every platform. `tests/run_tests.gd` checks it against HaymakerKit's golden fixture and replays.
-- **Arena:** `godot/scripts/arena/` loads the existing `.fighter`, `.fighteruv`, `.clips`, and `.crowd` binaries at runtime and ports the iOS animator, director, choreographer, crowd, camera, and lighting. Assets in `godot/assets/` are copies of the app bundle's files, so regenerate them with the usual scripts and copy them across.
-- **Shell:** `godot/scripts/game/main.gd` ports `ContentView` (home, career, versus, countdown, HUD, pause, results, records, settings, career finale). Records and settings persist locally in `user://`. There is no network code, and the Android export requests only `VIBRATE`.
-- **Screens:** desktop opens in a centered 16:9 window (80% of the screen; F11 toggles full screen). The window can be resized to any aspect ratio, and the UI switches between portrait and landscape layouts like the iPhone and iPad.
-- **Keyboard:** Space or J jabs, ←/A/K hook, ↑/W/I uppercut, →/D/L dodge, ↓/S guard, Shift or P parries, and Esc pauses. In menus, the arrows move focus, Enter or Space selects, and Esc goes back.
-- **Gamepad:** A jabs, X hooks, Y uppercuts, B dodges, LB/LT guard, RB/RT parry, and Start pauses. The D-pad also throws hook, uppercut, dodge, and guard. In menus, the D-pad or left stick moves focus, A selects, and B goes back. Fight buttons never take focus, so a punch can't press a menu button.
-- **Touch and mouse:** the on-screen one-thumb and two-handed controls and swipes work as on iOS.
-
-Run and test (Godot 4.7.2, with export templates for builds):
-
-```bash
-godot --path godot                                                         # play in the editor runtime
-godot --headless --path godot --script res://tests/run_tests.gd            # engine port tests
-godot --headless --path godot --script res://tests/input_test.gd -- --isolated-store   # keyboard/gamepad journey
+```sh
+godot --path godot
+godot --headless --path godot --script res://tests/run_tests.gd
+godot --headless --path godot --script res://tests/input_test.gd -- --isolated-store
 godot --headless --path godot --export-release "Windows Desktop" builds/windows/Haymaker.exe
 godot --headless --path godot --export-debug "Android" builds/android/Haymaker.apk
 ```
 
-`export_presets.cfg` has Windows x86_64, Windows ARM64, and Android (arm64-v8a + x86_64, package `com.infinityball.haymaker`) presets. Android export needs the Android SDK, JDK 17, and a debug keystore in Godot's editor settings. Release signing material stays out of the repository. Builds go to `godot/builds/`, which is ignored.
-## Development / build quickstart
+`godot/export_presets.cfg` includes Windows x86_64, Windows ARM64 and Android arm64-v8a/x86_64 presets. Android builds need the Android SDK, JDK 17 and a debug keystore configured in Godot's editor settings. Build output goes to ignored `godot/builds/`.
 
-- macOS with Xcode 26.0.1 (17A400), iOS 26 SDK. Clone, open `Haymaker.xcodeproj`.
-- Domain logic in `Packages/HaymakerKit` (Swift Package Manager, `swift test` runnable on Linux CI; UI/gameplay verification requires the pinned macOS CI runner):
-  ```bash
-  swift test --package-path Packages/HaymakerKit
-  swift test --package-path Packages/HaymakerStore
-  ```
-- Run the contract gates locally:
-  ```bash
-  bash scripts/check_zero_network.sh
-  bash scripts/check_native_only.sh
-  ```
-- CI on `macos-26` asserts the exact Xcode 26.0.1 (17A400) pin, iOS 26 SDK, `TARGETED_DEVICE_FAMILY = "1,2"` pre- and post-build (`UIDeviceFamily == [1, 2]` on the built app), the `com.infinityball.haymaker` bundle id, and privacy-manifest embedding.
+The planned iOS port will add a Godot iOS preset and use Apple's platform build/signing tools for the exported project. It will share the same engine, arena and shell; no separate game needs to be maintained.
 
-Hunter “Redline” Mercer joins the shuffled career ladder and is available in seeded sparring. His Closing Time pattern chains two jabs, a hook and a committed right, with a longer final recovery to punish overcommitment. His supplied portrait introduces the bout with “Try keeping up.” The defeat portrait is archived with the other future cut-scene art.
+### Architecture and validation
 
-## Adaptive screens
+- `godot/scripts/engine/` owns gameplay state, seeded RNG, opponent books and scoring. Engine changes belong here and in `godot/tests/`, without duplicate implementation work.
+- `godot/scripts/arena/` loads fighter/crowd binaries and owns animation, choreography, camera and lighting.
+- `godot/scripts/game/` owns the shell, career progression, settings and local records.
+- Headless tests cover engine regressions and input/UI journeys. They do not establish visual fidelity, physical-device frame rate or store readiness.
 
-Native iPad support uses the entire window for the Metal arena. Its vertical camera field of view reveals more of the arena as the window widens, without stretching fighters. Controls stay inside safe areas: two-handed controls reflow from two rows to one at 780 points of available width, with taller buttons in windows at least 600 points high. The control deck is capped at 960 points to keep buttons readable on large displays. Rotation and iPad window resizing update the layout automatically. These layouts also accommodate unusual phone aspect ratios; iPhone Duo hardware and separate fold surfaces remain unverified design targets.
+Legacy source and Apple project files remain in the repository but are not maintained game targets. The existing `.github/workflows/ci.yml` still checks those legacy targets and has not been migrated to Godot. Legacy CI results and simulator screenshots are not evidence that a Godot export works on iOS.
 
-### Making an existing iPad window full screen
+## Asset workflow
 
-After upgrading from an iPhone-only build, iPadOS may restore Haymaker in a narrow window even though the installed app supports iPad. If you can see the iPad wallpaper beside the rounded app window, open the iPad window menu and select **Enter Full Screen** (or **Window → Enter Full Screen** from the menu bar). The arena and controls adapt to the expanded window immediately; reinstalling the app or deleting records is unnecessary. iPadOS owns the restored window size, so native iPad support alone does not force a full-screen launch.
+Original character sources, rigs, portraits and provenance live in [`ArtDirection/README.md`](ArtDirection/README.md). Godot consumes runtime models from `godot/assets/models/`.
 
-This was verified with the existing universal build on an iPad mini (A17 Pro) simulator running iPadOS 27: the narrow title window expanded to fill the display. This is simulator evidence, not a physical-device or pinned-toolchain build claim. Apple's [iPad multitasking instructions](https://support.apple.com/en-us/125309) describe the system's full-screen controls.
+Rebuild generated assets rather than editing them by hand:
 
-The built-app display gate checks both device families, all four iPad orientations, a launch-screen declaration, and absence of the fixed-size `UIRequiresFullScreen` compatibility mode. Run `python3 scripts/test_device_families.py` for its regression checks. Do not add `UIRequiresFullScreen` as a workaround for a restored narrow window; see Apple's [iPad compatibility-mode migration guidance](https://developer.apple.com/documentation/technotes/tn3192-migrating-your-app-from-the-deprecated-uirequiresfullscreen-key).
+```sh
+python3 scripts/rig_fighters.py
+python3 scripts/test_rig_fighters.py
+python3 scripts/test_fighter_clips.py
+python3 scripts/test_crowd.py
+```
 
-## Fighter texture fidelity
+Existing tooling stages generated models, textures, crowd assets and `fighter.clips` in `Haymaker/Models/`; copy the relevant output into `godot/assets/models/`. This staging path does not make the legacy app authoritative. Blender is needed only to refit skin weights, recover source textures or rebake clips; runtime play does not require it. Never commit raw Mixamo FBX downloads.
 
-All eleven fighters use detailed base-color textures from the supplied model exports. UV seams preserve the existing rigs and contact geometry. OBJ's bottom-origin V coordinate is converted to the image's top-origin convention to keep faces, clothing and gloves correctly aligned. Neutral ambient fill and lighter haze preserve contrast. Rebuild textures with `python3 scripts/rig_fighters.py`; see [asset provenance and format](ArtDirection/Models/README.md#fighter-texture-fidelity), including the [iPad simulator preview](ArtDirection/Models/texture-ipad-preview.png).
+All eleven fighters use supplied base-color textures. HMT1 UV sidecars preserve the HMR2 rigs and contact geometry while duplicating render vertices at seams. The exporter converts OBJ's bottom-origin V to the image's top-origin convention once; runtime materials must not flip it again. See [fighter texture provenance and format](ArtDirection/Models/README.md#fighter-texture-fidelity).

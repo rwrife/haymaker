@@ -2,79 +2,79 @@
 
 ## Scope
 
-Haymaker is a single-player, offline, boss-rush arcade boxing game for iPhone and iPad (native Swift). MVP = 6-opponent career ladder + endless sparring + local records + backup/export, playable one-handed, deterministic seeded fights, zero network. Dual-screen battle layout is a documented design target behind one layout seam (iPhone Duo focus); it is not implemented or claimed until fold APIs exist.
+Haymaker is a single-player, offline, boss-rush arcade boxing game built only in Godot 4.7.2. Windows and Android exports exist; iPhone and iPad will use Godot's iOS export from the same project. There is no separately maintained native game.
 
-Out of scope (explicit): accounts, cloud save, multiplayer, ads/IAP/loot, licensed/trademarked boxers or franchise assets, betting, Android in the iOS app (Windows/Android come only from the separate Godot port), fitness/medical claims, video capture, camera/mic.
+The game has a ten-opponent career ladder, endless sparring, local records, one-thumb and two-handed controls, deterministic seeded fights and zero runtime network. Backup/export and iOS distribution remain planned work.
+
+Out of scope: accounts, cloud save, multiplayer, ads/IAP/loot, licensed or trademarked boxers and franchise assets, betting, fitness/medical claims, video capture, camera/microphone access.
 
 ## Architecture
 
-```
-Haymaker.xcodeproj (M1)
-├── App/                      SwiftUI shell: career, records, settings, results
-│   └── FightWorkspaceLayout  single seam: adaptive single-window sizing; future two-surface split
-├── MatchScene/               SpriteKit view + actor sprites + HUD bindings (thin)
-├── Packages/HaymakerKit/     pure Swift 6 package (no UIKit/SpriteKit imports)
-│   ├── PatternBook           per-opponent telegraph sequences, seed-driven scheduler
-│   ├── FightEngine           round flow, tell windows, guard/dodge/parry resolution
-│   ├── DamageModel           stamina + damage state machine, KO/KD rules
-│   ├── Scoring               deterministic bout score, PB comparison
-│   └── BackupCodec           versioned JSON archive + restore preview model
-└── Packages/HaymakerStore/   GRDB store: bouts ledger (append-only), records, settings
+```text
+godot/
+├── project.godot             single game project for all platforms
+├── scenes/main.tscn          application entry scene
+├── scripts/engine/           authoritative deterministic match simulation
+│   ├── opponent_book.gd      opponent patterns and career ladder
+│   ├── fight_engine.gd       fixed-tick round flow and input resolution
+│   ├── hm.gd                 damage/stamina rules and shared engine types
+│   ├── seeded_rng.gd         seed-driven random number generator
+│   └── scoring.gd            deterministic scoring and personal bests
+├── scripts/game/
+│   ├── game.gd               career, settings and append-only local records
+│   └── main.gd               home, versus, HUD, results, records and settings
+├── scripts/arena/            rendering, fighter animation, crowd and camera
+├── assets/                  runtime fighter/crowd binaries and portraits
+├── tests/                   engine regressions and input/UI journeys
+└── export_presets.cfg        Windows and Android; iOS preset still to be added
 ```
 
 Rules:
-- All gameplay truth lives in HaymakerKit; SpriteKit/SwiftUI are presentation adapters.
-- Fight outcomes are a pure function of (seed, player inputs) — replayable, testable, cheat-checkable.
-- Append-only bout ledger; records are derived, never edited.
-- Zero network by construction; CI grep gate enforces the empty allowlist.
-- The Godot port (`godot/`) mirrors this split: `scripts/engine/` is a deterministic GDScript port of HaymakerKit verified against its golden fixture, `scripts/arena/` renders from the same binary fighter/crowd assets, and `scripts/game/` is the shell. It targets Windows and Android only and shares no code with the iOS target.
-- Victory presentation stays in the app: defeated portraits share the versus top-30% crop; the career finale loops Mack's bundled victory clip without advancing the completed engine. Finale stats derive only from saved career bouts on the current ladder, and End game resets ladder progress while preserving the append-only ledger.
+- Gameplay truth lives in `godot/scripts/engine/`; arena and shell code are presentation/session adapters.
+- Fight outcomes depend only on seed, captured configuration and player input ticks. Rendering timing and crowd randomness must not affect simulation.
+- Bouts are appended to `user://bouts.jsonl`; records are derived from saved bouts. Settings use `user://settings.cfg`.
+- No runtime networking or network export permissions.
+- Godot is authoritative. Legacy source and Apple project files are not maintained targets, and engine changes do not need to be duplicated into them.
+- Defeated portraits share the versus top-30% crop. The career finale loops Mack's victory clip without advancing the completed engine. Finale stats cover only the current ladder's saved career bouts; End game resets progress while preserving records.
 
-## Technology choices and rationale
+## Technology choices
 
 | Choice | Rationale |
 |---|---|
-| Swift 6 + SwiftUI (shell) | Fleet policy: native Swift only; no Flutter, React Native, Expo, Kotlin Multiplatform, .NET MAUI, Unity. |
-| SpriteKit (match) | First-party 2D game framework on iOS 26; physics-light, deterministic update loop, no third-party engine dependency. |
-| GRDB (SQLite) | Proven fleet data layer with versioned migrations + fixture DB pattern. |
-| Xcode 26.0.1 (17A400) / iOS SDK 26 pin | Fleet toolchain contract in `toolchain.json`, enforced by CI. |
-| iPhone and iPad (`TARGETED_DEVICE_FAMILY = "1,2"`) | Fleet policy: Native iPad support is enabled by explicit user request. User directive; simplifies build + submission. |
-| Bundle `com.infinityball.haymaker` | Fleet `com.infinityball.` prefix convention; registered in ASC. |
+| Godot 4.7.2 + GDScript | One game implementation across desktop and mobile, including the planned iOS export. |
+| Fixed-tick integer simulation | Reproducible seeded fights, golden fixtures and input-log replays. |
+| Godot 3D arena and shared binary assets | Preserve original rigs, motion-capture clips, textures and choreography. |
+| Local JSON-lines ledger + ConfigFile | On-device records and settings without accounts or services. |
+| Package/bundle `com.infinityball.haymaker` | Preserve the game's existing application identity. |
 
-## Milestones and dependency order
+## Current state and remaining milestones
 
-1. ✅ **M1 Skeleton + CI** (#1) — done: `Haymaker.xcodeproj` (app target, bundle `com.infinityball.haymaker`, `TARGETED_DEVICE_FAMILY = "1,2"` in all configurations), `Packages/HaymakerKit` (pure Swift 6) + `Packages/HaymakerStore` stub packages with swift-testing suites, macos-26 CI with exact Xcode 26.0.1 (17A400) pin, iOS 26 SDK assert, iPhone and iPad pre/post-build gates, zero-network gate, native-only framework scan. Everything else depends on this.
-2. ✅ **M2 Engine core** (#2) — done: data-driven `PatternBook` (Twitch + Anvil authored), fixed-tick integer `FightEngine` (round clock, guard/dodge/parry/jab/hook/uppercut resolution, tell-window hit/whiff/counter outcomes, replay with captured config/book + seed + input log), `DamageModel` stamina/damage state machine with named KD/KO states and three-count rule, deterministic `Scoring` + personal-best comparison. 51 swift-testing cases passed on Linux and the pinned macOS CI lane. Depends on M1 (merged).
-3. **M3 Playable fight** (#3) — SpriteKit scene, one-thumb controls, one opponent end-to-end, hit-feedback, round flow. Depends on M2.
-4. **M4 Career + records** (#4) — 6-opponent ladder, endless sparring, append-only ledger, PB derivations, results cards. Depends on M2 (UI needs M3).
-5. **M5 Data & accessibility** (#5) — backup/restore/export, accessibility pass, `FightWorkspaceLayout` seam documenting the dual-screen target. Depends on M4.
-6. **M6 Release** (#6, #7) — App Store copy final review, generated icon wired into the asset catalog, `.github/workflows/release.yml` TestFlight publish Action. Depends on M1–M5.
+1. **Playable Godot game:** engine, arena, ten-opponent career, sparring, versus/countdown, results, records, settings and career finale are implemented.
+2. **Godot validation and CI:** headless engine and input/UI suites exist. Migrate the existing legacy-target CI to Godot checks and relevant asset/privacy checks; no Godot CI coverage is claimed yet.
+3. **Data and accessibility:** finish backup/restore/export and verify controls, reduced motion, tell readability and assistive technology on each supported platform.
+4. **iOS via Godot:** add an iOS export preset and validate iPhone/iPad layout, touch, haptics, local persistence, privacy metadata and signing on an Apple build environment. Do not create a second game implementation.
+5. **Distribution:** validate release exports, original icon and store copy against shipped features; configure iOS/TestFlight distribution from the Godot export when ready.
 
 ## Testing strategy
 
-- **HaymakerKit:** swift-testing suites on Linux CI + macOS lane: scheduler determinism (same seed → same sequence), tell-window resolution tables, damage/stamina state transitions, scoring, backup codec round-trips.
-- **HaymakerStore:** migration tests with committed fixture DB.
-- **UI/gameplay:** XCUITest journeys on pinned macOS runner (launch → start bout → land punches → results card → records visible). Simulator evidence only — never claimed as real-device or iPhone Duo compatibility.
-- **Contract gates:** iPhone and iPad (`UIDeviceFamily == [1, 2]` post-build), bundle-ID assert, zero-network allowlist grep.
-- Honesty rule: Linux CI green ≠ the game compiles on Apple; the Apple lane is authoritative for SpriteKit/UIKit code.
+- **Engine:** `godot --headless --path godot --script res://tests/run_tests.gd` covers seeded RNG, damage, golden fixtures, replay determinism, controls/countdown, ladder, scoring, stamina and playable roster.
+- **Input/UI:** `godot --headless --path godot --script res://tests/input_test.gd -- --isolated-store` exercises keyboard/gamepad journeys without appending to normal records.
+- **Assets:** run the existing Python rig, clip and crowd regression suites when changing their assets or generators. Tooling currently stages generated files in `Haymaker/Models/`; copy them into `godot/assets/models/` for the game.
+- **Runtime/export:** inspect the actual Godot arena and exports on affected platforms. Headless tests are not visual, physical-device performance or store-submission evidence.
+- **CI honesty:** `.github/workflows/ci.yml` still checks legacy targets. Those results do not verify Godot builds, and legacy toolchain configuration is not the current game's development contract.
 
 ## Packaging / distribution
 
-- Ad hoc/simulator builds in PR CI; TestFlight via `.github/workflows/release.yml` ported from the proven fleet template (rwrife/cook-console, green in rise-log, split-slip, catch-tally): `v*` tag or manual dispatch → macos-26 → iOS 26+ SDK enforcement → signed IPA archive → TestFlight upload via the App Store Connect API using `ASC_KEY_ID`/`ASC_ISSUER_ID`/`ASC_KEY_P8`/`ASC_TEAM_ID` → wait for ASC processing → GitHub release. Never a new signing flow; values never logged.
-- App Store copy: `AppStore/description.txt` reviewed against shipped features before release.
-- Icon: real generated artwork at `AppStore/icon.png` (fleet creative brief via `hermes-image-gen`), wired into the Xcode app-icon asset catalog; no placeholders.
+- `godot/export_presets.cfg` contains Windows x86_64, Windows ARM64 and Android arm64-v8a/x86_64 presets. Builds go to ignored `godot/builds/`.
+- Android export requires the Android SDK, JDK 17, matching Godot export templates and signing configured outside the repository.
+- iOS distribution will use Godot's iOS export, followed by Apple's platform build/signing requirements. No configured iOS preset, verified IPA or TestFlight pipeline is claimed.
+- Keep signing material and credentials out of git and logs.
+- Review `AppStore/description.txt` and icon artwork against actual exported features before release.
 
-## Risks
+## Risks and invariants
 
-- **SpriteKit determinism:** float timing in the render loop must not feed the engine; fixed-tick simulation in HaymakerKit with render interpolation only. (Mitigated by design — engine tick is integer-based and seed-driven.)
-- **Art scope:** original fighters need real art. Mitigation: geometric/vector style, 6 opponents in MVP, programmatic animation from a small pose set.
-- **Dual-screen SDK gap:** managed by the single `FightWorkspaceLayout` seam; no compatibility claims.
-- **Runner flake:** simctl boot timeouts are known fleet flake; bounded retries + honest disclosure, never silent skip.
-
-## Non-goals
-
-Restate explicitly for executors: no Flutter, React Native, Expo, Kotlin Multiplatform, .NET MAUI, or Unity in the iOS app; Android and Windows only through the separate Godot port; no accounts/cloud/ads/IAP; no licensed names or assets; no betting; no medical/fitness claims; no multiplayer in MVP.
-
-Adaptive display support: native iPhone/iPad families, full-window arena with vertical field of view, and width/height-driven control reflow. No fold-specific APIs or gameplay engine changes.
-
-Fighter rendering preserves the HMR2 rig/contact format. Optional HMT1 `.fighteruv` sidecars duplicate render vertices at UV seams, copying each original vertex's normals and bone weights, and pair with bundled source base-color JPEGs. Vertex-colored rigs remain the fallback and serve fighters without a supplied textured export. Asset generation checks source position/topology correspondence before exporting the sidecars.
+- **Determinism:** render interpolation, floating-point animation and wall-clock timing must not feed engine state.
+- **Asset fidelity:** preserve original sources and HMR2 rig/contact geometry. Optional HMT1 `.fighteruv` sidecars duplicate render vertices at UV seams while retaining normals and bone weights; base-color JPEGs preserve supplied artwork. Vertex-colored meshes remain the fallback.
+- **Mobile performance:** measure actual device frame times, memory and touch readability; do not infer them from desktop or headless checks.
+- **Adaptive displays:** use Godot's viewport/layout support for portrait, landscape and resizing. Dual-screen/foldable layouts remain a design target, not a compatibility claim.
+- **Legacy migration:** asset staging paths and existing CI need focused migration work, not ongoing parallel game maintenance.

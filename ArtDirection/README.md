@@ -1,6 +1,6 @@
 # Visual references and asset provenance
 
-The user's supplied boxing screenshot is the composition and mood reference. The shipped arena and characters are 3D meshes rendered with Metal through SceneKit. These PNGs are concept references only, not runtime backgrounds, sprite sheets, or screenshot substitutes.
+The user's supplied boxing screenshot is the composition and mood reference. The arena and characters are 3D meshes rendered in Godot. These PNGs are concept references only, not runtime backgrounds, sprite sheets, or screenshot substitutes.
 
 Created with the built-in imagegen tool. The three final images were copied into this directory from the tool's generated-images output. No external stock assets or runtime image services are used.
 
@@ -22,7 +22,7 @@ Prompt:
 
 > Use case: stylized-concept. Asset type: transparent player boxer sprite for original arcade boxing game. One athletic young adult male boxer shown FROM BEHIND in a three-quarter rear view, looking straight toward opponent offscreen, both bright emerald green boxing gloves raised, left glove near face and right glove out front; black short tousled hair, sleeveless dark forest green tank top showing toned shoulders and arms, green boxing trunks with broad pale silver waistband, visible full body with green boots. Crouched dynamic boxing guard stance. Premium polished hand-painted 3D comic arcade video game art like user's attached boxing screenshot, bold precise ink contours, richly shaded muscular skin, glossy bright emerald leather gloves, dramatic cool white-blue rim lighting and warm arena key light. Entire silhouette visible head to feet within image, transparent margin. Original character, no lettering, no logos, no environment, no shadows outside silhouette, no UI. Genuinely transparent background.
 
-## Native 3D assets
+## Godot 3D assets
 
 Eleven user-supplied character models are archived in [`Models`](Models/README.md): Mack, Goldie Voltage, Nico “Nightshift” Navarro, Bruiser Baxter, Atlas “Undertow” Reed, Duke Doubletake, Sylvie “Slipstream” Sloane, Cassian “Saint” Sterling, Vera Velvet, Jaison “Black Tie” Mercer, and Hunter “Redline” Mercer. Ten supplied 2D portraits are archived in [`IntroScenes`](IntroScenes/README.md) and bundled for pre-fight versus introductions. Eleven "just lost the fight" portraits, one for each character including Mack, are archived in [`DefeatedPortraits`](DefeatedPortraits/README.md). The ten opponent portraits are bundled unchanged for bout-victory screens, using the same top-30% close-up as the versus introductions; Mack's defeated portrait remains source-only. The career finale uses Mack's existing 3D victory animation, not a new asset. See [character backstories](character-backstories.md) for story direction for all eleven characters, including the player and final boss.
 
@@ -30,11 +30,11 @@ The eleven supplied OBJ sculpts in `ArtDirection/Models` are the character sourc
 
 - **Rigs.** A headless Blender script (`scripts/blender/autorig.py`) fits each sculpt to one shared Mixamo-compatible 22-bone skeleton and computes its skin weights. The results are committed as sidecars in [`Rigs`](Rigs/README.md). `scripts/rig_fighters.py` then triangulates the OBJ, preserves vertex colors, generates smooth normals and packs the `HMR2` `.fighter` assets in `Haymaker/Models`. CI re-packs them byte for byte without Blender.
 - **Animation.** The motion comes from [Mixamo](https://www.mixamo.com) boxing animations. They were downloaded on Mack's sculpt, then baked by `scripts/blender/extract_clips.py` into the shared clip library `Haymaker/Models/fighter.clips` (see [`Animations`](Animations/README.md)). Mixamo's licence lets the animations ship in a game but not be redistributed as raw files, so only the derived bake is committed. The FBX downloads stay outside the repository.
-- **Runtime.** `Haymaker/FighterRig.swift`, `FighterAnimator.swift`, `FootPlanting.swift` and `BoutChoreographer.swift` play the clips on the SceneKit skeletons. They handle cross-fades, foot planting, punch aim and fighter spacing.
+- **Runtime.** `godot/scripts/arena/fighter_assets.gd`, `fighter_animator.gd`, `fighter_pose.gd`, `fighter_director.gd` and `choreographer.gd` load the assets and play the clips on Godot skeletons. They handle cross-fades, foot planting, punch aim and fighter spacing. Existing generators stage files in `Haymaker/Models/`; copy generated runtime files into `godot/assets/models/`, without maintaining the legacy game.
 
-The ring, lights and impact particles remain native scene geometry in `Haymaker/MatchScene.swift`. The crowd is ten rigged, animated spectators generated with the Tripo3D API; see [`Crowd`](Crowd/README.md) for the prompts' task IDs, pipeline, cost and format. All eleven story characters now have supplied source models.
+The ring, lights and impact particles are Godot scene geometry in `godot/scripts/arena/arena.gd`. The crowd uses four rigged bodies in ten looks generated with the Tripo3D API; see [`Crowd`](Crowd/README.md) for the prompts' task IDs, pipeline, cost and format. All eleven story characters now have supplied source models.
 
-The meshes use Y-up coordinates in meters, smooth vertex normals, and a mobile polygon budget. Materials are applied in the native scene, and animation comes from the bundled clip library. The app requires no Blender installation.
+The meshes use Y-up coordinates in meters, smooth vertex normals, and a mobile polygon budget. Materials are applied in the Godot scene, and animation comes from the bundled clip library. The game requires no Blender installation.
 
 ## Jaison “Black Tie” Mercer
 

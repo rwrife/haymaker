@@ -123,7 +123,7 @@ The file is little-endian, with every value in OBJ units (un-normalised).
 ## HMR2 runtime asset (`Haymaker/Models/<name>.fighter`)
 
 `scripts/rig_fighters.py` packs the OBJ and its sidecar. The authoritative layout is the HMR2 contract
-shared with the Swift loader (`Haymaker/FighterRig.swift`). In summary:
+consumed by the Godot loader (`godot/scripts/arena/fighter_assets.gd`). The generator currently stages files in `Haymaker/Models/`; copy them into `godot/assets/models/` for runtime use. In summary:
 
 ```
 char[4] "HMR2", u32 vertexCount, u32 indexCount, u32 boneCount (= 22)
