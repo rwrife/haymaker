@@ -807,7 +807,7 @@ func portrait_image(asset: String, height: float) -> Control:
 		tex.create_tween().tween_method(func(v: float):
 			zoom[0] = v
 			tex.queue_redraw(), zoom[0], PORTRAIT_ZOOM_END, PORTRAIT_ZOOM_SECONDS * (1.0 - t)) \
-			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_SINE)
+			.set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 	tex.draw.connect(func():
 		if texture != null:
 			tex.draw_texture_rect(texture, portrait_draw_rect(tex.size, texture.get_size(), zoom[0]), false))
@@ -830,7 +830,7 @@ const PORTRAIT_HEAD := Rect2(0.45, 0.0, 0.3, 0.22)
 ## Portraits open zoomed 2x on the head and ease out to 1.5x.
 const PORTRAIT_ZOOM_START := 2.0
 const PORTRAIT_ZOOM_END := 1.5
-const PORTRAIT_ZOOM_SECONDS := 3.0
+const PORTRAIT_ZOOM_SECONDS := 12.0
 var _portrait_zoom_since := {}
 
 ## Zoom onto the head: `zoom` times the full-width fit, never so far that the top
