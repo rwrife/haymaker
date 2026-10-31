@@ -72,6 +72,11 @@ Rules:
 - iOS distribution will use Godot's iOS export, followed by Apple's platform build/signing requirements. No configured iOS preset, verified IPA or TestFlight pipeline is claimed.
 - Keep signing material and credentials out of git and logs.
 - Review `AppStore/description.txt` and icon artwork against actual exported features before release.
+- Windows listing materials are prepared in `AppStore/Windows/`: English copy,
+  exact-size icons, promotional hero/poster/box art and real Godot screenshots.
+  Windows package/manifest resources, release-export validation and Store
+  certification/submission remain separate distribution work. The historical
+  Apple copy is not the Windows listing.
 
 ## Risks and invariants
 

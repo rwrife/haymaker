@@ -2,6 +2,18 @@
 
 The user's supplied boxing screenshot is the composition and mood reference. The arena and characters are 3D meshes rendered in Godot. These PNGs are concept references only, not runtime backgrounds, sprite sheets, or screenshot substitutes.
 
+## Windows Store listing art
+
+`AppStore/Windows/wallpaper-1920x1080.png` is a text-free promotional composition
+of the existing arena, player and Baxter concept references below, with resized
+alpha layers and a navy gradient. It is explicitly not a gameplay screenshot.
+The square icons are downscaled from the unchanged `AppStore/icon.png`; poster
+and box art reuse that icon with a rasterized Haymaker title. No new stock art
+or font binaries were added. The Windows screenshots are unaltered captures of
+the actual Godot runtime, including a naturally earned bout result, not layout
+test fixtures. See [the listing guide](../AppStore/Windows/README.md) for exact
+sizes, sources and capture steps.
+
 Created with the built-in imagegen tool. The three final images were copied into this directory from the tool's generated-images output. No external stock assets or runtime image services are used.
 
 ## arena-reference.png
