@@ -78,5 +78,25 @@ func _run() -> void:
 	await key(KEY_ESCAPE)
 	await wait(0.1)
 	check(not main.paused, "Esc resumes")
+	var game = root.get_node("Game")
+	var defeated: OpponentBook = game.opponent
+	game.bouts = [{"mode": "career", "result": {"opponentID": defeated.id, "outcome": HM.Outcome.PLAYER_WIN_BY_KO,
+		"score": {"points": 2691}, "roundsCompleted": 1, "ticksElapsed": 500,
+		"playerStats": {"landed": 9, "thrown": 9, "counters": 4}}}]
+	game._ladder_start = 0
+	game.saved = true
+	main.engine.phase = HM.Phase.OVER
+	main.engine.outcome = HM.Outcome.PLAYER_WIN_BY_KO
+	main.post_bout_elapsed = Arena.RESULTS_DELAY
+	main.replay_matches = true
+	await wait(0.1)
+	check(focused().begins_with("NEXT FIGHT"), "win focuses Next fight instead of Rematch")
+	var primary: Button = main._refs.primary
+	check(primary.get_index() == 0 and primary.get_parent().get_child(1).text == "REMATCH",
+		"Next fight appears before secondary Rematch")
+	await joy(JOY_BUTTON_A)
+	await wait(0.1)
+	check(main.showing_versus and game.opponent.id != defeated.id, "A on Next fight opens the next introduction")
+	check(focused().contains("RING THE BELL"), "next introduction focuses ring the bell")
 	print("%d input failures" % fails)
 	quit(1 if fails > 0 else 0)

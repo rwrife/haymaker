@@ -8,7 +8,7 @@ The authoritative game is `godot/`, using Godot 4.7.2. Windows and Android expor
 
 The game opens on Mack shadowboxing, with a career ladder and seeded sparring against ten story opponents: Goldie Voltage, Nico “Nightshift” Navarro, Atlas “Undertow” Reed, Vera Velvet, Duke Doubletake, Sylvie “Slipstream” Sloane, Cassian “Saint” Sterling, Jaison “Black Tie” Mercer, Hunter “Redline” Mercer, and final boss Bruiser Baxter. The first nine opponents are shuffled each session; Bruiser always closes the ladder. Early opponents are passive and easy to hit, and each later bout is more aggressive and harder, with shorter tells and recoveries and heavier hits.
 
-Before every bout, rematch and sparring round, a versus dialog shows the opponent's portrait cropped to the top 30%, their fighting identity and an intimidation line. The clock and controls wait for **Ring the bell**. After a win, the results screen shows the matching defeated portrait with **Rematch** and **Next fight**. The next opponent stays a surprise until their introduction.
+Before every bout, rematch and sparring round, a versus dialog shows the opponent's portrait, fighting identity and intimidation line. Portraits fit their full width and stay top-aligned, keeping at least the upper 30% visible without cropping faces sideways. The clock and controls wait for **Ring the bell**. After a win, the results screen shows the matching defeated portrait with a prominent **Next fight** first and **Rematch** as a secondary action. Keyboard/gamepad focus starts on Next fight when available; losses and draws keep Rematch primary. Defeats show Mack's existing defeated portrait. The next opponent stays a surprise until their introduction.
 
 Each fighter uses their supplied model and an authored rhythm based on their bio. Sylvie slips punches before a quick reply. Jaison uses precision counters and The Final Fitting hook–uppercut sequence, with “Let’s get this sorted.” as his walkout line. Hunter's Closing Time chains two jabs, a hook and a committed right with a longer final recovery; his introduction says “Try keeping up.”
 
@@ -45,7 +45,11 @@ Backup/restore, CSV export, a platform accessibility pass and iOS distribution r
 
 ## Controls and screens
 
-Desktop opens in a centered 16:9 window at 80% of the screen; F11 toggles full screen. Resizing switches the UI between portrait and landscape layouts.
+Desktop opens in a centered 16:9 window at 80% of the screen; F11 toggles full screen. Resizing switches the UI between portrait and landscape layouts. Desktop panels have a minimum width of 30% of the game window, up to their hard pixel maximum; the maximum takes precedence when the limits conflict. Desktop typography, images and controls scale together from a 1280 × 720 reference up to a bounded 2× zoom, so 4K displays remain readable without unlimited growth. Compact windows shrink to fit. The title is larger on desktop. The 30% minimum affects width only, not height; the arena still fills the display.
+
+Absolute desktop panel ceilings at maximum zoom are 1280 pixels wide for home actions, pause and career victory; 1280 × 1440 for career/settings/records; 1700 × 1040 for landscape versus; 1560 × 1040 for landscape results; and 1920 pixels wide for the HUD/control console. Smaller windows use proportionately smaller panels.
+
+Mobile uses a separate rule based on the platform, not its pixel resolution: a 430-unit logical canvas scales to the screen and expands with its aspect ratio. Mobile menus retain their screen-filling layouts, scrolling and safe-area padding instead of applying desktop pixel limits, so high-resolution phones do not get tiny desktop controls.
 
 | Input | Fight controls | Menus |
 |---|---|---|
@@ -71,6 +75,7 @@ Install Godot 4.7.2 and matching export templates for builds. Open `godot/projec
 godot --path godot
 godot --headless --path godot --script res://tests/run_tests.gd
 godot --headless --path godot --script res://tests/input_test.gd -- --isolated-store
+godot --headless --path godot --script res://tests/layout_test.gd -- --isolated-store
 godot --headless --path godot --export-release "Windows Desktop" builds/windows/Haymaker.exe
 godot --headless --path godot --export-debug "Android" builds/android/Haymaker.apk
 ```
