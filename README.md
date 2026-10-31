@@ -10,6 +10,13 @@ The game opens on Mack shadowboxing, with a career ladder and seeded sparring ag
 
 Before every bout, rematch and sparring round, a versus dialog shows the opponent's portrait, fighting identity and intimidation line. Portraits fit their full width and stay top-aligned, keeping at least the upper 30% visible without cropping faces sideways. The clock and controls wait for **Ring the bell**. After a win, the results screen shows the matching defeated portrait with a prominent **Next fight** first and **Rematch** as a secondary action. Keyboard/gamepad focus starts on Next fight when available; losses and draws keep Rematch primary. Defeats show Mack's existing defeated portrait. The next opponent stays a surprise until their introduction.
 
+**Fighter progression.** Each first career win against a ladder opponent, except the final one, earns Mack one training point. He must spend it on the results screen or the career screen before his next career bout:
+- **Power:** +10% punch damage per point.
+- **Dexterity:** dodge, block and parry windows 10% wider and punches about 8% cheaper on stamina, per point.
+- **Speed:** windups and recoveries about 8% faster per point.
+
+Every challenger still on the ladder also trains one point in a random attribute, so they hit harder, show faster tells with shorter gaps, or hold their guard longer and tire less. Each attribute caps at 5 points for Mack and for every challenger; a point with no open attribute is lost. The career screen shows Mack's attributes and each challenger's training. Training lasts for the current ladder only. Sparring always uses untrained fighters.
+
 Each fighter uses their supplied model and an authored rhythm based on their bio. Sylvie slips punches before a quick reply. Jaison uses precision counters and The Final Fitting hook–uppercut sequence, with “Let’s get this sorted.” as his walkout line. Hunter's Closing Time chains two jabs, a hook and a committed right with a longer final recovery; his introduction says “Try keeping up.”
 
 Completing the ladder opens a victory screen with Mack's looping victory animation and fighter statistics: score, wins/bouts, landed/thrown punches, accuracy, knockouts and counters. Totals include rematches and losses on the current ladder but exclude sparring and earlier ladders. **End game** returns to the title screen and starts a fresh ladder without deleting local records. Reduced Motion uses a still victory pose. The finale waits until the final win is saved; a failed save keeps the retry action available.

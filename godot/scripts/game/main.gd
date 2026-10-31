@@ -493,7 +493,7 @@ func _first_focusable(node: Node) -> Control:
 # MARK: - View building
 
 func _view_key() -> String:
-	var parts := [portrait, modal, Game.control_style, Game.error]
+	var parts := [portrait, modal, Game.control_style, Game.error, Game.unspent_points(), Game.progression.player]
 	if showing_victory:
 		parts.append("victory")
 	elif engine != null:
@@ -848,6 +848,9 @@ func _build_home() -> void:
 	var buttons := vbox(10)
 	fit_panel_width(buttons, 400, MENU_MAX.x, root.get_meta("content_size").x)
 	var start := btn("⚡  STEP INTO THE RING                →", func():
+		if Game.unspent_points() > 0:
+			showing_career = true
+			return
 		var first = Game.next_ladder_book()
 		_begin(first if first != null else Game.ladder[0], "career"), GOLD, INK, ring_font(true), 22, 62, Color(1, 1, 1, 0.45))
 	var start_style := _rounded_gradient([GOLD_LIGHT, GOLD], 8, Color(1, 1, 1, 0.45))
@@ -898,6 +901,7 @@ func _build_career() -> void:
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(list)
 	col.add_child(scroll)
+	list.add_child(_progression_panel(portrait))
 	if Game.ladder_complete():
 		list.add_child(lbl("Career complete — all %d opponents beaten" % Game.ladder.size(), 15, Color.WHITE, sys_font(600), 0, HORIZONTAL_ALIGNMENT_LEFT, true))
 		list.add_child(link("NEW LADDER", func():
@@ -913,6 +917,9 @@ func _build_career() -> void:
 		var status := "History unavailable" if not Game.history_loaded else ("Beaten" if Game.is_beaten(book.id) else \
 			("Ready" if Game.is_unlocked(book.id) else "Locked — beat previous opponents"))
 		info.add_child(lbl(status, 12, Color.WHITE, sys_font(500)))
+		var trained := Game.progression.attributes_for(book.id)
+		if not Game.is_beaten(book.id) and not Attributes.is_zero(trained):
+			info.add_child(lbl(Attributes.summary(trained), 11, GOLD_LIGHT, sys_font(600)))
 		var b := book
 		info.add_child(link("%s bio and records" % book.name, func():
 			detail_book = b
@@ -920,7 +927,7 @@ func _build_career() -> void:
 		row.add_child(info)
 		var start := btn("Start bout" if i == 0 else "Fight %s" % book.name.split(" ")[0], func(): _begin(b, "career"),
 			Color(0, 0, 0, 0), GOLD, sys_font(600), 15, 44)
-		start.disabled = not Game.is_unlocked(book.id)
+		start.disabled = not Game.is_unlocked(book.id) or Game.unspent_points() > 0
 		start.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(start)
 		if not start.disabled and not Game.is_beaten(book.id) and not _refs.has("primary"):
@@ -1467,6 +1474,9 @@ func _results_buttons(p: bool) -> Control:
 	var col := vbox(12 if p else 8)
 	var win := HM.is_player_win(engine.outcome)
 	var advance: Button = null
+	var locked: bool = Game.mode == "career" and Game.unspent_points() > 0
+	if locked and Game.saved:
+		col.add_child(_progression_panel(p))
 	if Game.mode == "sparring":
 		advance = btn("NEXT SPARRING ROUND", func():
 			if Game.next_round():
@@ -1479,18 +1489,20 @@ func _results_buttons(p: bool) -> Control:
 			advance = btn("NEXT FIGHT  →", func(): _begin(nb, "career"), GOLD, INK, ring_font(true), 23,
 				56 if p else 52, Color(GOLD_LIGHT, 0.8))
 	if advance != null:
-		advance.disabled = not Game.saved
+		advance.disabled = not Game.saved or locked
 	var advance_primary := advance != null and win
 	if advance_primary:
 		col.add_child(advance)
-		_refs.primary = advance
+		if not locked:
+			_refs.primary = advance
 	var rematch := btn("REMATCH", func(): _begin(Game.opponent, Game.mode),
 		Color(INK, 0.8) if advance_primary else GOLD, GOLD if advance_primary else INK, ring_font(true),
 		19 if advance_primary else 23, 44 if advance_primary else (52 if p else 46), Color(GOLD, 0.5))
-	rematch.disabled = not Game.saved
+	rematch.disabled = not Game.saved or locked
 	col.add_child(rematch)
 	if not advance_primary:
-		_refs.primary = rematch
+		if not locked:
+			_refs.primary = rematch
 		if advance != null:
 			col.add_child(advance)
 	var home := btn("CAREER LADDER", func():
@@ -1499,6 +1511,32 @@ func _results_buttons(p: bool) -> Control:
 	home.disabled = not Game.saved
 	col.add_child(home)
 	return col
+
+
+## Spend panel for points earned between career bouts.
+func _progression_panel(p: bool) -> Control:
+	var col := vbox(6)
+	var points := Game.unspent_points()
+	var header := "TRAINING POINT — PICK ONE" if points > 0 else "YOUR ATTRIBUTES"
+	col.add_child(lbl(header, 11, GOLD, sys_font(), 1.5, HORIZONTAL_ALIGNMENT_CENTER if p else HORIZONTAL_ALIGNMENT_LEFT, true))
+	var row := hbox(6)
+	for attribute in Attributes.ALL:
+		var a: String = attribute
+		var value: int = Game.progression.player[a]
+		var pips := "●".repeat(value) + "○".repeat(Attributes.MAX_POINTS - value)
+		var b := btn("%s\n%s" % [Attributes.TITLES[a].to_upper(), pips], func():
+			if Game.spend(a):
+				_built_key = "", Color(INK, 0.8), Color.WHITE, sys_font(600), 12, 50, Color(GOLD, 0.6))
+		b.disabled = not Game.can_spend(a)
+		b.tooltip_text = "Spend a point on %s" % Attributes.TITLES[a]
+		row.add_child(fill(b))
+		if not b.disabled and not _refs.has("primary"):
+			_refs.primary = b
+	col.add_child(row)
+	if points > 0:
+		col.add_child(lbl("Every challenger still on the ladder trained a point too.", 11, Color(1, 1, 1, 0.7), sys_font(500), 0,
+			HORIZONTAL_ALIGNMENT_CENTER if p else HORIZONTAL_ALIGNMENT_LEFT, true))
+	return panel(box(Color(INK, 0.7), 8, Color(GOLD, 0.4)), col, 8)
 
 
 func _build_results() -> void:

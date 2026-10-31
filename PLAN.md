@@ -37,6 +37,7 @@ Rules:
 - Godot is authoritative. Legacy source and Apple project files are not maintained targets, and engine changes do not need to be duplicated into them.
 - Intro and defeated portraits share full-width, top-aligned framing that preserves at least the upper 30% without horizontal face cropping. Losses display Mack's bundled defeated portrait. After wins, Next fight/Next sparring round is the primary result action when available, ahead of secondary Rematch; losses and draws keep Rematch primary. The career finale loops Mack's victory clip without advancing the completed engine. Finale stats cover only the current ladder's saved career bouts; End game resets progress while preserving records.
 - UI sizing is platform-specific: mobile retains a screen-adaptive 430-unit logical canvas and safe areas; desktop scales from a 1280 × 720 reference up to 2× and bounds panel widths between 30% of the window and per-surface pixel caps, with the cap taking precedence.
+- Attribute progression (`scripts/engine/attributes.gd`) is a pure data transform: player power, dexterity and speed boost a copy of the engine `Config`, and challenger training boosts a copy of their `OpponentBook`. Zero attributes are an exact identity, so the engine loop, replays and golden fixtures are unchanged. Challenger training is drawn from a per-ladder seed. `game.gd` keeps progression in memory for the current ladder only; it is not persisted.
 
 ## Technology choices
 
