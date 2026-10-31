@@ -35,8 +35,8 @@ Rules:
 - Bouts are appended to `user://bouts.jsonl`; records are derived from saved bouts. Settings use `user://settings.cfg`.
 - No runtime networking or network export permissions.
 - Godot is authoritative. Legacy source and Apple project files are not maintained targets, and engine changes do not need to be duplicated into them.
-- Defeated portraits share the versus top-30% crop. The career finale loops Mack's victory clip without advancing the completed engine. Finale stats cover only the current ladder's saved career bouts; End game resets progress while preserving records.
-- UI sizing is platform-specific: mobile retains a screen-adaptive 430-unit logical canvas and safe areas; desktop stops upscaling and bounds panel widths between 30% of the window and per-surface pixel caps, with the cap taking precedence.
+- Intro and defeated portraits share full-width, top-aligned framing that preserves at least the upper 30% without horizontal face cropping. Losses display Mack's bundled defeated portrait. After wins, Next fight/Next sparring round is the primary result action when available, ahead of secondary Rematch; losses and draws keep Rematch primary. The career finale loops Mack's victory clip without advancing the completed engine. Finale stats cover only the current ladder's saved career bouts; End game resets progress while preserving records.
+- UI sizing is platform-specific: mobile retains a screen-adaptive 430-unit logical canvas and safe areas; desktop scales from a 1280 × 720 reference up to 2× and bounds panel widths between 30% of the window and per-surface pixel caps, with the cap taking precedence.
 
 ## Technology choices
 

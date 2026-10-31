@@ -10,6 +10,8 @@ const RED := Color(0.97, 0.24, 0.19)
 const INK := Color(0.025, 0.04, 0.075)
 const TICK := 1.0 / 60.0
 const DESKTOP_CANVAS_MIN := Vector2(960, 540)
+const DESKTOP_CANVAS_REFERENCE := Vector2(1280, 720)
+const DESKTOP_SCALE_MAX := 2.0
 const MOBILE_CANVAS_SIZE := Vector2i(430, 430)
 const MENU_MAX := Vector2(640, 720)
 const HUD_MAX_WIDTH := 960.0
@@ -105,11 +107,19 @@ func _on_resize() -> void:
 	_built_key = ""
 
 
-## Mobile uses logical UI units; desktop shrinks compact windows but never magnifies.
+## Desktop zoom stops at 2x, giving every logical panel cap an absolute pixel ceiling.
+static func desktop_ui_scale(window_size: Vector2i) -> float:
+	var compact := minf(1.0, minf(window_size.x / DESKTOP_CANVAS_MIN.x, window_size.y / DESKTOP_CANVAS_MIN.y))
+	var zoom := clampf(minf(window_size.x / DESKTOP_CANVAS_REFERENCE.x,
+		window_size.y / DESKTOP_CANVAS_REFERENCE.y), 1.0, DESKTOP_SCALE_MAX)
+	return compact * zoom
+
+
+## Mobile uses its own logical canvas regardless of physical resolution.
 static func ui_canvas_size(window_size: Vector2i, mobile: bool) -> Vector2i:
 	if mobile:
 		return MOBILE_CANVAS_SIZE
-	var scale := minf(1.0, minf(window_size.x / DESKTOP_CANVAS_MIN.x, window_size.y / DESKTOP_CANVAS_MIN.y))
+	var scale := desktop_ui_scale(window_size)
 	return Vector2i(ceilf(window_size.x / scale), ceilf(window_size.y / scale))
 
 
@@ -550,8 +560,8 @@ func _sys_font(names: Array, weight: int, italic: bool, stretch: int) -> SystemF
 
 
 ## RingStyle.type: Avenir Next Condensed Heavy.
-func ring_font(italic: bool = false) -> Font:
-	return _sys_font(["Avenir Next Condensed", "Bahnschrift", "Roboto Condensed", "sans-serif-condensed", "Arial Narrow"], 800, italic, 75)
+func ring_font(italic: bool = false, weight: int = 800) -> Font:
+	return _sys_font(["Avenir Next Condensed", "Bahnschrift", "Roboto Condensed", "sans-serif-condensed", "Arial Narrow"], weight, italic, 75)
 
 
 func sys_font(weight: int = 800) -> Font:
@@ -768,6 +778,7 @@ func _close_modal() -> void:
 
 func portrait_image(asset: String, height: float) -> Control:
 	var frame := PanelContainer.new()
+	frame.set_meta("portrait_asset", asset)
 	var bg := StyleBoxTexture.new()
 	var g := GradientTexture2D.new()
 	var grad := Gradient.new()
@@ -785,14 +796,10 @@ func portrait_image(asset: String, height: float) -> Control:
 	var texture: Texture2D = load(path) if ResourceLoader.exists(path) else null
 	tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tex.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	# FighterPortrait: all portraits are 1024 x 1536 and only their top 30% fills the panel.
 	tex.draw.connect(func():
 		if texture == null:
 			return
-		var s: Vector2 = tex.size
-		var scale := maxf(s.x / 1024.0, s.y / (1536.0 * 0.30))
-		var w := 1024.0 * scale
-		tex.draw_texture_rect(texture, Rect2((s.x - w) / 2.0, 0.0, w, 1536.0 * scale), false))
+		tex.draw_texture_rect(texture, portrait_draw_rect(tex.size, texture.get_size()), false))
 	tex.resized.connect(tex.queue_redraw)
 	frame.add_child(tex)
 	var outline := Panel.new()
@@ -804,6 +811,13 @@ func portrait_image(asset: String, height: float) -> Control:
 	outline.add_theme_stylebox_override("panel", s)
 	frame.add_child(outline)
 	return frame
+
+
+## Keep the entire head-and-shoulders region visible; only crop below it in tall panels.
+static func portrait_draw_rect(panel_size: Vector2, texture_size: Vector2) -> Rect2:
+	var scale := minf(panel_size.x / texture_size.x, panel_size.y / (texture_size.y * 0.30))
+	var drawn := texture_size * scale
+	return Rect2(Vector2((panel_size.x - drawn.x) / 2.0, 0), drawn)
 
 
 # MARK: - Home
@@ -818,7 +832,13 @@ func _build_home() -> void:
 	top.add_child(settings_button())
 	col.add_child(top)
 	col.add_child(spacer(false, 18))
-	var title := shadowed(lbl("HAYMAKER", 61 if portrait else 76, Color.WHITE, ring_font(true)))
+	var mobile := OS.has_feature("mobile")
+	var title_size := (61.0 if portrait else 76.0) if mobile else 140.0
+	var title := shadowed(lbl("HAYMAKER", title_size, Color.WHITE, ring_font(true, 800 if mobile else 950)))
+	if not mobile:
+		title.add_theme_constant_override("outline_size", 2)
+		title.add_theme_color_override("font_outline_color", Color.WHITE)
+	_refs.title = title
 	col.add_child(title)
 	col.add_child(lbl("READ THE TELL. LAND THE COUNTER.", 10, GOLD, sys_font(), 2))
 	col.add_child(spacer())
@@ -1445,23 +1465,34 @@ func _sparring_stats(p: bool) -> Control:
 
 func _results_buttons(p: bool) -> Control:
 	var col := vbox(12 if p else 8)
-	var rematch := btn("REMATCH", func(): _begin(Game.opponent, Game.mode), GOLD, INK, ring_font(true), 23, 52 if p else 46)
-	rematch.disabled = not Game.saved
-	col.add_child(rematch)
-	_refs.primary = rematch
+	var win := HM.is_player_win(engine.outcome)
+	var advance: Button = null
 	if Game.mode == "sparring":
-		var next := btn("NEXT SPARRING ROUND", func():
+		advance = btn("NEXT SPARRING ROUND", func():
 			if Game.next_round():
-				start_bout(), Color(GOLD, 0.85), Color.WHITE, ring_font(), 19, 48 if p else 44)
-		next.disabled = not Game.saved
-		col.add_child(next)
-	elif HM.is_player_win(engine.outcome):
+				start_bout(), GOLD if win else Color(INK, 0.8), INK if win else GOLD, ring_font(true),
+			23 if win else 19, (56 if p else 52) if win else 44, Color(GOLD_LIGHT, 0.8))
+	elif win:
 		var next_book = Game.next_ladder_book()
 		if next_book != null and next_book.id != Game.opponent.id:
 			var nb: OpponentBook = next_book
-			var next := btn("NEXT FIGHT", func(): _begin(nb, "career"), Color(GOLD, 0.85), Color.WHITE, ring_font(), 19, 48 if p else 44)
-			next.disabled = not Game.saved
-			col.add_child(next)
+			advance = btn("NEXT FIGHT  →", func(): _begin(nb, "career"), GOLD, INK, ring_font(true), 23,
+				56 if p else 52, Color(GOLD_LIGHT, 0.8))
+	if advance != null:
+		advance.disabled = not Game.saved
+	var advance_primary := advance != null and win
+	if advance_primary:
+		col.add_child(advance)
+		_refs.primary = advance
+	var rematch := btn("REMATCH", func(): _begin(Game.opponent, Game.mode),
+		Color(INK, 0.8) if advance_primary else GOLD, GOLD if advance_primary else INK, ring_font(true),
+		19 if advance_primary else 23, 44 if advance_primary else (52 if p else 46), Color(GOLD, 0.5))
+	rematch.disabled = not Game.saved
+	col.add_child(rematch)
+	if not advance_primary:
+		_refs.primary = rematch
+		if advance != null:
+			col.add_child(advance)
 	var home := btn("CAREER LADDER", func():
 		session_reset()
 		showing_career = true, Color(0, 0, 0, 0), Color.WHITE, _tracked(sys_font(), 1.4), 11, 36 if p else 30)
@@ -1473,6 +1504,7 @@ func _results_buttons(p: bool) -> Control:
 func _build_results() -> void:
 	var win := HM.is_player_win(engine.outcome)
 	var draw := engine.outcome == HM.Outcome.DRAW
+	var result_asset := engine.book.asset() + "-defeated" if win else "mack-defeated"
 	ui.add_child(dim(Color(INK, 0.85)))
 	var root := safe_root(0, 0, 0, null, Vector2(456, 720) if portrait else Vector2(780, 520))
 	var size: Vector2 = root.get_meta("content_size")
@@ -1482,13 +1514,14 @@ func _build_results() -> void:
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		root.add_child(scroll)
 		var center := CenterContainer.new()
-		center.custom_minimum_size = Vector2(size.x, size.y)
+		center.custom_minimum_size.y = size.y
+		center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		scroll.add_child(center)
 		var col := vbox(19)
-		col.custom_minimum_size.x = size.x - 56.0
+		col.custom_minimum_size.x = size.x - 56.0 - scroll.get_v_scroll_bar().get_combined_minimum_size().x
 		col.add_child(_results_summary(win, draw, true))
-		if win:
-			col.add_child(portrait_image(engine.book.asset() + "-defeated", minf(size.y * 0.3, 240.0)))
+		if not draw:
+			col.add_child(portrait_image(result_asset, minf(size.y * 0.3, 240.0)))
 		col.add_child(_bout_stats(true))
 		if Game.mode == "sparring":
 			col.add_child(_sparring_stats(true))
@@ -1504,10 +1537,10 @@ func _build_results() -> void:
 	var row := hbox(28 if win else 32)
 	row.custom_minimum_size = Vector2(size.x, size.y - 32.0)
 	center.add_child(row)
-	if win:
+	if not draw:
 		var left := vbox(10)
 		left.custom_minimum_size.x = minf(350.0, size.x * 0.38)
-		var face := portrait_image(engine.book.asset() + "-defeated", 0.0)
+		var face := portrait_image(result_asset, 0.0)
 		face.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		left.add_child(face)
 		left.add_child(_results_buttons(false))
