@@ -8,6 +8,7 @@ Instructions for AI coding agents (and humans) working in this repository. Read 
 - `Packages/HaymakerKit` — pure-Swift deterministic match engine. The engine is authoritative; keep gameplay logic here, not in views.
 - `Packages/HaymakerStore` — local persistence (SQLite via GRDB).
 - `Haymaker/` — the app target; `HaymakerUITests/` — simulator UI journeys.
+- `godot/` — separate Godot 4.7.2 port for Windows and Android. `scripts/engine/` must stay a faithful, deterministic port of HaymakerKit; port engine changes to both.
 - `scripts/` — CI gates and asset tooling; `ArtDirection/` — asset provenance.
 - Toolchain is pinned in `toolchain.json` (Xcode 26.0.1, iOS SDK 26.0). Never substitute another toolchain.
 
@@ -16,7 +17,7 @@ Instructions for AI coding agents (and humans) working in this repository. Read 
 - iPhone and iPad: `TARGETED_DEVICE_FAMILY = "1,2"`. Keep both device families enabled.
 - Bundle id stays `com.infinityball.haymaker`; the privacy manifest must stay embedded.
 - Zero network: no networking code or entitlements (`scripts/check_zero_network.sh`).
-- Native only: no Flutter, React Native, Unity, etc. (`scripts/check_native_only.sh`).
+- Native only in the iOS app: no Flutter, React Native, Unity, etc. (`scripts/check_native_only.sh`). The Godot port in `godot/` is the only cross-platform target and never ships into the iOS build.
 - Signing material (`.p8`, `.p12`, `.mobileprovision`, `.cer`) must never be committed.
 - Original characters and assets only; keep provenance current in `ArtDirection/README.md`.
 
@@ -55,6 +56,9 @@ bash scripts/check_native_only.sh
 python3 scripts/test_rig_fighters.py                  # when touching fighter assets or rigs
 python3 scripts/test_fighter_clips.py                 # when touching fighter.clips or the clip extractor
 python3 scripts/test_crowd.py                         # when touching crowd assets or scripts/build_crowd.py
+# when touching godot/ (Godot 4.7.2):
+godot --headless --path godot --script res://tests/run_tests.gd
+godot --headless --path godot --script res://tests/input_test.gd -- --isolated-store
 ```
 
 The iOS build and simulator UI journey need macOS with Xcode and only run in CI on the pinned toolchain. If you can't run them locally, rely on the PR build.

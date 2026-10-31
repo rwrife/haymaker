@@ -67,8 +67,8 @@ The concept also maps naturally to the **iPhone Duo dual-screen** design target:
 
 ## Non-goals
 
-- No Flutter, React Native, Expo, Kotlin Multiplatform, .NET MAUI, Unity, or any cross-platform/hybrid framework — native Swift only.
-- No Android support.
+- The iOS/iPadOS app stays native Swift — no Flutter, React Native, Expo, Kotlin Multiplatform, .NET MAUI, Unity, or other cross-platform/hybrid framework inside it.
+- Windows and Android come only from the separate Godot port in `godot/` (see below), added by explicit user request; it never ships code into the iOS target.
 - No accounts, cloud save, leaderboards, ads, IAP, or loot boxes; zero network at runtime.
 - No licensed fighters, gyms, footage, trademarks, or names of real boxers or game franchises; all characters and art are original.
 - No gambling/betting mechanics, no blood-gore realism, no medical/fitness claims.
@@ -108,6 +108,29 @@ Early build-out: the repository now carries the native Swift project skeleton �
 5. 🔜 **M5** — Backup/restore, CSV export, accessibility pass, `FightWorkspaceLayout` dual-screen seam (design target).
 6. 🔜 **M6** — App Store copy finalization, generated icon wired into the asset catalog, TestFlight publish Action.
 
+## Windows and Android (Godot port)
+
+`godot/` is a separate Godot 4.7 project that ports the game to Windows and Android so it looks and plays like the iOS build. The iOS app is untouched and remains the reference implementation.
+
+- **Engine:** `godot/scripts/engine/` is a line-for-line GDScript port of HaymakerKit (`FightEngine`, `OpponentBook`, scoring, seeded RNG). It uses the same integer fixed tick, so a seed and input log produce the same fight on every platform. `tests/run_tests.gd` checks it against HaymakerKit's golden fixture and replays.
+- **Arena:** `godot/scripts/arena/` loads the existing `.fighter`, `.fighteruv`, `.clips`, and `.crowd` binaries at runtime and ports the iOS animator, director, choreographer, crowd, camera, and lighting. Assets in `godot/assets/` are copies of the app bundle's files, so regenerate them with the usual scripts and copy them across.
+- **Shell:** `godot/scripts/game/main.gd` ports `ContentView` (home, career, versus, countdown, HUD, pause, results, records, settings, career finale). Records and settings persist locally in `user://`. There is no network code, and the Android export requests only `VIBRATE`.
+- **Screens:** desktop opens in a centered 16:9 window (80% of the screen; F11 toggles full screen). The window can be resized to any aspect ratio, and the UI switches between portrait and landscape layouts like the iPhone and iPad.
+- **Keyboard:** Space or J jabs, ←/A/K hook, ↑/W/I uppercut, →/D/L dodge, ↓/S guard, Shift or P parries, and Esc pauses. In menus, the arrows move focus, Enter or Space selects, and Esc goes back.
+- **Gamepad:** A jabs, X hooks, Y uppercuts, B dodges, LB/LT guard, RB/RT parry, and Start pauses. The D-pad also throws hook, uppercut, dodge, and guard. In menus, the D-pad or left stick moves focus, A selects, and B goes back. Fight buttons never take focus, so a punch can't press a menu button.
+- **Touch and mouse:** the on-screen one-thumb and two-handed controls and swipes work as on iOS.
+
+Run and test (Godot 4.7.2, with export templates for builds):
+
+```bash
+godot --path godot                                                         # play in the editor runtime
+godot --headless --path godot --script res://tests/run_tests.gd            # engine port tests
+godot --headless --path godot --script res://tests/input_test.gd -- --isolated-store   # keyboard/gamepad journey
+godot --headless --path godot --export-release "Windows Desktop" builds/windows/Haymaker.exe
+godot --headless --path godot --export-debug "Android" builds/android/Haymaker.apk
+```
+
+`export_presets.cfg` has Windows x86_64, Windows ARM64, and Android (arm64-v8a + x86_64, package `com.infinityball.haymaker`) presets. Android export needs the Android SDK, JDK 17, and a debug keystore in Godot's editor settings. Release signing material stays out of the repository. Builds go to `godot/builds/`, which is ignored.
 ## Development / build quickstart
 
 - macOS with Xcode 26.0.1 (17A400), iOS 26 SDK. Clone, open `Haymaker.xcodeproj`.
