@@ -84,6 +84,12 @@ godot --headless --path godot --export-debug "Android" builds/android/Haymaker.a
 
 The planned iOS port will add a Godot iOS preset and use Apple's platform build/signing tools for the exported project. It will share the same engine, arena and shell; no separate game needs to be maintained.
 
+Windows Store listing copy, a 1920 x 1080 promotional wallpaper, square icons,
+game poster/box art and real desktop screenshots are in
+[`AppStore/Windows/`](AppStore/Windows/README.md). This is a listing kit, not a
+certified Store package; its guide distinguishes listing graphics from future
+manifest assets and records screenshot provenance.
+
 ### Architecture and validation
 
 - `godot/scripts/engine/` owns gameplay state, seeded RNG, opponent books and scoring. Engine changes belong here and in `godot/tests/`, without duplicate implementation work.
