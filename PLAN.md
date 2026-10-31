@@ -36,6 +36,7 @@ Rules:
 - No runtime networking or network export permissions.
 - Godot is authoritative. Legacy source and Apple project files are not maintained targets, and engine changes do not need to be duplicated into them.
 - Defeated portraits share the versus top-30% crop. The career finale loops Mack's victory clip without advancing the completed engine. Finale stats cover only the current ladder's saved career bouts; End game resets progress while preserving records.
+- UI sizing is platform-specific: mobile retains a screen-adaptive 430-unit logical canvas and safe areas; desktop stops upscaling and bounds panel widths between 30% of the window and per-surface pixel caps, with the cap taking precedence.
 
 ## Technology choices
 
@@ -59,6 +60,7 @@ Rules:
 
 - **Engine:** `godot --headless --path godot --script res://tests/run_tests.gd` covers seeded RNG, damage, golden fixtures, replay determinism, controls/countdown, ladder, scoring, stamina and playable roster.
 - **Input/UI:** `godot --headless --path godot --script res://tests/input_test.gd -- --isolated-store` exercises keyboard/gamepad journeys without appending to normal records.
+- **Layout:** `godot --headless --path godot --script res://tests/layout_test.gd -- --isolated-store` checks desktop panel minima/caps, scrolling and control bounds from small windows through 4K, ultrawide and portrait, plus the resolution-independent mobile canvas rule. Run without `--headless` for rendered desktop journeys.
 - **Assets:** run the existing Python rig, clip and crowd regression suites when changing their assets or generators. Tooling currently stages generated files in `Haymaker/Models/`; copy them into `godot/assets/models/` for the game.
 - **Runtime/export:** inspect the actual Godot arena and exports on affected platforms. Headless tests are not visual, physical-device performance or store-submission evidence.
 - **CI honesty:** `.github/workflows/ci.yml` still checks legacy targets. Those results do not verify Godot builds, and legacy toolchain configuration is not the current game's development contract.

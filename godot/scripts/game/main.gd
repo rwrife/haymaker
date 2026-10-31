@@ -9,6 +9,11 @@ const GREEN := Color(0.31, 0.92, 0.39)
 const RED := Color(0.97, 0.24, 0.19)
 const INK := Color(0.025, 0.04, 0.075)
 const TICK := 1.0 / 60.0
+const DESKTOP_CANVAS_MIN := Vector2(960, 540)
+const MOBILE_CANVAS_SIZE := Vector2i(430, 430)
+const MENU_MAX := Vector2(640, 720)
+const HUD_MAX_WIDTH := 960.0
+const MIN_SCREEN_WIDTH := 0.3
 
 var arena: Arena
 var layer: CanvasLayer
@@ -88,12 +93,24 @@ func _notification(what: int) -> void:
 
 
 func _on_resize() -> void:
+	var window := get_tree().root
+	var canvas := ui_canvas_size(window.size, OS.has_feature("mobile"))
+	if window.content_scale_size != canvas:
+		window.content_scale_size = canvas
 	var s := _view_size()
 	var p := s.y > s.x
 	if p != portrait or arena.camera == null:
 		portrait = p
 		arena.layout(portrait)
 	_built_key = ""
+
+
+## Mobile uses logical UI units; desktop shrinks compact windows but never magnifies.
+static func ui_canvas_size(window_size: Vector2i, mobile: bool) -> Vector2i:
+	if mobile:
+		return MOBILE_CANVAS_SIZE
+	var scale := minf(1.0, minf(window_size.x / DESKTOP_CANVAS_MIN.x, window_size.y / DESKTOP_CANVAS_MIN.y))
+	return Vector2i(ceilf(window_size.x / scale), ceilf(window_size.y / scale))
 
 
 func _view_size() -> Vector2:
@@ -668,6 +685,13 @@ func panel(style: StyleBox, child: Control = null, pad: float = 0.0) -> PanelCon
 	return p
 
 
+func fit_panel_width(control: Control, preferred: float, maximum: float, available: float) -> void:
+	var minimum := 0.0 if OS.has_feature("mobile") else minf(_view_size().x * MIN_SCREEN_WIDTH, minf(maximum, available))
+	control.custom_minimum_size.x = minf(maxf(preferred, minimum), minf(maximum, available))
+	control.set_meta("width_min", minimum)
+	control.set_meta("width_max", maximum)
+
+
 func dim(color: Color) -> ColorRect:
 	var r := ColorRect.new()
 	r.color = color
@@ -675,16 +699,28 @@ func dim(color: Color) -> ColorRect:
 	return r
 
 
-## Full-screen margin container honouring the device safe area.
-func safe_root(h: float, top: float = 0.0, bottom: float = 0.0, parent: Control = null) -> MarginContainer:
+## Center bounded content within the safe area; backgrounds still cover the viewport.
+func safe_root(h: float, top: float = 0.0, bottom: float = 0.0, parent: Control = null,
+		max_size: Vector2 = Vector2.ZERO) -> MarginContainer:
 	var m := MarginContainer.new()
 	m.set_anchors_preset(Control.PRESET_FULL_RECT)
 	m.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var inset := _safe_insets()
-	m.add_theme_constant_override("margin_left", int(h + inset.position.x))
-	m.add_theme_constant_override("margin_right", int(h + inset.size.x))
-	m.add_theme_constant_override("margin_top", int(top + inset.position.y))
-	m.add_theme_constant_override("margin_bottom", int(bottom + inset.size.y))
+	var available := _view_size() - inset.position - inset.size - Vector2(h * 2.0, top + bottom)
+	if OS.has_feature("mobile"):
+		max_size = Vector2.ZERO
+	var bounded := available
+	if max_size.x > 0.0:
+		bounded.x = minf(available.x, max_size.x)
+	if max_size.y > 0.0:
+		bounded.y = minf(available.y, max_size.y)
+	var extra := (available - bounded) / 2.0
+	m.add_theme_constant_override("margin_left", int(h + inset.position.x + extra.x))
+	m.add_theme_constant_override("margin_right", int(h + inset.size.x + extra.x))
+	m.add_theme_constant_override("margin_top", int(top + inset.position.y + extra.y))
+	m.add_theme_constant_override("margin_bottom", int(bottom + inset.size.y + extra.y))
+	m.set_meta("content_size", bounded)
+	m.set_meta("max_size", max_size)
 	(parent if parent != null else ui).add_child(m)
 	return m
 
@@ -773,7 +809,7 @@ func portrait_image(asset: String, height: float) -> Control:
 # MARK: - Home
 
 func _build_home() -> void:
-	var root := safe_root(25.0 if portrait else 36.0, 10.0, 12.0)
+	var root := safe_root(25.0 if portrait else 36.0, 10.0, 12.0, null, Vector2(960, 720))
 	var col := vbox()
 	root.add_child(col)
 	var top := hbox()
@@ -790,7 +826,7 @@ func _build_home() -> void:
 		col.add_child(lbl(Game.error, 14, RED, null, 0, HORIZONTAL_ALIGNMENT_CENTER, true))
 	var center := CenterContainer.new()
 	var buttons := vbox(10)
-	buttons.custom_minimum_size.x = minf(400.0, _view_size().x - 50.0)
+	fit_panel_width(buttons, 400, MENU_MAX.x, root.get_meta("content_size").x)
 	var start := btn("⚡  STEP INTO THE RING                →", func():
 		var first = Game.next_ladder_book()
 		_begin(first if first != null else Game.ladder[0], "career"), GOLD, INK, ring_font(true), 22, 62, Color(1, 1, 1, 0.45))
@@ -821,7 +857,7 @@ func _rounded_gradient(colors: Array, radius: float, border: Color) -> StyleBoxF
 
 func _build_career() -> void:
 	ui.add_child(dim(Color(INK, 0.92)))
-	var root := safe_root(25.0 if portrait else 36.0, 10.0, 8.0)
+	var root := safe_root(25.0 if portrait else 36.0, 10.0, 8.0, null, MENU_MAX)
 	var col := vbox(12)
 	root.add_child(col)
 	var top := hbox()
@@ -884,7 +920,8 @@ func _build_career() -> void:
 func _build_versus() -> void:
 	var book := Game.opponent
 	ui.add_child(dim(Color(INK, 0.98)))
-	var root := safe_root(24.0, 8.0 if portrait else 14.0, 8.0 if portrait else 14.0)
+	var root := safe_root(24.0, 8.0 if portrait else 14.0, 8.0 if portrait else 14.0, null,
+		Vector2(480, 720) if portrait else Vector2(850, 520))
 	var header := hbox()
 	header.add_child(lbl("THE CHALLENGER APPROACHES", 10, GOLD, sys_font(), 2))
 	header.add_child(spacer())
@@ -901,17 +938,14 @@ func _build_versus() -> void:
 		Color.WHITE, sys_font(600), 0, HORIZONTAL_ALIGNMENT_LEFT, true))
 	var fight := btn("RING THE BELL  →", begin_fight, GOLD, INK, ring_font(), 19, 54 if portrait else 48)
 	_refs.primary = fight
-	var size := _view_size()
-	var center := CenterContainer.new()
-	root.add_child(center)
+	var size: Vector2 = root.get_meta("content_size")
 	if portrait:
 		var scroll := ScrollContainer.new()
 		scroll.follow_focus = true
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		root.remove_child(center)
 		root.add_child(scroll)
 		var col := vbox(18)
-		col.custom_minimum_size = Vector2(minf(850.0, size.x - 48.0), size.y - 16.0)
+		col.custom_minimum_size = size
 		scroll.add_child(col)
 		col.add_child(header)
 		col.add_child(portrait_image(book.asset() + "-intro", minf(size.y * 0.38, 310.0)))
@@ -919,8 +953,10 @@ func _build_versus() -> void:
 		col.add_child(spacer())
 		col.add_child(fight)
 	else:
+		var center := CenterContainer.new()
+		root.add_child(center)
 		var row := hbox(24)
-		row.custom_minimum_size = Vector2(minf(850.0, size.x - 48.0), size.y - 28.0)
+		row.custom_minimum_size = size
 		center.add_child(row)
 		var face := portrait_image(book.asset() + "-intro", 0.0)
 		face.custom_minimum_size.x = minf(size.x * 0.43, 360.0)
@@ -999,7 +1035,8 @@ func _build_match() -> void:
 	var size := _view_size()
 	var roomy := size.y >= 600.0
 	var wide := size.x >= 780.0
-	var root := safe_root(16.0 if portrait else 24.0, 6.0 if portrait else 8.0, 8.0 if portrait else 0.0)
+	var root := safe_root(16.0 if portrait else 24.0, 6.0 if portrait else 8.0, 8.0 if portrait else 0.0,
+		null, Vector2(HUD_MAX_WIDTH, 0))
 	var col := vbox()
 	root.add_child(col)
 	var hud := hbox(10 if portrait else 22)
@@ -1093,7 +1130,7 @@ func _build_match() -> void:
 	var console_panel := panel(console_style, console)
 	var console_center := CenterContainer.new()
 	console_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	console_panel.custom_minimum_size.x = minf(960.0, size.x - (32.0 if portrait else 48.0) - _safe_insets().position.x - _safe_insets().size.x)
+	fit_panel_width(console_panel, HUD_MAX_WIDTH, HUD_MAX_WIDTH, root.get_meta("content_size").x)
 	console_center.add_child(console_panel)
 	col.add_child(console_center)
 	# Overlays: countdown (blocking) and knockdown count (non-blocking).
@@ -1316,9 +1353,10 @@ func _tell_color(f: FightEngine) -> Color:
 
 func _build_pause() -> void:
 	ui.add_child(dim(Color(INK, 0.9)))
+	var root := safe_root(24, 16, 16, null, MENU_MAX)
 	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var col := vbox(20)
+	fit_panel_width(col, 320, MENU_MAX.x, root.get_meta("content_size").x)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_child(lbl("IN YOUR CORNER", 38, Color.WHITE, ring_font(true), 0, HORIZONTAL_ALIGNMENT_CENTER))
 	col.add_child(lbl("Take a breath. The ring can wait.", 13, Color(1, 1, 1, 0.6), sys_font(500), 0, HORIZONTAL_ALIGNMENT_CENTER))
@@ -1327,13 +1365,11 @@ func _build_pause() -> void:
 		_last_frame = -1.0, GOLD, INK, ring_font(), 22, 55)
 	resume.custom_minimum_size.x = 240
 	_refs.primary = resume
-	var holder := CenterContainer.new()
-	holder.add_child(resume)
-	col.add_child(holder)
+	col.add_child(resume)
 	col.add_child(btn("Settings", func(): _open_modal("settings"), Color(0, 0, 0, 0), GOLD, sys_font(600), 17, 36))
 	col.add_child(btn("Leave bout", session_reset, Color(0, 0, 0, 0), Color(1, 1, 1, 0.6), sys_font(500), 15, 36))
 	center.add_child(col)
-	ui.add_child(center)
+	root.add_child(center)
 
 
 # MARK: - Results
@@ -1437,9 +1473,9 @@ func _results_buttons(p: bool) -> Control:
 func _build_results() -> void:
 	var win := HM.is_player_win(engine.outcome)
 	var draw := engine.outcome == HM.Outcome.DRAW
-	var size := _view_size()
 	ui.add_child(dim(Color(INK, 0.85)))
-	var root := safe_root(0, 0, 0)
+	var root := safe_root(0, 0, 0, null, Vector2(456, 720) if portrait else Vector2(780, 520))
+	var size: Vector2 = root.get_meta("content_size")
 	if portrait:
 		var scroll := ScrollContainer.new()
 		scroll.follow_focus = true
@@ -1449,7 +1485,7 @@ func _build_results() -> void:
 		center.custom_minimum_size = Vector2(size.x, size.y)
 		scroll.add_child(center)
 		var col := vbox(19)
-		col.custom_minimum_size.x = minf(400.0, size.x - 56.0)
+		col.custom_minimum_size.x = size.x - 56.0
 		col.add_child(_results_summary(win, draw, true))
 		if win:
 			col.add_child(portrait_image(engine.book.asset() + "-defeated", minf(size.y * 0.3, 240.0)))
@@ -1466,7 +1502,7 @@ func _build_results() -> void:
 	var center := CenterContainer.new()
 	root.add_child(center)
 	var row := hbox(28 if win else 32)
-	row.custom_minimum_size = Vector2(minf(780.0, size.x - 64.0), minf(size.y - 32.0, 520.0))
+	row.custom_minimum_size = Vector2(size.x, size.y - 32.0)
 	center.add_child(row)
 	if win:
 		var left := vbox(10)
@@ -1507,8 +1543,8 @@ func _build_results() -> void:
 
 func _build_victory() -> void:
 	var stats := Game.ladder_summary()
-	var size := _view_size()
-	var root := safe_root(24, 16, 16)
+	var root := safe_root(24, 16, 16, null, Vector2(960, 720))
+	var size: Vector2 = root.get_meta("content_size")
 	var col := vbox(14 if portrait else 8)
 	col.add_child(lbl("CAREER COMPLETE", 11, GOLD, sys_font(), 3, HORIZONTAL_ALIGNMENT_CENTER))
 	col.add_child(lbl("VICTORY", 48 if portrait else 36, GOLD, ring_font(true), 0, HORIZONTAL_ALIGNMENT_CENTER))
@@ -1534,7 +1570,7 @@ func _build_victory() -> void:
 	var style := box(Color(INK, 0.9), 16, Color(GOLD, 0.6))
 	style.set_content_margin_all(20 if portrait else 16)
 	var dialog := panel(style, col)
-	dialog.custom_minimum_size.x = minf(420.0, size.x - 48.0) if portrait else minf(420.0, size.x * 0.52)
+	fit_panel_width(dialog, 420, MENU_MAX.x, size.x)
 	var outer := vbox()
 	outer.add_child(spacer())
 	var row := hbox()
@@ -1551,11 +1587,11 @@ func _build_victory() -> void:
 
 func _sheet(title: String) -> VBoxContainer:
 	ui.add_child(dim(Color(0, 0, 0, 0.5)))
-	var size := _view_size()
-	var root := safe_root(0 if portrait else maxf(24.0, (size.x - 640.0) / 2.0), 24 if portrait else 16, 0 if portrait else 16)
+	var root := safe_root(0 if portrait else 24, 24 if portrait else 16, 0 if portrait else 16, null, MENU_MAX)
 	var style := box(Color(0.08, 0.085, 0.1), 14)
-	style.corner_radius_bottom_left = 0 if portrait else 14
-	style.corner_radius_bottom_right = 0 if portrait else 14
+	var mobile_sheet := portrait and OS.has_feature("mobile")
+	style.corner_radius_bottom_left = 0 if mobile_sheet else 14
+	style.corner_radius_bottom_right = 0 if mobile_sheet else 14
 	style.set_content_margin_all(18)
 	var sheet := panel(style)
 	sheet.mouse_filter = Control.MOUSE_FILTER_STOP

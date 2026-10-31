@@ -45,7 +45,9 @@ Backup/restore, CSV export, a platform accessibility pass and iOS distribution r
 
 ## Controls and screens
 
-Desktop opens in a centered 16:9 window at 80% of the screen; F11 toggles full screen. Resizing switches the UI between portrait and landscape layouts.
+Desktop opens in a centered 16:9 window at 80% of the screen; F11 toggles full screen. Resizing switches the UI between portrait and landscape layouts. Desktop panels have a minimum width of 30% of the game window, up to their hard pixel maximum; the maximum takes precedence when the limits conflict. Home buttons, pause and career-victory panels are capped at 640 pixels wide; career/settings/records layouts at 640 × 720; landscape versus/results layouts at 850 × 520 and 780 × 520 respectively; and the HUD/control console at 960 pixels wide. These are canvas pixels: desktop UI can shrink for small windows but never magnifies on large monitors. The 30% minimum affects width only, not height; the arena still fills the display.
+
+Mobile uses a separate rule based on the platform, not its pixel resolution: a 430-unit logical canvas scales to the screen and expands with its aspect ratio. Mobile menus retain their screen-filling layouts, scrolling and safe-area padding instead of applying desktop pixel limits, so high-resolution phones do not get tiny desktop controls.
 
 | Input | Fight controls | Menus |
 |---|---|---|
@@ -71,6 +73,7 @@ Install Godot 4.7.2 and matching export templates for builds. Open `godot/projec
 godot --path godot
 godot --headless --path godot --script res://tests/run_tests.gd
 godot --headless --path godot --script res://tests/input_test.gd -- --isolated-store
+godot --headless --path godot --script res://tests/layout_test.gd -- --isolated-store
 godot --headless --path godot --export-release "Windows Desktop" builds/windows/Haymaker.exe
 godot --headless --path godot --export-debug "Android" builds/android/Haymaker.apk
 ```
