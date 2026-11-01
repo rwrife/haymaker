@@ -4,6 +4,7 @@ extends SceneTree
 
 var main
 var fails := 0
+var crowd_player: AudioStreamPlayer
 
 func _initialize() -> void:
 	main = (load("res://scenes/main.tscn") as PackedScene).instantiate()
@@ -45,6 +46,11 @@ func shows(text: String) -> bool:
 
 func _run() -> void:
 	await wait(0.3)
+	crowd_player = main.crowd_audio_player
+	check(crowd_player.stream is AudioStreamMP3 and crowd_player.stream.loop,
+		"supplied crowd recording is configured to loop")
+	check(is_equal_approx(crowd_player.volume_db, -12.0), "crowd plays at -12 dB background volume")
+	check_crowd("home")
 	await joy(JOY_BUTTON_A)
 	await wait(0.1)
 	check(main.engine == null, "first press only reveals focus")
@@ -52,15 +58,18 @@ func _run() -> void:
 	await joy(JOY_BUTTON_A)
 	await wait(0.1)
 	check(main.engine != null and main.showing_versus, "A on start opens versus")
+	check_crowd("versus")
 	check(focused().contains("RING THE BELL"), "versus focuses ring the bell")
 	await joy(JOY_BUTTON_A)
 	await wait(0.1)
 	check(main.engine != null and not main.showing_versus, "A rings the bell")
+	check_crowd("countdown")
 	var t := 0.0
 	while not (main._fighting() and main.countdown < 0.0) and t < 10.0:
 		await wait(0.1)
 		t += 0.1
 	check(main._fighting(), "fighting after countdown")
+	check_crowd("fight")
 	await joy(JOY_BUTTON_X)
 	await wait(0.2)
 	await key(KEY_UP)
@@ -70,11 +79,13 @@ func _run() -> void:
 	await joy(JOY_BUTTON_START)
 	await wait(0.1)
 	check(main.paused, "Start pauses")
+	check_crowd("pause")
 	check(focused().contains("RESUME"), "pause focuses resume")
 	await joy(JOY_BUTTON_DPAD_DOWN)
 	await joy(JOY_BUTTON_A)
 	await wait(0.1)
 	check(main.modal == "settings", "D-pad down + A opens settings")
+	check_crowd("settings")
 	await joy(JOY_BUTTON_B)
 	await wait(0.1)
 	check(main.modal == "" and main.paused, "B closes settings")
@@ -95,6 +106,7 @@ func _run() -> void:
 	main.replay_matches = true
 	await wait(0.1)
 	check(focused().begins_with("NEXT FIGHT"), "win focuses Next fight instead of Rematch")
+	check_crowd("results")
 	check(shows("FIGHT PRIZE TOKENS  1") and shows("FIGHTER STATS"), "win screen shows prize tokens and fighter stats")
 	check(not (main._refs.primary as Button).disabled, "unspent tokens never lock Next fight")
 	var primary: Button = main._refs.primary
@@ -108,17 +120,45 @@ func _run() -> void:
 	check(game.prize_tokens() == 1, "tokens carry into the next fight unspent")
 	check(main.title_music_player != null and main.title_music_player.stream != null,
 		"title music player is initialized with stream")
+	check(main.title_music_player.stream is AudioStreamMP3
+		and main.title_music_player.stream.resource_path == "res://assets/music/title_intro.mp3"
+		and main.title_music_player.stream.loop, "replacement intro song is loaded and loops")
 	main.session_reset()
 	check(main.title_music_player.playing, "title music plays on home screen")
+	check_crowd("return home")
+	var position := crowd_player.get_playback_position()
 	main.start_bout()
 	check(not main.title_music_player.playing, "title music stops during bout")
+	check(crowd_player.get_playback_position() >= position, "starting a bout does not restart crowd audio")
 	main.session_reset()
 	check(main.title_music_player.playing, "title music resumes after returning home")
 	game.music_enabled = false
 	main._update_title_music()
 	check(not main.title_music_player.playing, "disabling music setting stops player")
+	check_crowd("music disabled")
 	game.music_enabled = true
 	main._update_title_music()
 	check(main.title_music_player.playing, "re-enabling music setting resumes player")
+	var song_duration: float = main.title_music_player.stream.get_length()
+	check(song_duration > 1.0, "replacement intro song has playable duration")
+	main.title_music_player.seek(song_duration - 0.1)
+	await wait(0.5)
+	check(main.title_music_player.playing and main.title_music_player.get_playback_position() < 1.0,
+		"replacement intro song loops without stopping")
+	check_crowd("intro music loop boundary")
+	paused = true
+	await wait(0.2)
+	check_crowd("scene tree paused")
+	paused = false
+	var duration := crowd_player.stream.get_length()
+	check(duration > 1.0, "crowd recording has playable duration")
+	crowd_player.seek(duration - 0.1)
+	await wait(0.5)
+	check_crowd("loop boundary")
+	check(crowd_player.get_playback_position() < 1.0, "crowd wraps to the beginning without stopping")
 	print("%d input failures" % fails)
 	quit(1 if fails > 0 else 0)
+
+func check_crowd(screen: String) -> void:
+	check(main.crowd_audio_player == crowd_player and crowd_player.playing and not crowd_player.stream_paused,
+		"same crowd player continues through " + screen)

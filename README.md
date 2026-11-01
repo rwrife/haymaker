@@ -25,6 +25,8 @@ The Godot arena uses real 3D meshes and an authoritative deterministic engine. A
 
 The stands hold 105 rigged spectators: four Tripo3D-generated bodies in ten outfits. Independent schedules drive sitting, clapping, yelling and cheering; heavy blows and knockdowns excite the crowd without affecting fight randomness. Reduced Motion pauses ambient crowd movement.
 
+The supplied boxing-crowd recording loops quietly in the background from launch until exit, including menus, introductions, fights, pause screens, results and the career finale. Screen changes do not restart it. Every landed punch by either fighter also plays a six-second crowd reaction, cropped from seconds 3–9 of the second supplied recording and amplified by 50%. Rapid hits overlap instead of cutting off earlier reactions; blocked, dodged, parried and missed punches do not trigger it. Player wins by knockout or decision play the supplied loud crowd cheer once when the winning screen appears, including the career finale; losses and draws do not. The cheer stops when leaving for the next bout or title screen. The supplied **Brisk Tread** song loops as title music and stops when a bout starts. The Music setting controls title music only; crowd ambience, punch reactions and victory cheers continue independently.
+
 Four show spotlights hang above the arena. Each has a hazy beam that softens at its edges and light that reaches the ring and crowd. On the title and victory screens they sweep the ring and stands like a pre-fight walkout, periodically converging on Mack. During bouts and with Reduced Motion, they hold still and aim into the stands.
 
 ## Overview
@@ -84,6 +86,7 @@ Install Godot 4.7.2 and matching export templates for builds. Open `godot/projec
 godot --path godot
 godot --headless --path godot --script res://tests/run_tests.gd
 godot --headless --path godot --script res://tests/input_test.gd -- --isolated-store
+godot --headless --path godot --script res://tests/audio_test.gd -- --isolated-store
 godot --headless --path godot --script res://tests/layout_test.gd -- --isolated-store
 godot --headless --path godot --export-release "Windows Desktop" builds/windows/Haymaker.exe
 godot --headless --path godot --export-debug "Android" builds/android/Haymaker.apk

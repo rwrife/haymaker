@@ -16,11 +16,17 @@ const MOBILE_CANVAS_SIZE := Vector2i(430, 430)
 const MENU_MAX := Vector2(640, 720)
 const HUD_MAX_WIDTH := 960.0
 const MIN_SCREEN_WIDTH := 0.3
+const CROWD_AUDIO: AudioStreamMP3 = preload("res://assets/audio/boxing_crowd.mp3")
+const PUNCH_CROWD_AUDIO: AudioStreamWAV = preload("res://assets/audio/punch_crowd.wav")
+const TITLE_MUSIC: AudioStreamMP3 = preload("res://assets/music/title_intro.mp3")
+const WIN_CHEER_AUDIO: AudioStreamMP3 = preload("res://assets/audio/win_cheer.mp3")
 
 var arena: Arena
 var layer: CanvasLayer
 var ui: Control
 var title_music_player: AudioStreamPlayer = null
+var crowd_audio_player: AudioStreamPlayer
+var win_cheer_player: AudioStreamPlayer
 
 var engine: FightEngine = null
 var input_log: Array = []
@@ -48,9 +54,22 @@ var _last_frame := -1.0
 var _refs := {}
 var _fonts := {}
 var _swipe_start = null
+var _win_cheer_played := false
 
 
 func _ready() -> void:
+	crowd_audio_player = AudioStreamPlayer.new()
+	crowd_audio_player.name = "CrowdAudioPlayer"
+	crowd_audio_player.process_mode = Node.PROCESS_MODE_ALWAYS
+	crowd_audio_player.stream = CROWD_AUDIO
+	crowd_audio_player.volume_db = -12.0
+	add_child(crowd_audio_player)
+	crowd_audio_player.play()
+	win_cheer_player = AudioStreamPlayer.new()
+	win_cheer_player.name = "WinCheerPlayer"
+	win_cheer_player.process_mode = Node.PROCESS_MODE_ALWAYS
+	win_cheer_player.stream = WIN_CHEER_AUDIO
+	add_child(win_cheer_player)
 	arena = Arena.new(true)
 	add_child(arena)
 	layer = CanvasLayer.new()
@@ -69,10 +88,7 @@ func _ready() -> void:
 	layer.add_child(ui)
 	title_music_player = AudioStreamPlayer.new()
 	title_music_player.name = "TitleMusicPlayer"
-	# ponytail: single title music loop; add dynamic crossfades when fight BGM is staged.
-	var stream = load("res://assets/music/title_intro.ogg")
-	if stream != null:
-		title_music_player.stream = stream
+	title_music_player.stream = TITLE_MUSIC
 	add_child(title_music_player)
 	_update_title_music()
 	register_input_actions()
@@ -199,6 +215,7 @@ func _process(_delta: float) -> void:
 		var e: Dictionary = events[i]
 		match e.type:
 			"landed":
+				_play_punch_crowd()
 				var mine: bool = e.by == HM.Who.PLAYER
 				feedback = ("COUNTER!" if e.counter else "CLEAN HIT!") if mine else "HIT!"
 				feedback_color = GOLD if mine else RED
@@ -234,6 +251,23 @@ func _process(_delta: float) -> void:
 		Game.haptic(1.0 if value == 1 else 0.6)
 	last_knockdown_value = value
 	_update_match_ui()
+
+
+func _play_punch_crowd() -> void:
+	var player := AudioStreamPlayer.new()
+	player.name = "PunchCrowdPlayer"
+	player.process_mode = Node.PROCESS_MODE_ALWAYS
+	player.stream = PUNCH_CROWD_AUDIO
+	player.finished.connect(player.queue_free)
+	add_child(player)
+	player.play()
+
+
+func _play_win_cheer() -> void:
+	if _win_cheer_played:
+		return
+	_win_cheer_played = true
+	win_cheer_player.play()
 
 
 func _advance() -> void:
@@ -292,6 +326,8 @@ func _knockdown_count() -> Dictionary:
 # MARK: - Navigation (startBout / beginFight / sessionReset)
 
 func start_bout() -> void:
+	win_cheer_player.stop()
+	_win_cheer_played = false
 	showing_victory = false
 	victory_elapsed = 0.0
 	engine = Game.make_engine()
@@ -322,6 +358,8 @@ func begin_fight() -> void:
 
 
 func session_reset() -> void:
+	win_cheer_player.stop()
+	_win_cheer_played = false
 	showing_victory = false
 	victory_elapsed = 0.0
 	showing_versus = false
@@ -1603,6 +1641,8 @@ func _progression_panel(p: bool) -> Control:
 
 func _build_results() -> void:
 	var win := HM.is_player_win(engine.outcome)
+	if win:
+		_play_win_cheer()
 	var draw := engine.outcome == HM.Outcome.DRAW
 	var result_asset := engine.book.asset() + "-defeated" if win else "mack-defeated"
 	ui.add_child(dim(Color(INK, 0.85)))
@@ -1681,6 +1721,7 @@ func _build_results() -> void:
 # MARK: - Career victory
 
 func _build_victory() -> void:
+	_play_win_cheer()
 	var stats := Game.ladder_summary()
 	var root := safe_root(24, 16, 16, null, Vector2(960, 720))
 	var size: Vector2 = root.get_meta("content_size")
