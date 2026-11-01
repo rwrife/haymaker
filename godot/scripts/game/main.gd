@@ -493,7 +493,7 @@ func _first_focusable(node: Node) -> Control:
 # MARK: - View building
 
 func _view_key() -> String:
-	var parts := [portrait, modal, Game.control_style, Game.error, Game.unspent_points(), Game.progression.player]
+	var parts := [portrait, modal, Game.control_style, Game.error, Game.prize_tokens(), Game.progression.player]
 	if showing_victory:
 		parts.append("victory")
 	elif engine != null:
@@ -796,10 +796,21 @@ func portrait_image(asset: String, height: float) -> Control:
 	var texture: Texture2D = load(path) if ResourceLoader.exists(path) else null
 	tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tex.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# Keyed per bout so UI rebuilds continue the zoom instead of restarting it.
+	var key := "%s:%d" % [asset, engine.get_instance_id() if engine != null else 0]
+	if not _portrait_zoom_since.has(key):
+		_portrait_zoom_since[key] = Time.get_ticks_msec()
+	var t := 1.0 if Game.reduced_motion else \
+		clampf((Time.get_ticks_msec() - int(_portrait_zoom_since[key])) / 1000.0 / PORTRAIT_ZOOM_SECONDS, 0.0, 1.0)
+	var zoom := [lerpf(PORTRAIT_ZOOM_START, PORTRAIT_ZOOM_END, t)]
+	if t < 1.0:
+		tex.create_tween().tween_method(func(v: float):
+			zoom[0] = v
+			tex.queue_redraw(), zoom[0], PORTRAIT_ZOOM_END, PORTRAIT_ZOOM_SECONDS * (1.0 - t)) \
+			.set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 	tex.draw.connect(func():
-		if texture == null:
-			return
-		tex.draw_texture_rect(texture, portrait_draw_rect(tex.size, texture.get_size()), false))
+		if texture != null:
+			tex.draw_texture_rect(texture, portrait_draw_rect(tex.size, texture.get_size(), zoom[0]), false))
 	tex.resized.connect(tex.queue_redraw)
 	frame.add_child(tex)
 	var outline := Panel.new()
@@ -813,11 +824,26 @@ func portrait_image(asset: String, height: float) -> Control:
 	return frame
 
 
-## Keep the entire head-and-shoulders region visible; only crop below it in tall panels.
-static func portrait_draw_rect(panel_size: Vector2, texture_size: Vector2) -> Rect2:
-	var scale := minf(panel_size.x / texture_size.x, panel_size.y / (texture_size.y * 0.30))
+## Portrait heads sit in the top fifth of the art, slightly right of centre.
+const PORTRAIT_HEAD := Rect2(0.45, 0.0, 0.3, 0.22)
+
+## Portraits open zoomed 2x on the head and ease out to 1.5x.
+const PORTRAIT_ZOOM_START := 2.0
+const PORTRAIT_ZOOM_END := 1.5
+const PORTRAIT_ZOOM_SECONDS := 12.0
+var _portrait_zoom_since := {}
+
+## Zoom onto the head: `zoom` times the full-width fit, never so far that the top
+## fifth of the art spills out of short panels. Covers the width when it can;
+## very wide, short panels centre the art instead of cropping the head.
+static func portrait_draw_rect(panel_size: Vector2, texture_size: Vector2, zoom: float = PORTRAIT_ZOOM_END) -> Rect2:
+	var fit := minf(panel_size.x / texture_size.x, panel_size.y / (texture_size.y * 0.30))
+	var head_fit := panel_size.y / (texture_size.y * PORTRAIT_HEAD.size.y)
+	var scale := minf(maxf(panel_size.x / texture_size.x, fit * zoom), head_fit)
 	var drawn := texture_size * scale
-	return Rect2(Vector2((panel_size.x - drawn.x) / 2.0, 0), drawn)
+	var focus := (PORTRAIT_HEAD.position.x + PORTRAIT_HEAD.size.x / 2.0) * drawn.x
+	var x := (panel_size.x - drawn.x) / 2.0 if drawn.x < panel_size.x else clampf(panel_size.x / 2.0 - focus, panel_size.x - drawn.x, 0.0)
+	return Rect2(Vector2(x, 0), drawn)
 
 
 # MARK: - Home
@@ -848,9 +874,6 @@ func _build_home() -> void:
 	var buttons := vbox(10)
 	fit_panel_width(buttons, 400, MENU_MAX.x, root.get_meta("content_size").x)
 	var start := btn("⚡  STEP INTO THE RING                →", func():
-		if Game.unspent_points() > 0:
-			showing_career = true
-			return
 		var first = Game.next_ladder_book()
 		_begin(first if first != null else Game.ladder[0], "career"), GOLD, INK, ring_font(true), 22, 62, Color(1, 1, 1, 0.45))
 	var start_style := _rounded_gradient([GOLD_LIGHT, GOLD], 8, Color(1, 1, 1, 0.45))
@@ -927,7 +950,7 @@ func _build_career() -> void:
 		row.add_child(info)
 		var start := btn("Start bout" if i == 0 else "Fight %s" % book.name.split(" ")[0], func(): _begin(b, "career"),
 			Color(0, 0, 0, 0), GOLD, sys_font(600), 15, 44)
-		start.disabled = not Game.is_unlocked(book.id) or Game.unspent_points() > 0
+		start.disabled = not Game.is_unlocked(book.id)
 		start.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(start)
 		if not start.disabled and not Game.is_beaten(book.id) and not _refs.has("primary"):
@@ -963,6 +986,8 @@ func _build_versus() -> void:
 	intro.add_child(lbl(book.style() if book.style() != "" else "CHALLENGER", 10, GOLD, sys_font(), 1.5))
 	intro.add_child(lbl("“%s”" % (book.taunt() if book.taunt() != "" else "Meet me in the ring."), 19 if portrait else 16,
 		Color.WHITE, sys_font(600), 0, HORIZONTAL_ALIGNMENT_LEFT, true))
+	if Game.mode == "career":
+		intro.add_child(_challenger_stats(Game.progression.attributes_for(book.id)))
 	var fight := btn("RING THE BELL  →", begin_fight, GOLD, INK, ring_font(), 19, 54 if portrait else 48)
 	_refs.primary = fight
 	var size: Vector2 = root.get_meta("content_size")
@@ -972,7 +997,7 @@ func _build_versus() -> void:
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		root.add_child(scroll)
 		var col := vbox(18)
-		col.custom_minimum_size = size
+		col.custom_minimum_size = Vector2(size.x - scroll.get_v_scroll_bar().get_combined_minimum_size().x, size.y)
 		scroll.add_child(col)
 		col.add_child(header)
 		col.add_child(portrait_image(book.asset() + "-intro", minf(size.y * 0.38, 310.0)))
@@ -996,6 +1021,24 @@ func _build_versus() -> void:
 		col.add_child(spacer())
 		col.add_child(fight)
 		row.add_child(col)
+
+
+## The challenger's trained attributes for this ladder.
+func _challenger_stats(a: Dictionary) -> Control:
+	var col := vbox(6)
+	col.add_child(lbl("CHALLENGER STATS", 11, GOLD, sys_font(), 1.5))
+	var row := hbox(6)
+	for attribute in Attributes.ALL:
+		var value: int = a[attribute]
+		var cell := vbox(2)
+		cell.add_child(lbl(Attributes.TITLES[attribute].to_upper(), 10, Color.WHITE, sys_font(600)))
+		cell.add_child(lbl("●".repeat(value) + "○".repeat(Attributes.MAX_POINTS - value), 12, GOLD, sys_font()))
+		row.add_child(fill(cell))
+	col.add_child(row)
+	if Attributes.is_zero(a):
+		col.add_child(lbl("Untrained — no wins on this ladder yet.", 11, Color(1, 1, 1, 0.7), sys_font(500), 0,
+			HORIZONTAL_ALIGNMENT_LEFT, true))
+	return panel(box(Color(INK, 0.7), 8, Color(GOLD, 0.4)), col, 8)
 
 
 # MARK: - Match HUD + controls
@@ -1474,9 +1517,6 @@ func _results_buttons(p: bool) -> Control:
 	var col := vbox(12 if p else 8)
 	var win := HM.is_player_win(engine.outcome)
 	var advance: Button = null
-	var locked: bool = Game.mode == "career" and Game.unspent_points() > 0
-	if locked and Game.saved:
-		col.add_child(_progression_panel(p))
 	if Game.mode == "sparring":
 		advance = btn("NEXT SPARRING ROUND", func():
 			if Game.next_round():
@@ -1489,20 +1529,18 @@ func _results_buttons(p: bool) -> Control:
 			advance = btn("NEXT FIGHT  →", func(): _begin(nb, "career"), GOLD, INK, ring_font(true), 23,
 				56 if p else 52, Color(GOLD_LIGHT, 0.8))
 	if advance != null:
-		advance.disabled = not Game.saved or locked
+		advance.disabled = not Game.saved
 	var advance_primary := advance != null and win
 	if advance_primary:
 		col.add_child(advance)
-		if not locked:
-			_refs.primary = advance
+		_refs.primary = advance
 	var rematch := btn("REMATCH", func(): _begin(Game.opponent, Game.mode),
 		Color(INK, 0.8) if advance_primary else GOLD, GOLD if advance_primary else INK, ring_font(true),
 		19 if advance_primary else 23, 44 if advance_primary else (52 if p else 46), Color(GOLD, 0.5))
-	rematch.disabled = not Game.saved or locked
+	rematch.disabled = not Game.saved
 	col.add_child(rematch)
 	if not advance_primary:
-		if not locked:
-			_refs.primary = rematch
+		_refs.primary = rematch
 		if advance != null:
 			col.add_child(advance)
 	var home := btn("CAREER LADDER", func():
@@ -1513,29 +1551,32 @@ func _results_buttons(p: bool) -> Control:
 	return col
 
 
-## Spend panel for points earned between career bouts.
+## Fight prize token total and Mack's fighter stats; tokens are spent here.
 func _progression_panel(p: bool) -> Control:
+	var align := HORIZONTAL_ALIGNMENT_CENTER if p else HORIZONTAL_ALIGNMENT_LEFT
 	var col := vbox(6)
-	var points := Game.unspent_points()
-	var header := "TRAINING POINT — PICK ONE" if points > 0 else "YOUR ATTRIBUTES"
-	col.add_child(lbl(header, 11, GOLD, sys_font(), 1.5, HORIZONTAL_ALIGNMENT_CENTER if p else HORIZONTAL_ALIGNMENT_LEFT, true))
+	var tokens := Game.prize_tokens()
+	var head := hbox(8)
+	head.add_child(fill(lbl("FIGHTER STATS", 11, GOLD, sys_font(), 1.5, align)))
+	head.add_child(lbl("FIGHT PRIZE TOKENS  %d" % tokens, 11, GOLD if tokens > 0 else Color(1, 1, 1, 0.6), sys_font(),
+		1.5, HORIZONTAL_ALIGNMENT_RIGHT))
+	col.add_child(head)
 	var row := hbox(6)
 	for attribute in Attributes.ALL:
 		var a: String = attribute
 		var value: int = Game.progression.player[a]
 		var pips := "●".repeat(value) + "○".repeat(Attributes.MAX_POINTS - value)
-		var b := btn("%s\n%s" % [Attributes.TITLES[a].to_upper(), pips], func():
+		var b := btn("%s  +\n%s" % [Attributes.TITLES[a].to_upper(), pips] if Game.can_spend(a) else
+			"%s\n%s" % [Attributes.TITLES[a].to_upper(), pips], func():
 			if Game.spend(a):
 				_built_key = "", Color(INK, 0.8), Color.WHITE, sys_font(600), 12, 50, Color(GOLD, 0.6))
 		b.disabled = not Game.can_spend(a)
-		b.tooltip_text = "Spend a point on %s" % Attributes.TITLES[a]
+		b.tooltip_text = "Spend a fight prize token on %s" % Attributes.TITLES[a]
 		row.add_child(fill(b))
-		if not b.disabled and not _refs.has("primary"):
-			_refs.primary = b
 	col.add_child(row)
-	if points > 0:
-		col.add_child(lbl("Every challenger still on the ladder trained a point too.", 11, Color(1, 1, 1, 0.7), sys_font(500), 0,
-			HORIZONTAL_ALIGNMENT_CENTER if p else HORIZONTAL_ALIGNMENT_LEFT, true))
+	var note := "Spend a token to train an attribute (max %d each)." % Attributes.MAX_POINTS if tokens > 0 \
+		else "Win a new career fight to earn a fight prize token."
+	col.add_child(lbl(note, 11, Color(1, 1, 1, 0.7), sys_font(500), 0, align, true))
 	return panel(box(Color(INK, 0.7), 8, Color(GOLD, 0.4)), col, 8)
 
 
@@ -1563,6 +1604,8 @@ func _build_results() -> void:
 		col.add_child(_bout_stats(true))
 		if Game.mode == "sparring":
 			col.add_child(_sparring_stats(true))
+		elif Game.saved:
+			col.add_child(_progression_panel(true))
 		col.add_child(_results_buttons(true))
 		var m := MarginContainer.new()
 		for side in ["left", "right", "top", "bottom"]:
@@ -1593,6 +1636,8 @@ func _build_results() -> void:
 		right.add_child(_bout_stats(false))
 		if Game.mode == "sparring":
 			right.add_child(_sparring_stats(false))
+		elif Game.saved:
+			right.add_child(_progression_panel(false))
 		scroll.add_child(right)
 		row.add_child(scroll)
 	else:
@@ -1606,6 +1651,8 @@ func _build_results() -> void:
 		actions.add_child(_bout_stats(false))
 		if Game.mode == "sparring":
 			actions.add_child(_sparring_stats(false))
+		elif Game.saved:
+			actions.add_child(_progression_panel(false))
 		actions.add_child(_results_buttons(false))
 		row.add_child(actions)
 

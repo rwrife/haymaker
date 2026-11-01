@@ -89,20 +89,21 @@ static func boost_book(book: OpponentBook, a: Dictionary) -> OpponentBook:
 ## One career ladder's progression.
 class Progression:
 	var player := Attributes.zero()
-	var unspent := 0
+	## Fight prize tokens waiting to be spent on the player's attributes.
+	var tokens := 0
 	var opponents := {}
 
 	func attributes_for(opponent_id: String) -> Dictionary:
 		return opponents.get(opponent_id, Attributes.zero())
 
-	## Awards the post-win points: one for the player to spend, one trained into
+	## Awards the post-win prizes: one fight prize token for the player, one point trained into
 	## a seeded pick for every remaining challenger. The final win awards none.
 	func record_win(remaining: Array, seed: int) -> Dictionary:
 		var trained := {}
 		if remaining.is_empty():
 			return trained
-		if Attributes.total(player) + unspent < Attributes.MAX_POINTS * Attributes.ALL.size():
-			unspent += 1
+		if Attributes.total(player) + tokens < Attributes.MAX_POINTS * Attributes.ALL.size():
+			tokens += 1
 		var rng := SeededRNG.new(seed ^ 0x7A1A000000000000)
 		for id in remaining:
 			var a: Dictionary = attributes_for(id).duplicate()
@@ -116,12 +117,12 @@ class Progression:
 		return trained
 
 	func can_spend(attribute: String) -> bool:
-		return unspent > 0 and Attributes.can_raise(player, attribute)
+		return tokens > 0 and Attributes.can_raise(player, attribute)
 
 	func spend(attribute: String) -> bool:
 		if not can_spend(attribute):
 			return false
 		player = player.duplicate()
 		player[attribute] += 1
-		unspent -= 1
+		tokens -= 1
 		return true
