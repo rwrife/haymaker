@@ -19,12 +19,14 @@ const MIN_SCREEN_WIDTH := 0.3
 const CROWD_AUDIO: AudioStreamMP3 = preload("res://assets/audio/boxing_crowd.mp3")
 const PUNCH_CROWD_AUDIO: AudioStreamWAV = preload("res://assets/audio/punch_crowd.wav")
 const TITLE_MUSIC: AudioStreamMP3 = preload("res://assets/music/title_intro.mp3")
+const WIN_CHEER_AUDIO: AudioStreamMP3 = preload("res://assets/audio/win_cheer.mp3")
 
 var arena: Arena
 var layer: CanvasLayer
 var ui: Control
 var title_music_player: AudioStreamPlayer = null
 var crowd_audio_player: AudioStreamPlayer
+var win_cheer_player: AudioStreamPlayer
 
 var engine: FightEngine = null
 var input_log: Array = []
@@ -52,6 +54,7 @@ var _last_frame := -1.0
 var _refs := {}
 var _fonts := {}
 var _swipe_start = null
+var _win_cheer_played := false
 
 
 func _ready() -> void:
@@ -62,6 +65,11 @@ func _ready() -> void:
 	crowd_audio_player.volume_db = -12.0
 	add_child(crowd_audio_player)
 	crowd_audio_player.play()
+	win_cheer_player = AudioStreamPlayer.new()
+	win_cheer_player.name = "WinCheerPlayer"
+	win_cheer_player.process_mode = Node.PROCESS_MODE_ALWAYS
+	win_cheer_player.stream = WIN_CHEER_AUDIO
+	add_child(win_cheer_player)
 	arena = Arena.new(true)
 	add_child(arena)
 	layer = CanvasLayer.new()
@@ -255,6 +263,13 @@ func _play_punch_crowd() -> void:
 	player.play()
 
 
+func _play_win_cheer() -> void:
+	if _win_cheer_played:
+		return
+	_win_cheer_played = true
+	win_cheer_player.play()
+
+
 func _advance() -> void:
 	if engine.is_over():
 		return
@@ -311,6 +326,8 @@ func _knockdown_count() -> Dictionary:
 # MARK: - Navigation (startBout / beginFight / sessionReset)
 
 func start_bout() -> void:
+	win_cheer_player.stop()
+	_win_cheer_played = false
 	showing_victory = false
 	victory_elapsed = 0.0
 	engine = Game.make_engine()
@@ -341,6 +358,8 @@ func begin_fight() -> void:
 
 
 func session_reset() -> void:
+	win_cheer_player.stop()
+	_win_cheer_played = false
 	showing_victory = false
 	victory_elapsed = 0.0
 	showing_versus = false
@@ -1622,6 +1641,8 @@ func _progression_panel(p: bool) -> Control:
 
 func _build_results() -> void:
 	var win := HM.is_player_win(engine.outcome)
+	if win:
+		_play_win_cheer()
 	var draw := engine.outcome == HM.Outcome.DRAW
 	var result_asset := engine.book.asset() + "-defeated" if win else "mack-defeated"
 	ui.add_child(dim(Color(INK, 0.85)))
@@ -1700,6 +1721,7 @@ func _build_results() -> void:
 # MARK: - Career victory
 
 func _build_victory() -> void:
+	_play_win_cheer()
 	var stats := Game.ladder_summary()
 	var root := safe_root(24, 16, 16, null, Vector2(960, 720))
 	var size: Vector2 = root.get_meta("content_size")

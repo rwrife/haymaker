@@ -30,6 +30,16 @@ func present_events() -> void:
 	main._process(0.0)
 
 
+func show_result(outcome: int) -> void:
+	main.start_bout()
+	main.showing_versus = false
+	main.engine.phase = HM.Phase.OVER
+	main.engine.outcome = outcome
+	main.post_bout_elapsed = Arena.RESULTS_DELAY
+	main._built_key = ""
+	present_events()
+
+
 func _run() -> void:
 	await process_frame
 	main.set_process(false)
@@ -46,6 +56,9 @@ func _run() -> void:
 		and main.PUNCH_CROWD_AUDIO.data.size() == 288000 * 2 * 2,
 		"import preserves the boosted PCM without lossy compression")
 	check(reactions().is_empty(), "no punch reactions before a landed punch")
+	check(not main.WIN_CHEER_AUDIO.loop and main.WIN_CHEER_AUDIO.get_length() > 1.0,
+		"supplied winning-screen cheer is a playable one-shot")
+	check(not main.win_cheer_player.playing, "winning-screen cheer does not play during a bout")
 	main.engine.events = [
 		{"type": "landed", "tick": 0, "by": HM.Who.PLAYER, "move": HM.Move.JAB, "damage": 8, "counter": false},
 		{"type": "landed", "tick": 0, "by": HM.Who.OPPONENT, "move": HM.Move.JAB, "damage": 8, "counter": false},
@@ -88,17 +101,51 @@ func _run() -> void:
 	present_events()
 	check(main.engine.is_over() and reactions().size() == 1,
 		"the knockout-ending punch still triggers its reaction")
+	check(not main.win_cheer_player.playing, "win cheer waits for the winning screen, not the knockout")
+	main.post_bout_elapsed = Arena.RESULTS_DELAY
+	present_events()
+	check(main.win_cheer_player.playing and main.crowd_audio_player.playing,
+		"knockout winning screen plays cheer over continuous crowd ambience")
+	main.win_cheer_player.seek(main.WIN_CHEER_AUDIO.get_length() - 0.1)
+	await create_timer(0.5).timeout
+	check(not main.win_cheer_player.playing, "win cheer ends instead of looping")
+	main._built_key = ""
+	present_events()
+	check(not main.win_cheer_player.playing, "rebuilding a winning screen does not replay its cheer")
+	show_result(HM.Outcome.PLAYER_WIN_BY_DECISION)
+	check(main.win_cheer_player.playing, "decision win starts a fresh winning-screen cheer")
+	show_result(HM.Outcome.PLAYER_LOSS_BY_KO)
+	check(not main.win_cheer_player.playing, "knockout defeat stops the previous cheer and does not cheer")
+	show_result(HM.Outcome.PLAYER_LOSS_BY_DECISION)
+	check(not main.win_cheer_player.playing, "decision defeat does not cheer")
+	show_result(HM.Outcome.DRAW)
+	check(not main.win_cheer_player.playing, "draw does not cheer")
+	show_result(HM.Outcome.PLAYER_WIN_BY_KO)
+	main.start_bout()
+	check(not main.win_cheer_player.playing and not main._win_cheer_played,
+		"starting the next bout stops and resets the victory cheer")
+	main.showing_versus = false
+	main.engine.phase = HM.Phase.OVER
+	main.engine.outcome = HM.Outcome.PLAYER_WIN_BY_KO
 	game.ladder = [game.opponent]
 	game.bouts = [{"mode": "career", "result": main.engine.result()}]
 	game._ladder_start = 0
 	game.saved = true
 	main.post_bout_elapsed = Arena.RESULTS_DELAY
 	present_events()
+	present_events()
 	check(main.showing_victory and main.crowd_audio_player.playing,
 		"background crowd continues into the career finale")
+	check(main.win_cheer_player.playing, "career winning screen also plays the victory cheer")
+	main.win_cheer_player.seek(0.5)
+	var position: float = main.win_cheer_player.get_playback_position()
+	main._built_key = ""
+	present_events()
+	check(main.win_cheer_player.get_playback_position() >= position,
+		"career winning-screen rebuild does not restart the cheer")
 	main.session_reset()
-	check(main.crowd_audio_player.playing and reactions().size() == 1,
-		"returning home preserves ambience and the last punch reaction")
+	check(main.crowd_audio_player.playing and not main.win_cheer_player.playing,
+		"returning home preserves ambience but stops the victory cheer")
 	main.queue_free()
 	await process_frame
 	print("%d audio failures" % fails)
