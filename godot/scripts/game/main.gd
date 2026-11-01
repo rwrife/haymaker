@@ -20,6 +20,7 @@ const MIN_SCREEN_WIDTH := 0.3
 var arena: Arena
 var layer: CanvasLayer
 var ui: Control
+var title_music_player: AudioStreamPlayer = null
 
 var engine: FightEngine = null
 var input_log: Array = []
@@ -66,6 +67,14 @@ func _ready() -> void:
 	ui.set_anchors_preset(Control.PRESET_FULL_RECT)
 	ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(ui)
+	title_music_player = AudioStreamPlayer.new()
+	title_music_player.name = "TitleMusicPlayer"
+	# ponytail: single title music loop; add dynamic crossfades when fight BGM is staged.
+	var stream = load("res://assets/music/title_intro.ogg")
+	if stream != null:
+		title_music_player.stream = stream
+	add_child(title_music_player)
+	_update_title_music()
 	register_input_actions()
 	get_tree().root.size_changed.connect(_on_resize)
 	_fit_desktop_window()
@@ -286,6 +295,7 @@ func start_bout() -> void:
 	showing_victory = false
 	victory_elapsed = 0.0
 	engine = Game.make_engine()
+	_update_title_music()
 	input_log = []
 	pending = []
 	arena.reset_for_next_bout(Game.opponent.asset())
@@ -327,6 +337,17 @@ func session_reset() -> void:
 	paused = false
 	_last_frame = -1.0
 	feedback = ""
+	_update_title_music()
+
+
+func _update_title_music() -> void:
+	if title_music_player == null or title_music_player.stream == null:
+		return
+	var should_play := (engine == null) and Game.music_enabled
+	if should_play and not title_music_player.playing:
+		title_music_player.play()
+	elif not should_play and title_music_player.playing:
+		title_music_player.stop()
 
 
 func _begin(book: OpponentBook, mode: String) -> void:
@@ -1780,6 +1801,10 @@ func _build_settings() -> void:
 	_toggle(corner, "Haptics", Game.haptics_enabled, func(v):
 		Game.haptics_enabled = v
 		Game.save_settings())
+	_toggle(corner, "Music", Game.music_enabled, func(v):
+		Game.music_enabled = v
+		Game.save_settings()
+		_update_title_music())
 	var learn := _section(list, "Learn the rhythm")
 	_row_text(learn, "Tap PUNCH for a jab. Swipe left for a hook, up for an uppercut, right to dodge, and down to guard. Two hands gives every move its own button.")
 	_row_text(learn, "Counter during an opponent’s windup for double damage. Dodge just before the glove lands. An uppercut breaks the guard. Feints are a trap—wait for the opening.")

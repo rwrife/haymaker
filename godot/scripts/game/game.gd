@@ -11,6 +11,7 @@ var control_style := "oneThumb" # or "twoHanded"
 var colorblind_cues := true
 var reduced_motion := false
 var haptics_enabled := true
+var music_enabled := true
 
 var bouts: Array = [] # SavedBout dicts: {id, mode, runID, runRound, result}
 var history_loaded := false
@@ -51,6 +52,7 @@ func _load_settings() -> void:
 	colorblind_cues = cfg.get_value("corner", "colorblindCues", colorblind_cues)
 	reduced_motion = cfg.get_value("corner", "reducedMotion", reduced_motion)
 	haptics_enabled = cfg.get_value("corner", "hapticsEnabled", haptics_enabled)
+	music_enabled = cfg.get_value("corner", "musicEnabled", music_enabled)
 
 
 func save_settings() -> void:
@@ -59,6 +61,7 @@ func save_settings() -> void:
 	cfg.set_value("corner", "colorblindCues", colorblind_cues)
 	cfg.set_value("corner", "reducedMotion", reduced_motion)
 	cfg.set_value("corner", "hapticsEnabled", haptics_enabled)
+	cfg.set_value("corner", "musicEnabled", music_enabled)
 	cfg.save(SETTINGS_PATH)
 
 
