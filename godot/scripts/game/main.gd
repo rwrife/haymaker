@@ -334,7 +334,7 @@ func start_bout() -> void:
 	_update_title_music()
 	input_log = []
 	pending = []
-	arena.reset_for_next_bout(Game.opponent.asset())
+	arena.reset_for_next_bout(Game.opponent.asset(), reduced())
 	showing_versus = true
 	paused = false
 	last_event_count = 0
