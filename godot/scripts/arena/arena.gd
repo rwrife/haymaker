@@ -302,24 +302,133 @@ func _build_lighting() -> void:
 	_spotlight(Vector3(-3, 6, 4), Color(1, 0.87, 0.68), 780, true)
 	_spotlight(Vector3(4, 5, -3), Color(0.38, 0.62, 1), 620, false)
 	_spotlight(Vector3(0, 7, 1), Color(0.85, 0.85, 0.85), 180, false)
-	var haze := StandardMaterial3D.new()
-	haze.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	haze.albedo_color = Color(0.43, 0.66, 1.0, 0.035)
-	haze.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	haze.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	haze.cull_mode = BaseMaterial3D.CULL_DISABLED
-	haze.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	_build_beams()
+
+
+# MARK: - Moving show lights
+
+# The Mobile renderer has no volumetric fog, so each beam is a cone whose
+# brightness fades toward its silhouette, along its length and where it meets
+# the scene, with scrolling haze for drifting smoke.
+const BEAM_SHADER := """
+shader_type spatial;
+render_mode unshaded, blend_add, cull_disabled, depth_draw_never, shadows_disabled, fog_disabled;
+
+uniform vec4 beam_color : source_color = vec4(0.7, 0.82, 1.0, 1.0);
+uniform float intensity = 0.5;
+uniform float beam_length = 18.0;
+uniform float edge_power = 1.6;
+uniform float soft_distance = 0.8;
+uniform sampler2D haze_noise : repeat_enable, filter_linear_mipmap;
+uniform sampler2D depth_tex : hint_depth_texture, filter_nearest;
+
+varying float along;
+
+void vertex() {
+	along = clamp((beam_length * 0.5 - VERTEX.y) / beam_length, 0.0, 1.0);
+}
+
+void fragment() {
+	float facing = abs(dot(normalize(NORMAL), normalize(VIEW)));
+	float core = pow(facing, edge_power);
+	float falloff = pow(1.0 - along, 1.7) * smoothstep(0.0, 0.08, along);
+	vec2 drift_a = vec2(UV.x * 3.0, along * 1.4 - TIME * 0.03);
+	vec2 drift_b = vec2(UV.x * 5.0 + 0.37, along * 2.6 + TIME * 0.045);
+	float haze = texture(haze_noise, drift_a).r * 0.7 + texture(haze_noise, drift_b).r * 0.5;
+	float depth = texture(depth_tex, SCREEN_UV).r;
+	vec4 scene = INV_PROJECTION_MATRIX * vec4(SCREEN_UV * 2.0 - 1.0, depth, 1.0);
+	float soft = clamp((VERTEX.z - scene.z / scene.w) / soft_distance, 0.0, 1.0);
+	ALBEDO = beam_color.rgb * intensity * core * falloff * (0.35 + haze) * soft;
+}
+"""
+const BEAM_LENGTH := 18.0
+const BEAM_HALF_ANGLE := 6.0
+
+## source, colour, resting aim (used in bouts and with Reduced Motion), sweep
+## centre, sweep extents and phase for each fixture.
+const BEAM_RIGS := [
+	[Vector3(-6.0, 8.6, -7.5), Color(0.62, 0.78, 1.0), Vector3(-4.6, 0.0, -5.6), Vector3(-1.5, 0.4, -3.5), Vector2(6.5, 4.5), 0.0],
+	[Vector3(6.0, 8.6, -7.5), Color(0.62, 0.78, 1.0), Vector3(4.6, 0.0, -5.6), Vector3(1.5, 0.4, -3.5), Vector2(6.5, 4.5), 2.1],
+	[Vector3(-10.5, 7.8, 2.0), Color(1.0, 0.9, 0.74), Vector3(-7.0, 0.6, -8.5), Vector3(0.5, 0.4, -4.0), Vector2(7.5, 4.0), 4.0],
+	[Vector3(10.5, 7.8, 2.0), Color(1.0, 0.9, 0.74), Vector3(7.0, 0.6, -8.5), Vector3(-0.5, 0.4, -4.0), Vector2(7.5, 4.0), 5.3],
+]
+
+var beams: Array = []
+
+
+func _build_beams() -> void:
+	var fnl := FastNoiseLite.new()
+	fnl.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	fnl.frequency = 0.012
+	fnl.fractal_octaves = 3
+	var noise := NoiseTexture2D.new()
+	noise.width = 256
+	noise.height = 256
+	noise.seamless = true
+	noise.noise = fnl
 	var cone := CylinderMesh.new()
-	cone.top_radius = 0.06
-	cone.bottom_radius = 1.6
-	cone.height = 6.7
+	cone.top_radius = 0.05
+	cone.bottom_radius = BEAM_LENGTH * tan(deg_to_rad(BEAM_HALF_ANGLE))
+	cone.height = BEAM_LENGTH
+	cone.radial_segments = 32
+	cone.rings = 4
 	cone.cap_top = false
 	cone.cap_bottom = false
-	for x in [-6.0, 6.0]:
-		_spotlight(Vector3(x, 7, -5), Color(0.5, 0.7, 1), 300, false)
-		var c := _node(cone, Vector3(x * 0.8, 3.7, -5), haze)
-		c.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		c.rotation.z = -0.18 if x < 0 else 0.18
+	var shader := Shader.new()
+	shader.code = BEAM_SHADER
+	for rig in BEAM_RIGS:
+		var pivot := Node3D.new()
+		pivot.name = "ShowBeam"
+		add_child(pivot)
+		var light := SpotLight3D.new()
+		light.light_color = rig[1]
+		light.light_energy = 7.0
+		light.spot_angle = BEAM_HALF_ANGLE + 0.5
+		light.spot_angle_attenuation = 0.35
+		light.spot_range = 26.0
+		light.spot_attenuation = 0.3
+		light.shadow_enabled = false
+		pivot.add_child(light)
+		var material := ShaderMaterial.new()
+		material.shader = shader
+		material.set_shader_parameter("beam_color", rig[1])
+		material.set_shader_parameter("beam_length", BEAM_LENGTH)
+		material.set_shader_parameter("haze_noise", noise)
+		var beam := MeshInstance3D.new()
+		beam.mesh = cone
+		beam.material_override = material
+		beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		# Apex at the fixture, cone opening along the pivot's -Z.
+		beam.rotation.x = PI / 2.0
+		beam.position = Vector3(0, 0, -BEAM_LENGTH / 2.0)
+		pivot.add_child(beam)
+		beams.append(pivot)
+	_animate_beams(0.0, false)
+
+
+static func beam_target(rig: Array, t: float, sweeping: bool, focus: Vector3) -> Vector3:
+	if not sweeping:
+		return rig[2]
+	var centre: Vector3 = rig[3]
+	var reach: Vector2 = rig[4]
+	var phase: float = rig[5]
+	var roam := centre + Vector3(
+		sin(t * 0.47 + phase) * reach.x + sin(t * 1.13 + phase * 1.7) * 0.6,
+		0.0,
+		cos(t * 0.31 + phase * 0.8) * reach.y)
+	# Every so often all fixtures converge on the fighter, then fan out again.
+	var gather := smoothstep(0.55, 0.95, sin(t * 0.16 + 1.2))
+	return roam.lerp(focus, gather)
+
+
+func _animate_beams(t: float, sweeping: bool) -> void:
+	var focus := Vector3(hero.position.x, 1.0, hero.position.z) if hero != null else Vector3(0, 1, 0)
+	for i in beams.size():
+		var rig: Array = BEAM_RIGS[i]
+		var source: Vector3 = rig[0]
+		var dir := beam_target(rig, t, sweeping, focus) - source
+		var up := Vector3.BACK if absf(dir.normalized().y) > 0.99 else Vector3.UP
+		(beams[i] as Node3D).look_at_from_position(source, source + dir, up)
 
 
 func _mist_system(extents: Vector3, at: Vector3, rate: float, life: float, size: float, alpha: float, tint: Color, drift: Vector3) -> GPUParticles3D:
@@ -407,6 +516,7 @@ func reset_for_next_bout(asset: String) -> void:
 	excitement = 0.15
 	_last_crowd_time = null
 	_animate_crowd(0.0, true)
+	_animate_beams(0.0, false)
 	choreographer.reset()
 	choreographer.rest_pose()
 
@@ -452,6 +562,7 @@ func render_title(time: float, reduced: bool) -> void:
 	hero.position = Vector3(0, 0, 0.85 if portrait else 0.55)
 	hero.rotation = Vector3(0, PI / 9.0, 0)
 	_animate_crowd(time, reduced)
+	_animate_beams(time, not reduced)
 
 
 func begin_career_victory(reduced: bool) -> void:
@@ -475,6 +586,7 @@ func render_career_victory(time: float, reduced: bool) -> void:
 	_set_mist_paused(reduced)
 	hero.pose_victory(time, reduced)
 	_animate_crowd(time, reduced)
+	_animate_beams(time, not reduced)
 
 
 ## Render one frame of a bout. `frame_delta` advances the presentation clock.
