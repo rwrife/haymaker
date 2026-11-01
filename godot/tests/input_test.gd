@@ -106,5 +106,19 @@ func _run() -> void:
 	check(focused().contains("RING THE BELL"), "next introduction focuses ring the bell")
 	check(shows("CHALLENGER STATS"), "versus shows the challenger stats")
 	check(game.prize_tokens() == 1, "tokens carry into the next fight unspent")
+	check(main.title_music_player != null and main.title_music_player.stream != null,
+		"title music player is initialized with stream")
+	main.session_reset()
+	check(main.title_music_player.playing, "title music plays on home screen")
+	main.start_bout()
+	check(not main.title_music_player.playing, "title music stops during bout")
+	main.session_reset()
+	check(main.title_music_player.playing, "title music resumes after returning home")
+	game.music_enabled = false
+	main._update_title_music()
+	check(not main.title_music_player.playing, "disabling music setting stops player")
+	game.music_enabled = true
+	main._update_title_music()
+	check(main.title_music_player.playing, "re-enabling music setting resumes player")
 	print("%d input failures" % fails)
 	quit(1 if fails > 0 else 0)
