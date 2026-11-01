@@ -36,6 +36,34 @@ Prompt:
 
 ## Godot 3D assets
 
+### Title music
+
+`godot/assets/music/title_intro.mp3` is the unchanged user-supplied song
+`Brisk_Tread_2026-11-01T164909.mp3`, received November 1, 2026. It replaces the
+previous intro recording, loops on the title screen, and retains the existing
+Music toggle and stop-on-bout behavior. The original author and licence were
+not supplied.
+
+### Crowd ambience
+
+`godot/assets/audio/boxing_crowd.mp3` is the unchanged user-supplied recording
+`crowd_at_a_boxing_ma_#2-1793551075650.mp3`, received November 1, 2026.
+The game loops it at -12 dB through one application-shell audio player,
+independent of title music and arena resets. No external audio was downloaded
+or generated for this integration; the recording's original author and licence
+were not supplied.
+
+`godot/assets/audio/punch_crowd.wav` derives from the second user-supplied
+recording, `crowd_at_a_boxing_ma_#4-1793551094650.mp3`, received the same day.
+Only seconds 3 through 9 are included, with linear amplitude multiplied by 1.5
+(50% gain). It is stored as six seconds of 48 kHz stereo 16-bit PCM; the boosted
+excerpt peaks at -9 dB, without clipping. The original author and licence were
+not supplied. The offline conversion used FFmpeg:
+
+```sh
+ffmpeg -ss 3 -i "crowd_at_a_boxing_ma_#4-1793551094650.mp3" -t 6 -af "volume=1.5" -c:a pcm_s16le punch_crowd.wav
+```
+
 Eleven user-supplied character models are archived in [`Models`](Models/README.md): Mack, Goldie Voltage, Nico “Nightshift” Navarro, Bruiser Baxter, Atlas “Undertow” Reed, Duke Doubletake, Sylvie “Slipstream” Sloane, Cassian “Saint” Sterling, Vera Velvet, Jaison “Black Tie” Mercer, and Hunter “Redline” Mercer. Ten supplied 2D portraits are archived in [`IntroScenes`](IntroScenes/README.md) and bundled for pre-fight versus introductions. Eleven "just lost the fight" portraits, one for each character including Mack, are archived in [`DefeatedPortraits`](DefeatedPortraits/README.md) and copied unchanged into `godot/assets/portraits/`. Wins show the defeated opponent; losses show Mack. Intro and defeated portraits open zoomed 2× on the head and ease out to 1.5×. The career finale uses Mack's existing 3D victory animation, not a new asset. See [character backstories](character-backstories.md) for story direction for all eleven characters, including the player and final boss.
 
 The eleven supplied OBJ sculpts in `ArtDirection/Models` are the character source assets.

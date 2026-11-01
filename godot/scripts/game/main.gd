@@ -16,11 +16,15 @@ const MOBILE_CANVAS_SIZE := Vector2i(430, 430)
 const MENU_MAX := Vector2(640, 720)
 const HUD_MAX_WIDTH := 960.0
 const MIN_SCREEN_WIDTH := 0.3
+const CROWD_AUDIO: AudioStreamMP3 = preload("res://assets/audio/boxing_crowd.mp3")
+const PUNCH_CROWD_AUDIO: AudioStreamWAV = preload("res://assets/audio/punch_crowd.wav")
+const TITLE_MUSIC: AudioStreamMP3 = preload("res://assets/music/title_intro.mp3")
 
 var arena: Arena
 var layer: CanvasLayer
 var ui: Control
 var title_music_player: AudioStreamPlayer = null
+var crowd_audio_player: AudioStreamPlayer
 
 var engine: FightEngine = null
 var input_log: Array = []
@@ -51,6 +55,13 @@ var _swipe_start = null
 
 
 func _ready() -> void:
+	crowd_audio_player = AudioStreamPlayer.new()
+	crowd_audio_player.name = "CrowdAudioPlayer"
+	crowd_audio_player.process_mode = Node.PROCESS_MODE_ALWAYS
+	crowd_audio_player.stream = CROWD_AUDIO
+	crowd_audio_player.volume_db = -12.0
+	add_child(crowd_audio_player)
+	crowd_audio_player.play()
 	arena = Arena.new(true)
 	add_child(arena)
 	layer = CanvasLayer.new()
@@ -69,10 +80,7 @@ func _ready() -> void:
 	layer.add_child(ui)
 	title_music_player = AudioStreamPlayer.new()
 	title_music_player.name = "TitleMusicPlayer"
-	# ponytail: single title music loop; add dynamic crossfades when fight BGM is staged.
-	var stream = load("res://assets/music/title_intro.ogg")
-	if stream != null:
-		title_music_player.stream = stream
+	title_music_player.stream = TITLE_MUSIC
 	add_child(title_music_player)
 	_update_title_music()
 	register_input_actions()
@@ -199,6 +207,7 @@ func _process(_delta: float) -> void:
 		var e: Dictionary = events[i]
 		match e.type:
 			"landed":
+				_play_punch_crowd()
 				var mine: bool = e.by == HM.Who.PLAYER
 				feedback = ("COUNTER!" if e.counter else "CLEAN HIT!") if mine else "HIT!"
 				feedback_color = GOLD if mine else RED
@@ -234,6 +243,16 @@ func _process(_delta: float) -> void:
 		Game.haptic(1.0 if value == 1 else 0.6)
 	last_knockdown_value = value
 	_update_match_ui()
+
+
+func _play_punch_crowd() -> void:
+	var player := AudioStreamPlayer.new()
+	player.name = "PunchCrowdPlayer"
+	player.process_mode = Node.PROCESS_MODE_ALWAYS
+	player.stream = PUNCH_CROWD_AUDIO
+	player.finished.connect(player.queue_free)
+	add_child(player)
+	player.play()
 
 
 func _advance() -> void:
