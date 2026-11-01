@@ -25,6 +25,8 @@ The Godot arena uses real 3D meshes and an authoritative deterministic engine. A
 
 The stands hold 105 rigged spectators: four Tripo3D-generated bodies in ten outfits. Independent schedules drive sitting, clapping, yelling and cheering; heavy blows and knockdowns excite the crowd without affecting fight randomness. Reduced Motion pauses ambient crowd movement.
 
+Four show spotlights hang above the arena. Each has a hazy beam that softens at its edges and light that reaches the ring and crowd. On the title and victory screens they sweep the ring and stands like a pre-fight walkout, periodically converging on Mack. During bouts and with Reduced Motion, they hold still and aim into the stands.
+
 ## Overview
 
 Every fight is a boss fight: an original opponent with readable tells, guards, feints and a rhythm to learn. The core loop is short, one-handed and score-attack friendly: pick a bout, read the telegraphs, land combos, dodge and beat your own record.
