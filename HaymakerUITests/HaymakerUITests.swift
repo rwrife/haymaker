@@ -4,7 +4,7 @@ final class HaymakerUITests: XCTestCase {
     @MainActor
     func testAdaptiveControlsStayInsideWindowAfterRotation() {
         let app = XCUIApplication()
-        app.launchArguments = ["-haymakerUITestIsolatedStore", "-controlStyle", "Two hands"]
+        app.launchArguments = ["-haymakerUITestIsolatedStore", "-haymakerUITestFreezeBout", "-controlStyle", "Two hands"]
         app.launch()
         defer { XCUIDevice.shared.orientation = .portrait }
         app.buttons["bout.start"].tap()

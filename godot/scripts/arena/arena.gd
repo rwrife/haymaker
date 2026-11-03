@@ -343,6 +343,10 @@ void fragment() {
 """
 const BEAM_LENGTH := 18.0
 const BEAM_HALF_ANGLE := 6.0
+## Show lights sweep at half the title-screen pace during a bout.
+const FIGHT_BEAM_SPEED := 0.5
+## Only the overhead pair (the first two rigs) stays lit during a bout.
+const FIGHT_BEAM_COUNT := 2
 
 ## source, colour, resting aim (used in bouts and with Reduced Motion), sweep
 ## centre, sweep extents and phase for each fixture.
@@ -421,14 +425,19 @@ static func beam_target(rig: Array, t: float, sweeping: bool, focus: Vector3) ->
 	return roam.lerp(focus, gather)
 
 
-func _animate_beams(t: float, sweeping: bool) -> void:
-	var focus := Vector3(hero.position.x, 1.0, hero.position.z) if hero != null else Vector3(0, 1, 0)
+func _animate_beams(t: float, sweeping: bool, focus_at = null, count: int = BEAM_RIGS.size()) -> void:
+	var focus: Vector3 = focus_at if focus_at != null else \
+		(Vector3(hero.position.x, 1.0, hero.position.z) if hero != null else Vector3(0, 1, 0))
 	for i in beams.size():
+		var pivot := beams[i] as Node3D
+		pivot.visible = i < count
+		if not pivot.visible:
+			continue
 		var rig: Array = BEAM_RIGS[i]
 		var source: Vector3 = rig[0]
 		var dir := beam_target(rig, t, sweeping, focus) - source
 		var up := Vector3.BACK if absf(dir.normalized().y) > 0.99 else Vector3.UP
-		(beams[i] as Node3D).look_at_from_position(source, source + dir, up)
+		pivot.look_at_from_position(source, source + dir, up)
 
 
 func _mist_system(extents: Vector3, at: Vector3, rate: float, life: float, size: float, alpha: float, tint: Color, drift: Vector3) -> GPUParticles3D:
@@ -497,7 +506,7 @@ func _set_mist_paused(paused: bool) -> void:
 
 # MARK: - Scene states
 
-func reset_for_next_bout(asset: String) -> void:
+func reset_for_next_bout(asset: String, reduced: bool = true) -> void:
 	if asset != "" and rival.rig.name != asset:
 		rival.queue_free()
 		stage.remove_child(rival)
@@ -516,9 +525,13 @@ func reset_for_next_bout(asset: String) -> void:
 	excitement = 0.15
 	_last_crowd_time = null
 	_animate_crowd(0.0, true)
-	_animate_beams(0.0, false)
 	choreographer.reset()
 	choreographer.rest_pose()
+	_animate_beams(0.0, not reduced, _beam_focus(), FIGHT_BEAM_COUNT)
+
+
+func _beam_focus() -> Vector3:
+	return Vector3(choreographer.ring_center.x, 1.0, choreographer.ring_center.z)
 
 
 func _clear_effects() -> void:
@@ -615,6 +628,7 @@ func render(fight: FightEngine, reduced: bool, frame_delta: float, tick_fraction
 					_trail(pos)
 	_update_camera(now, dt, reduced)
 	_animate_crowd(now, reduced)
+	_animate_beams(now * FIGHT_BEAM_SPEED, not reduced, _beam_focus(), FIGHT_BEAM_COUNT)
 
 
 func _update_camera(t: float, elapsed: float, reduced: bool) -> void:

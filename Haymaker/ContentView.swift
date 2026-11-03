@@ -957,6 +957,12 @@ struct ContentView: View {
             scene.render(session.engine, reducedMotion: effectiveReducedMotion, highContrast: colorblindCues, frameDelta: elapsed)
             return
         }
+        // ponytail: rotation journey freezes engine ticks only; live bouts still advance.
+        guard !ProcessInfo.processInfo.arguments.contains("-haymakerUITestFreezeBout") else {
+            scene.render(session.engine, reducedMotion: effectiveReducedMotion, highContrast: colorblindCues,
+                         frameDelta: elapsed, tickFraction: tickAccumulator * 60)
+            return
+        }
         tickAccumulator += elapsed
         while tickAccumulator >= 1.0 / 60.0 {
             session.advance()
