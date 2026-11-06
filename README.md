@@ -68,6 +68,8 @@ Absolute desktop panel ceilings at maximum zoom are 1280 pixels wide for home ac
 
 Mobile uses a separate rule based on the platform, not its pixel resolution: a 430-unit logical canvas scales to the screen and expands with its aspect ratio. Mobile menus retain their screen-filling layouts, scrolling and safe-area padding instead of applying desktop pixel limits, so high-resolution phones do not get tiny desktop controls.
 
+The home and career settings buttons use a centred gear icon with a 44-unit hit target, independent of system-font glyph alignment.
+
 | Input | Fight controls | Menus |
 |---|---|---|
 | Keyboard | Space/J jab; Left/A/K hook; Up/W/I uppercut; Right/D/L dodge; Down/S guard; Shift/P parry; Esc pause | Arrows move focus; Enter/Space select; Esc back |

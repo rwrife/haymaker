@@ -16,6 +16,7 @@ const MOBILE_CANVAS_SIZE := Vector2i(430, 430)
 const MENU_MAX := Vector2(640, 720)
 const HUD_MAX_WIDTH := 960.0
 const MIN_SCREEN_WIDTH := 0.3
+const SETTINGS_ICON: Texture2D = preload("res://assets/ui/settings.svg")
 const CROWD_AUDIO: AudioStreamMP3 = preload("res://assets/audio/boxing_crowd.mp3")
 const PUNCH_CROWD_AUDIO: AudioStreamWAV = preload("res://assets/audio/punch_crowd.wav")
 const TITLE_MUSIC: AudioStreamMP3 = preload("res://assets/music/title_intro.mp3")
@@ -908,8 +909,12 @@ func _vertical_gradient(colors: Array, offsets: Array) -> GradientTexture2D:
 
 
 func settings_button() -> Button:
-	var b := btn("⚙", func(): _open_modal("settings"), Color(1, 1, 1, 0.1), Color.WHITE, sys_font(), 20, 44, Color(0, 0, 0, 0), 10)
+	var b := btn("", func(): _open_modal("settings"), Color(1, 1, 1, 0.1), Color.WHITE, sys_font(), 20, 44, Color(0, 0, 0, 0), 10)
 	b.custom_minimum_size = Vector2(44, 44)
+	b.icon = SETTINGS_ICON
+	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	b.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
+	b.accessibility_name = "Settings"
 	b.tooltip_text = "Settings"
 	return b
 
