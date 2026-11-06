@@ -67,8 +67,12 @@ Mobile uses a separate rule based on the platform, not its pixel resolution: a 4
 | Input | Fight controls | Menus |
 |---|---|---|
 | Keyboard | Space/J jab; Left/A/K hook; Up/W/I uppercut; Right/D/L dodge; Down/S guard; Shift/P parry; Esc pause | Arrows move focus; Enter/Space select; Esc back |
-| Gamepad | A jab; X hook; Y uppercut; B dodge; LB/LT guard; RB/RT parry; Start pause. D-pad also throws hook, uppercut, dodge and guard | D-pad/left stick move focus; A select; B back |
+| Xbox controller | A jab; X hook; Y uppercut; B dodge; LB/LT guard; RB/RT parry; Menu (Start) pause. D-pad also throws hook, uppercut, dodge and guard | D-pad/left stick move focus; A select; B back |
 | Touch/mouse | On-screen one-thumb/two-handed controls and swipes | On-screen menu controls |
+
+Both touch layouts show keyboard keycaps on desktop. Connecting a controller replaces them with colored Xbox-style A/B/X/Y glyphs and LB/LT, RB/RT and Menu hints; disconnecting the last controller restores keyboard hints. Compact layouts keep these hints visible too. Touch-only mobile keeps its touch labels until a keyboard is used or a controller connects. Trigger squeezes queue one move per press rather than repeating while held.
+
+The Xbox Menu button, Esc or the on-screen pause button opens **Resume bout**, **Settings**, **Return to title** and **Quit game**. Return to title abandons the current bout without deleting saved records; Quit game closes the application.
 
 Fight buttons do not take focus, so a punch cannot activate a menu button. Dual-screen/foldable battle layouts remain a design target: fight stage on one surface and controls on another. No special hardware compatibility is claimed.
 
