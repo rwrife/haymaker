@@ -377,14 +377,16 @@ func _run() -> void:
 	check(not main.paused, "Esc resumes")
 	var game = root.get_node("Game")
 	var defeated: OpponentBook = game.opponent
-	game.bouts = [{"mode": "career", "result": {"opponentID": defeated.id, "outcome": HM.Outcome.PLAYER_WIN_BY_KO,
+	game.bouts = []
+	game._pending = {"mode": "career", "result": {"opponentID": defeated.id, "outcome": HM.Outcome.PLAYER_WIN_BY_KO,
 		"score": {"points": 2691}, "roundsCompleted": 1, "ticksElapsed": 500,
-		"playerStats": {"landed": 9, "thrown": 9, "counters": 4}}}]
+		"playerStats": {"landed": 9, "thrown": 9, "counters": 4, "knockdownsScored": 2, "damageTaken": 0}}}
 	game._ladder_start = 0
-	game.saved = true
-	game.progression.tokens = 1
+	game.saved = false
 	main.engine.phase = HM.Phase.OVER
 	main.engine.outcome = HM.Outcome.PLAYER_WIN_BY_KO
+	game.save(main.engine, [])
+	check(game.tycoon_revealed() and game.next_ladder_book().id == "tycoon", "clean saved win reveals secret as next fight")
 	main.post_bout_elapsed = Arena.RESULTS_DELAY
 	main.replay_matches = true
 	await wait(0.1)
@@ -407,7 +409,8 @@ func _run() -> void:
 	check(focused().begins_with("NEXT FIGHT"), "D-pad up returns to Next fight")
 	await joy(JOY_BUTTON_A)
 	await wait(0.1)
-	check(main.showing_versus and game.opponent.id != defeated.id, "A on Next fight opens the next introduction")
+	check(main.showing_versus and game.opponent.id == "tycoon", "A on Next fight opens Fruit Tycoon's introduction")
+	check(shows("FRUIT TYCOON"), "secret challenger is revealed in the versus dialog")
 	check(focused().contains("RING THE BELL"), "next introduction focuses ring the bell")
 	check(shows("CHALLENGER STATS"), "versus shows the challenger stats")
 	check(game.prize_tokens() == 1, "tokens carry into the next fight unspent")

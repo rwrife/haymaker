@@ -39,6 +39,8 @@ func _init() -> void:
 	test_determinism()
 	test_controls_and_countdown()
 	test_ladder()
+	test_secret_opponent()
+	test_secret_career()
 	test_scoring()
 	test_stamina()
 	test_roster_playable()
@@ -329,13 +331,13 @@ func _pressure(book: OpponentBook) -> float:
 func test_ladder() -> void:
 	for i in 20:
 		var ladder := OpponentBook.random_ladder()
-		expect(ladder.size() == 11, "ladder size")
+		expect(ladder.size() == 10, "ladder size")
 		expect(ladder[-1].id == "baxter", "boss last")
-		expect(ladder.any(func(b): return b.id == "tycoon"), "tycoon shuffled into the ladder")
+		expect(not ladder.any(func(b): return b.id == "tycoon"), "tycoon hidden from the normal ladder")
 	var authored := OpponentBook.authored_ladder()
 	var ids := authored.map(func(b): return b.id)
 	expect(ids == OpponentBook.career_roster().map(func(b): return b.id), "authored order")
-	for book in OpponentBook.career_roster():
+	for book in OpponentBook.all_roster():
 		expect(book.bio() != "" and book.style() != "" and book.taunt() != "", "%s has a profile" % book.id)
 		expect(_pressure(book.scaled(0)) < _pressure(book.scaled(0.5)), "%s harder mid" % book.id)
 		expect(_pressure(book.scaled(0.5)) < _pressure(book.scaled(1)), "%s harder end" % book.id)
@@ -344,6 +346,119 @@ func test_ladder() -> void:
 			for k in book.sequence.size():
 				expect(s.sequence[k].tell >= mini(book.sequence[k].tell, OpponentBook.MIN_TELL), "readable tell")
 				expect(s.sequence[k].damage > 0 or book.sequence[k].damage == 0, "damage kept")
+
+
+func test_secret_opponent() -> void:
+	var result := {"opponentID": "goldie", "outcome": HM.Outcome.PLAYER_WIN_BY_KO,
+		"playerStats": {"knockdownsScored": 2, "damageTaken": 0}}
+	expect(OpponentBook.reveals_tycoon(result), "two knockdowns and no damage reveal tycoon")
+	result.playerStats.knockdownsScored = 3
+	expect(OpponentBook.reveals_tycoon(result), "three knockdowns also qualify")
+	result.playerStats.knockdownsScored = 1
+	expect(not OpponentBook.reveals_tycoon(result), "one knockdown does not qualify")
+	result.playerStats.knockdownsScored = 0
+	expect(not OpponentBook.reveals_tycoon(result), "no knockdowns do not qualify")
+	result.playerStats.knockdownsScored = 2
+	result.playerStats.damageTaken = 1
+	expect(not OpponentBook.reveals_tycoon(result), "even one point of chip damage disqualifies")
+	result.playerStats.damageTaken = 0
+	for outcome in [HM.Outcome.DRAW, HM.Outcome.PLAYER_LOSS_BY_KO, HM.Outcome.PLAYER_LOSS_BY_DECISION]:
+		result.outcome = outcome
+		expect(not OpponentBook.reveals_tycoon(result), "only a win qualifies")
+	result.outcome = HM.Outcome.PLAYER_WIN_BY_DECISION
+	expect(OpponentBook.reveals_tycoon(result), "clean decision win can qualify")
+	result.opponentID = "tycoon"
+	expect(not OpponentBook.reveals_tycoon(result), "tycoon cannot reveal himself")
+	expect(OpponentBook.by_id("tycoon").id == "tycoon", "secret book remains addressable")
+	expect(not OpponentBook.career_roster().any(func(b): return b.id == "tycoon"), "sparring roster hides tycoon")
+
+
+func secret_session() -> Node:
+	var game := preload("res://scripts/game/game.gd").new()
+	game._records_path = ""
+	game.history_loaded = true
+	game.ladder = OpponentBook.authored_ladder()
+	game.opponent = game.ladder[0]
+	return game
+
+
+func save_clean_win(game: Node, book: OpponentBook) -> void:
+	var config := FightEngine.Config.make(1, 2000, 0)
+	config.max_knockdowns = 2
+	config.knockdown_threshold = 8
+	config.knockdown_ticks = 1
+	var harmless := OpponentBook.new(book.id, book.name,
+		[OpponentBook.entry(HM.Move.FEINT, 100, 0, 100, 0, 0)])
+	var engine := FightEngine.new(config, 42, harmless)
+	var inputs := []
+	while not engine.is_over() and inputs.size() < config.hard_tick_cap():
+		inputs.append(HM.Cmd.JAB)
+		engine.tick(HM.Cmd.JAB)
+	expect(engine.player_stats.knockdowns_scored == 2 and engine.player_stats.damage_taken == 0,
+		"secret fixture produces exactly two clean knockdowns")
+	game.save(engine, inputs)
+
+
+func test_secret_career() -> void:
+	var game := secret_session()
+	expect(not game.tycoon_revealed() and not game.is_unlocked("tycoon"), "secret starts locked")
+	expect(not game.record_roster().any(func(b): return b.id == "tycoon"), "fresh records hide secret")
+	expect(not game.begin(OpponentBook.tycoon(), "career"), "cannot begin unrevealed bonus")
+	expect(not game.begin(OpponentBook.tycoon(), "sparring"), "cannot spar with secret")
+	var opener: OpponentBook = game.ladder[0]
+	var next: OpponentBook = game.ladder[1]
+	expect(game.begin(opener, "career"), "begin qualifying career bout")
+	game._records_path = "user://missing-secret-test-directory/bouts.jsonl"
+	save_clean_win(game, opener)
+	expect(not game.saved and game.has_unsaved_result and not game.tycoon_revealed(),
+		"failed save cannot reveal bonus")
+	expect(not game.new_ladder(), "unsaved result cannot be discarded by new ladder")
+	game._records_path = ""
+	save_clean_win(game, opener)
+	expect(game.saved and game.tycoon_revealed() and game.ladder.size() == 11, "retry save reveals once")
+	expect(game.next_ladder_book().id == "tycoon" and game.ladder[2] == next, "bonus is next without rescaling others")
+	expect(not game.is_unlocked(next.id), "bonus gates remaining career")
+	expect(game.prize_tokens() == 1 and Attributes.total(game.progression.attributes_for("tycoon")) == 1,
+		"qualifying win rewards player and trains bonus")
+	expect(game.record_roster().any(func(b): return b.id == "tycoon"), "revealed bonus appears in records")
+	save_clean_win(game, opener)
+	expect(game.bouts.size() == 1 and game.ladder.size() == 11, "repeated save is idempotent")
+	expect(game.begin(opener, "career"), "qualifying rematch allowed")
+	save_clean_win(game, opener)
+	expect(game.ladder.size() == 11 and game.prize_tokens() == 1, "rematch cannot repeat reveal or prize")
+	expect(game.begin(game.next_ladder_book(), "career"), "revealed bonus can begin")
+	var loss := FightEngine.new(FightEngine.Config.make(1, 600, 0), 42, OpponentBook.tycoon())
+	while not loss.is_over():
+		loss.tick(HM.Cmd.NONE)
+	game.save(loss, [])
+	expect(not HM.is_player_win(loss.outcome) and game.next_ladder_book().id == "tycoon"
+		and not game.ladder_complete(), "lost bonus stays available")
+	expect(game.begin(game.next_ladder_book(), "career"), "bonus can be retried after loss")
+	save_clean_win(game, OpponentBook.tycoon())
+	expect(game.next_ladder_book().id == next.id and game.ladder.size() == 11, "bonus win resumes normal ladder")
+	expect(game.prize_tokens() == 2, "first bonus win earns normal nonfinal prize")
+	expect(game.new_ladder() and not game.tycoon_revealed() and game.ladder.size() == 10, "new ladder hides bonus again")
+	expect(not game.is_unlocked("tycoon") and game.record_roster().any(func(b): return b.id == "tycoon"),
+		"new ladder keeps historical records, not access")
+	game.free()
+
+	game = secret_session()
+	game.ladder = [OpponentBook.baxter().scaled(1.0)]
+	expect(game.begin(game.ladder[0], "career"), "begin final regular bout")
+	save_clean_win(game, game.opponent)
+	expect(not game.can_celebrate_victory() and game.next_ladder_book().id == "tycoon",
+		"qualifying final boss win delays finale")
+	expect(game.begin(game.next_ladder_book(), "career"), "begin final bonus")
+	save_clean_win(game, game.opponent)
+	expect(game.can_celebrate_victory() and game.next_ladder_book() == null, "bonus win completes career")
+	expect(game.ladder_summary().wins == 2, "finale includes bonus win")
+	game.free()
+
+	game = secret_session()
+	expect(game.begin(game.opponent, "sparring"), "begin sparring fixture")
+	save_clean_win(game, game.opponent)
+	expect(not game.tycoon_revealed() and game.prize_tokens() == 0, "clean sparring cannot reveal bonus")
+	game.free()
 
 
 func test_scoring() -> void:
@@ -393,7 +508,7 @@ func test_roster_playable() -> void:
 	var inputs := []
 	for i in 600:
 		inputs.append(HM.Cmd.JAB if i % 30 == 0 else HM.Cmd.NONE)
-	for book in OpponentBook.authored_ladder():
+	for book in OpponentBook.authored_ladder() + [OpponentBook.tycoon().scaled(1.0)]:
 		var a := FightEngine.simulate(config, 42, book, inputs)
 		expect(a == FightEngine.simulate(config, 42, book, inputs), "%s replay" % book.id)
 	# Career config: a jab every 20 ticks should finish the bout within cap.

@@ -174,6 +174,15 @@ func is_unlocked(id: String) -> bool:
 	return false
 
 
+func tycoon_revealed() -> bool:
+	return ladder.any(func(b): return b.id == "tycoon")
+
+
+func record_roster() -> Array:
+	return OpponentBook.all_roster().filter(func(b): return b.id != "tycoon" \
+		or tycoon_revealed() or not history(b.id).is_empty())
+
+
 func ladder_complete() -> bool:
 	return history_loaded and ladder.all(func(b): return is_beaten(b.id))
 
@@ -254,6 +263,9 @@ func spend(attribute: String) -> bool:
 func begin(book: OpponentBook, p_mode: String) -> bool:
 	if has_unsaved_result or (p_mode == "career" and not history_loaded):
 		return false
+	if book.id == "tycoon" and (p_mode != "career" or not is_unlocked(book.id)):
+		error = "This opponent is not available for this bout."
+		return false
 	opponent = book
 	mode = p_mode
 	run_id = _uuid() if p_mode == "sparring" else ""
@@ -305,6 +317,12 @@ func save(engine: FightEngine, input_log: Array) -> void:
 	saved = true
 	has_unsaved_result = false
 	error = ""
+	if mode == "career" and not tycoon_revealed() and OpponentBook.reveals_tycoon(won.result):
+		for i in ladder.size():
+			if ladder[i].id == won.result.opponentID:
+				var difficulty := minf(float(i + 1) / float(maxi(1, ladder.size() - 1)), 1.0)
+				ladder.insert(i + 1, OpponentBook.tycoon().scaled(difficulty))
+				break
 	if first_ladder_win:
 		var remaining := ladder.map(func(b): return b.id).filter(func(id): return not is_beaten(id))
 		progression.record_win(remaining, _progression_seed + ladder.size() - remaining.size())
