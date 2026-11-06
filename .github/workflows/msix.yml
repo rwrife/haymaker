@@ -1,0 +1,127 @@
+name: Windows Store build
+
+# Builds the Microsoft Store .msixbundle (x64 + ARM64) and portable zips with
+# scripts/build_msix.ps1. Published releases get the artifacts attached.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Store version (X.Y.Z; revision is always 0)"
+        required: true
+        default: "1.0.0"
+  pull_request:
+    paths:
+      - ".github/workflows/msix.yml"
+      - "scripts/build_msix.ps1"
+      - "scripts/build_msix_assets.py"
+      - "AppStore/Windows/msix/**"
+      - "godot/export_presets.cfg"
+
+concurrency:
+  group: msix-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: "4.7.2"
+
+jobs:
+  msix:
+    name: Build MSIX bundle
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          INPUT: ${{ github.event.inputs.version }}
+        run: |
+          $version = if ($env:TAG) { $env:TAG -replace '^v', '' } elseif ($env:INPUT) { $env:INPUT } else { '0.0.0' }
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Version '$version' must be X.Y.Z" }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Pillow
+        run: python -m pip install --quiet pillow
+
+      - name: Cache Godot
+        id: godot-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/godot
+          key: godot-${{ env.GODOT_VERSION }}-win64-windows-templates
+
+      - name: Download Godot and Windows export templates
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'godot'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          Set-Location $dir
+          $tag = "$env:GODOT_VERSION-stable"
+          $editor = "Godot_v$($tag)_win64.exe.zip"
+          $templates = "Godot_v$($tag)_export_templates.tpz"
+          gh release download $tag --repo godotengine/godot --pattern $editor --pattern $templates --pattern SHA512-SUMS.txt
+          foreach ($file in $editor, $templates) {
+            $expected = (Select-String SHA512-SUMS.txt -Pattern "  $file" -SimpleMatch | Select-Object -First 1).Line.Split(' ')[0]
+            $actual = (Get-FileHash $file -Algorithm SHA512).Hash.ToLower()
+            if ($expected -ne $actual) { throw "Checksum mismatch for $file" }
+          }
+          Expand-Archive $editor -DestinationPath editor
+          # Only the Windows templates are needed; skip the rest of the 1.3 GB archive.
+          tar -xf $templates 'templates/windows_*' 'templates/version.txt'
+          Remove-Item $editor, $templates, SHA512-SUMS.txt
+
+      - name: Install Godot export templates
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'godot'
+          $dest = Join-Path $env:APPDATA "Godot\export_templates\$env:GODOT_VERSION.stable"
+          New-Item -ItemType Directory -Force $dest | Out-Null
+          Copy-Item (Join-Path $dir 'templates\*') $dest
+          $godot = Get-ChildItem (Join-Path $dir 'editor') -Filter '*_console.exe' | Select-Object -First 1
+          "GODOT=$($godot.FullName)" >> $env:GITHUB_ENV
+
+      - name: Import project
+        run: |
+          & $env:GODOT --headless --path godot --editor --import --quit
+          if ($LASTEXITCODE -ne 0) { throw "Godot import failed" }
+
+      - name: Build MSIX bundle
+        run: scripts/build_msix.ps1 -Version ${{ steps.version.outputs.version }}
+
+      - name: Checksums
+        working-directory: godot/builds/store
+        run: |
+          Get-FileHash *.msixbundle, *.zip -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path -Leaf $_.Path)" } |
+            Set-Content SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: haymaker-${{ steps.version.outputs.version }}-windows
+          path: |
+            godot/builds/store/*.msixbundle
+            godot/builds/store/*.zip
+            godot/builds/store/SHA256SUMS.txt
+          retention-days: 30
+
+      - name: Attach to release
+        if: github.event_name == 'release'
+        working-directory: godot/builds/store
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          $files = (Get-ChildItem *.msixbundle, *.zip, SHA256SUMS.txt).FullName
+          gh release upload $env:TAG @files --repo ${{ github.repository }} --clobber

@@ -62,7 +62,7 @@ Engine changes need tests in `godot/tests/run_tests.gd`. Keep the engine determi
 
 ## Pull request review and auto-merge
 
-`.github/workflows/ci.yml` runs only platform-neutral repository checks (fighter asset tests and the signing-material gitignore gate); Swift and iOS CI was removed. It does not run the Godot suites yet, so run them locally and report the results. Do not bypass or weaken checks to merge.
+`.github/workflows/ci.yml` runs only platform-neutral repository checks (fighter asset tests and the signing-material gitignore gate); Swift and iOS CI was removed. `.github/workflows/msix.yml` builds the Microsoft Store `.msixbundle` on Windows for published releases, manual runs and PRs that touch Windows packaging. Neither workflow runs the Godot suites yet, so run them locally and report the results. Do not bypass or weaken checks to merge.
 
 A PR is **clean** when all of the following hold:
 

@@ -120,6 +120,11 @@ This exports both Windows presets and writes an unsigned
 `godot/builds/store/`. Upload the bundle in Partner Center (Store ID
 `9NHMLZ8842DJ`); the Store signs it. Bump `-Version` for every submission.
 
+The **Windows Store build** GitHub Action (`.github/workflows/msix.yml`) runs the
+same script on a Windows runner. Publishing a GitHub release tagged `vX.Y.Z`
+builds version `X.Y.Z` and attaches the bundle, zips and `SHA256SUMS.txt` to
+the release; it can also be run manually from the Actions tab with a version.
+
 ### Architecture and validation
 
 - `godot/scripts/engine/` owns gameplay state, seeded RNG, opponent books and scoring. Engine changes belong here and in `godot/tests/`, without duplicate implementation work.
@@ -127,7 +132,7 @@ This exports both Windows presets and writes an unsigned
 - `godot/scripts/game/` owns the shell, career progression, settings and local records.
 - Headless tests cover engine regressions and input/UI journeys. They do not establish visual fidelity, physical-device frame rate or store readiness.
 
-Legacy source and Apple project files remain in the repository but are not maintained game targets. `.github/workflows/ci.yml` runs only platform-neutral repository checks; Swift and iOS builds and tests were removed from CI, and Godot suites are not yet run there. Legacy simulator screenshots are not evidence that a Godot export works on iOS.
+Legacy source and Apple project files remain in the repository but are not maintained game targets. `.github/workflows/ci.yml` runs only platform-neutral repository checks and `.github/workflows/msix.yml` builds the Windows Store package; Swift and iOS builds and tests were removed from CI, and Godot suites are not yet run there. Legacy simulator screenshots are not evidence that a Godot export works on iOS.
 
 ## Asset workflow
 
