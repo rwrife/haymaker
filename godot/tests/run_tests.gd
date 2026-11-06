@@ -566,9 +566,12 @@ func test_progression() -> void:
 	capped.record_win(["x"], 2)
 	expect(capped.tokens == 0, "maxed fighter forfeits")
 
-	# Career journey, spending power, dexterity, speed in turn: a jab masher can
-	# take the opener but the matched, trained finale punishes mashing.
-	var ladder := OpponentBook.authored_ladder()
+	# Keep the original eleven-opponent balance fixture, now the bonus route:
+	# removing a training recipient changes the seeded attribute draws.
+	var order := OpponentBook.career_roster()
+	order.insert(order.size() - 1, OpponentBook.tycoon())
+	var ladder := OpponentBook.ladder_stages(order)
+	var journey_ids := ladder.map(func(b): return b.id)
 	var run := Attributes.Progression.new()
 	var jabs := []
 	jabs.resize(FightEngine.Config.career().hard_tick_cap())
@@ -585,7 +588,7 @@ func test_progression() -> void:
 				expect(HM.is_player_win(int(result.outcome)), "jab masher beats the opener")
 			else:
 				expect(not HM.is_player_win(int(result.outcome)), "jab masher loses to trained %s" % ladder[i].id)
-		var remaining := ids.slice(i + 1)
+		var remaining := journey_ids.slice(i + 1)
 		run.record_win(remaining, 0x7EA12026 + ladder.size() - remaining.size())
 	expect(run.tokens == 0 and Attributes.total(run.player) == ladder.size() - 1, "player trained every bout")
 	expect(Attributes.total(run.attributes_for("baxter")) == ladder.size() - 1, "final boss trained after every win")
