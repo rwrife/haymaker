@@ -108,11 +108,11 @@ static func anvil() -> OpponentBook:
 
 
 static func career_roster() -> Array:
-	return [goldie(), nico(), atlas(), vera(), duke(), sylvie(), cassian(), jaison(), hunter(), baxter()]
+	return all_roster().filter(func(b): return b.id != "tycoon")
 
 
 static func all_roster() -> Array:
-	return career_roster() + [tycoon()]
+	return [goldie(), nico(), atlas(), vera(), duke(), sylvie(), cassian(), jaison(), hunter(), tycoon(), baxter()]
 
 
 static func reveals_tycoon(result: Dictionary) -> bool:

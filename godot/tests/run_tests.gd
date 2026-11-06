@@ -568,9 +568,7 @@ func test_progression() -> void:
 
 	# Keep the original eleven-opponent balance fixture, now the bonus route:
 	# removing a training recipient changes the seeded attribute draws.
-	var order := OpponentBook.career_roster()
-	order.insert(order.size() - 1, OpponentBook.tycoon())
-	var ladder := OpponentBook.ladder_stages(order)
+	var ladder := OpponentBook.ladder_stages(OpponentBook.all_roster())
 	var journey_ids := ladder.map(func(b): return b.id)
 	var run := Attributes.Progression.new()
 	var jabs := []
