@@ -1,7 +1,6 @@
 """HMR2 fighter asset checks (stdlib only): byte-exact rebuild from OBJ + skin sidecar, the 22-bone
 skeleton contract, and the skin-weight guarantees the Mixamo animations rely on (rigid gloves, boots
 and head; no weight crossing between the left and right limbs)."""
-import json
 import math
 import re
 import struct
@@ -55,6 +54,14 @@ def weight(row, bone):
 
 def bones_of(row):
     return {j for w, j in zip(row[9:13], row[13:17]) if w > 0}
+
+
+def godot_roster():
+    """(id, asset) pairs from the Godot OpponentBook: career_roster() order, asset() maps baxter to bruiser."""
+    book = (ROOT/'godot'/'scripts'/'engine'/'opponent_book.gd').read_text(encoding='utf-8')
+    roster = re.search(r'func career_roster\(\) -> Array:\s*return \[([^\]]+)\]', book).group(1)
+    ids = re.findall(r'(\w+)\(\)', roster)
+    return [(i, 'bruiser' if i == 'baxter' else i) for i in ids]
 
 
 class FighterAssetsTests(unittest.TestCase):
@@ -126,13 +133,13 @@ class FighterAssetsTests(unittest.TestCase):
                 texture_payload('test', path)
 
     def test_roster_asset_contract(self):
-        roster = (ROOT/'Packages'/'HaymakerKit'/'Sources'/'HaymakerKit'/'CharacterRoster.swift').read_text()
-        pairs = set(re.findall(r'case "([^"]+)":\s*CharacterProfile\(asset: "([^"]+)"', roster))
+        pairs = set(godot_roster())
         pairs.add(('mack', 'mack'))  # Mack is the player, outside the opponent roster.
         self.assertEqual(pairs, {
             ('mack', 'mack'), ('goldie', 'goldie'), ('nico', 'nico'),
             ('atlas', 'atlas'), ('vera', 'vera'), ('duke', 'duke'),
             ('sylvie', 'sylvie'), ('cassian', 'cassian'), ('baxter', 'bruiser'), ('jaison', 'jaison'), ('hunter', 'hunter'),
+            ('tycoon', 'tycoon'),
         })
         committed = set(subprocess.check_output(
             ['git', 'ls-files', 'Haymaker/Models/*.fighter'], cwd=ROOT, text=True
@@ -142,6 +149,9 @@ class FighterAssetsTests(unittest.TestCase):
                 path = f'Haymaker/Models/{asset}.fighter'
                 self.assertIn(path, committed)
                 self.assertTrue((ROOT/path).is_file())
+                for suffix in ('.fighter', '.fighteruv', '-basecolor.jpg'):
+                    runtime = ROOT/'godot'/'assets'/'models'/f'{asset}{suffix}'
+                    self.assertEqual(runtime.read_bytes(), (ROOT/'Haymaker'/'Models'/f'{asset}{suffix}').read_bytes())
         self.assertEqual(committed, {f'Haymaker/Models/{name}.fighter' for name in NAMES})
 
     def test_rebuild_is_byte_identical(self):
@@ -152,20 +162,17 @@ class FighterAssetsTests(unittest.TestCase):
                                 f'{name}.fighter is stale: run python3 scripts/rig_fighters.py')
 
     def test_defeated_portraits_cover_the_story_roster(self):
-        roster = (ROOT/'Packages'/'HaymakerKit'/'Sources'/'HaymakerKit'/'CharacterRoster.swift').read_text()
-        assets = set(re.findall(r'CharacterProfile\(asset: "([^"]+)"', roster))
-        catalog = ROOT/'Haymaker'/'Assets.xcassets'
-        self.assertEqual({p.stem.removesuffix('-defeated') for p in catalog.glob('*-defeated.imageset')}, assets)
+        assets = {asset for _, asset in godot_roster()}
+        portraits = ROOT/'godot'/'assets'/'portraits'
+        self.assertEqual({p.stem.removesuffix('-defeated') for p in portraits.glob('*-defeated.png')} - {'mack'}, assets)
         for asset in assets:
             with self.subTest(asset=asset):
                 filename = f'{asset}-defeated.png'
-                imageset = catalog/f'{asset}-defeated.imageset'
-                contents = json.loads((imageset/'Contents.json').read_text())
-                self.assertEqual(contents['images'], [{'filename': filename, 'idiom': 'universal'}])
-                data = (imageset/filename).read_bytes()
+                data = (portraits/filename).read_bytes()
                 self.assertEqual(data, (ROOT/'ArtDirection'/'DefeatedPortraits'/filename).read_bytes())
                 self.assertEqual(data[:8], b'\x89PNG\r\n\x1a\n')
                 self.assertEqual(struct.unpack_from('>II', data, 16), (1024, 1536))
+                self.assertTrue((portraits/f'{asset}-intro.png').is_file())
 
     def test_header_and_skeleton(self):
         self.assertEqual(BONES, SPEC_BONES)

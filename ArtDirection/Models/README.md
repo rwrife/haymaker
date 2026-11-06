@@ -14,6 +14,7 @@ These ten OBJ files were supplied by the user for character integration. The ori
 | `cassian.obj` | Cassian “Saint” Sterling | 21,215 | 23,190 |
 | `vera.obj` | Vera Velvet | 21,821 | 22,492 |
 | `jaison.obj` | Jaison “Black Tie” Mercer | 4,824 | 9,644 |
+| `tycoon.obj` | Fruit Tycoon (Cyrus Pomeroy) | 9,770 | 19,559 |
 
 The files are preserved byte-for-byte from the supplied exports. Their headers identify Blender 5.0.1. Vertex records include RGB colors; there are no external material-library references, UV coordinates, or exported normals. The offline rig builder preserves vertex colors and generates area-weighted smooth normals. OBJ does not carry a skeletal rig or animation, so T-pose alone does not make these assets animation-ready. The runtime exports normalize each sculpt to 2.7 scene units, preserve Y-up/+Z-front orientation, and skin it to the shared Mixamo-compatible 22-bone skeleton described in [`../Rigs`](../Rigs/README.md).
 
@@ -128,9 +129,22 @@ Jaison’s source is the user-supplied `jaison.obj`. It has 4,824 colored vertic
 
 User-supplied original character assets received October 19, 2026: `hunter.obj`, `hunter.png` (versus portrait), and `hunter-defeated.png` (bundled unchanged for victory results). The OBJ is rigged with the existing offline pipeline; runtime uses the generated `hunter.fighter`. No external stock assets.
 
+## Fruit Tycoon (Cyrus Pomeroy)
+
+User-supplied original Tripo3D T-pose export (`boxer_character_3d_model.obj`, `.mtl`, 4096² base-color JPEG, plus metallic, roughness and normal maps), received with his intro and defeated portraits. `tycoon.zip` preserves the supplied OBJ, MTL and base-color JPEG byte-for-byte; the metallic, roughness and normal maps (about 21 MB) are not archived because the runtime uses base colour only. The base colour is intentionally greyscale: per the user, the colourless look depicts how evil he is, so it is not recoloured.
+
+`tycoon.obj` is the rig source derived by `scripts/bake_obj_vertex_colors.py`. It keeps the supplied export's exact position tokens, vertex order and triangle faces, and adds each vertex's mean bilinear base-colour sample over its UV corners as the vertex-colour fallback:
+
+```sh
+python3 scripts/bake_obj_vertex_colors.py --name tycoon \
+  --obj boxer_character_3d_model.obj --basecolor boxer_character_3d_model_basecolor.jpg
+```
+
+The sculpt is 9,770 vertices and 19,559 triangles, Y-up and +Z front. His long sleeves need a cuff-detection rule; see [`../Rigs`](../Rigs/README.md).
+
 ## Fighter texture fidelity
 
-All eleven fighters use the original base-color JPEGs from supplied model exports. `python3 scripts/rig_fighters.py` verifies exact position and face correspondence, then generates `.fighteruv` seam mappings and `-basecolor.jpg` images alongside the unchanged `.fighter` rigs. UV seams duplicate render vertices with identical normals and skin weights; contact geometry stays unchanged. Textured meshes use white vertex colors to avoid multiplying the original paint into the texture a second time. The vertex-colored mesh remains available as a fallback if texture resources are missing or malformed. No new external art or generated detail is introduced.
+All twelve fighters use the original base-color JPEGs from supplied model exports. `python3 scripts/rig_fighters.py` verifies exact position and face correspondence, then generates `.fighteruv` seam mappings and `-basecolor.jpg` images alongside the unchanged `.fighter` rigs. UV seams duplicate render vertices with identical normals and skin weights; contact geometry stays unchanged. Textured meshes use white vertex colors to avoid multiplying the original paint into the texture a second time. The vertex-colored mesh remains available as a fallback if texture resources are missing or malformed. No new external art or generated detail is introduced.
 
 The runtime consumes base color; additional material maps supplied for Jaison are not yet wired into this pipeline. Missing or malformed UV sidecars retain the vertex-colored mesh. Run `python3 scripts/test_rig_fighters.py` to check byte-exact texture regeneration, UV seams and triangle correspondence as well as rig integrity. The simulator screenshots below are historical asset evidence, not current Godot validation or physical-device performance measurements.
 

@@ -1,6 +1,6 @@
 # Defeated character portraits
 
-Eleven "just lost the fight" portraits, including the user-supplied Hunter portrait. The generated portraits are image edits of each character's existing reference art, so the face, hair, costume colors, gloves, framing and art style carry over. Only the condition and pose change: slumped posture, lowered gloves, swollen eye, split lip, bruising, light blood and scuffed gear. The tone is stylized and not graphic. Each character is isolated on a fully transparent background, so the portrait can be placed directly over any scene. All eleven PNGs are copied unchanged into `godot/assets/portraits/`: wins show the defeated opponent and losses show Mack. Runtime framing opens zoomed 2× on the head and eases out to 1.5×. All ten story opponents, including Hunter, Jaison and Bruiser Baxter, are covered; no defeated portraits are missing.
+Twelve "just lost the fight" portraits, including the user-supplied Hunter and Fruit Tycoon portraits. The generated portraits are image edits of each character's existing reference art, so the face, hair, costume colors, gloves, framing and art style carry over. Only the condition and pose change: slumped posture, lowered gloves, swollen eye, split lip, bruising, light blood and scuffed gear. The tone is stylized and not graphic. Each character is isolated on a fully transparent background, so the portrait can be placed directly over any scene. All twelve PNGs are copied unchanged into `godot/assets/portraits/`: wins show the defeated opponent and losses show Mack. Runtime framing opens zoomed 2× on the head and eases out to 1.5×. All eleven story opponents, including Hunter, Jaison, Fruit Tycoon and Bruiser Baxter, are covered; no defeated portraits are missing.
 
 | Character | Portrait | Edited from |
 | --- | --- | --- |
@@ -15,6 +15,7 @@ Eleven "just lost the fight" portraits, including the user-supplied Hunter portr
 | Bruiser Baxter, the final boss | [bruiser-defeated.png](bruiser-defeated.png) | [`../IntroScenes/bruiser.png`](../IntroScenes/bruiser.png) |
 | Jaison “Black Tie” Mercer | [jaison-defeated.png](jaison-defeated.png) | [`../IntroScenes/jaison.png`](../IntroScenes/jaison.png) |
 | Hunter “Redline” Mercer | [hunter-defeated.png](hunter-defeated.png) | User-supplied original defeat portrait |
+| Fruit Tycoon | [tycoon-defeated.png](tycoon-defeated.png) | User-supplied original defeat portrait (`Defeated Boxer Character Render.png`) |
 
 ## Provenance
 

@@ -21,7 +21,7 @@ ArtDirection/Models/<name>.obj + <name>.skin ──(python3 scripts/rig_fighters
 Run both steps from the repo root:
 
 ```sh
-# 1. Fit joints and compute weights (headless Blender 5.x; about 15 s for all ten).
+# 1. Fit joints and compute weights (headless Blender 5.x; about 20 s for all twelve).
 /Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup \
     --python scripts/blender/autorig.py -- [mack bruiser ...] [--out ArtDirection/Rigs] [--fbx-dir ~/Downloads]
 
@@ -32,7 +32,7 @@ python3 scripts/rig_fighters.py [names] [--output Haymaker/Models] [--rigs ArtDi
 python3 scripts/test_rig_fighters.py
 ```
 
-- With no names, both scripts process all ten boxers (`NAMES` in `scripts/rig_fighters.py` and
+- With no names, both scripts process all twelve boxers (`NAMES` in `scripts/rig_fighters.py` and
   `scripts/blender/autorig_common.py`; add new fighters to both).
 - Both steps are deterministic: re-running them produces byte-identical files.
 - CI does not run Blender. It re-packs every `.fighter` from the committed OBJ and `.skin` and requires a
@@ -50,7 +50,7 @@ Conventions are Mixamo's: Y-up, +Z front, and `Left*` bones on the character's a
   - His legs are the exception. Mixamo put the knees, ankles and toes on the inner surface of the legs,
     so they are re-centred in the limb cross-sections. Heights and depths are kept.
   - Mack's fitted values: LeftLeg x .082, LeftFoot x .117, LeftToeBase (.143, .007, .045).
-- **The other nine** use the same landmarks, measured on each sculpt. Joints are placed at the same
+- **The other eleven** use the same landmarks, measured on each sculpt. Joints are placed at the same
   relative positions as on Mack and centred in the limb cross-sections. Each side is fitted separately.
   - Landmarks: shoulder line, armpit, glove cuff, glove tip, crotch, chin, boot heel/sole/toe and mesh top.
   - The elbow and wrist sit at Mack's fractions of shoulder→cuff and cuff→glove tip. The hand aims at
@@ -63,6 +63,9 @@ Conventions are Mixamo's: Y-up, +Z front, and `Left*` bones on the character's a
     leaves the mid-forearm colour. That puts his cuff at x .35 (left) and .335 (right); the white cuff rim
     is at about .345–.35. These were measured on the supplied colours, before his gloves were repainted
     (white cuff from |x| .342, black glove from .388; see `ArtDirection/Models/README.md`).
+  - Fruit Tycoon (`SLEEVED` in `autorig_joints.py`) wears long black sleeves over the shoulder sample, so
+    the first colour change is the sleeve hem on the upper forearm (x .265). His cuff is instead the darkest
+    slab 0.04–0.09 past the hem: the black binding stripe of the wrist wrap, at x .33 (left) and .335 (right).
 - `<name>.joints.json → notes` records the measured landmarks for review.
 
 ### 2. Bone heat (`scripts/blender/autorig_weights.py`)
@@ -79,7 +82,7 @@ Instead:
    - If a bone is left empty, or more than 2% of vertices get no weight, the whole model falls back to
      inverse-distance-to-bone weights.
    - If only a few vertices get no weight, just those vertices fall back.
-   - `joints.json → heat` records which case applied (`fallback: none` for all ten at present).
+   - `joints.json → heat` records which case applied (`fallback: none` for all twelve at present).
 
 ### 3. Anatomical post-processing (`scripts/blender/autorig_regions.py`)
 
@@ -99,7 +102,7 @@ at the top of the file.
 | Ball of foot | Foot/ToeBase band; the toe cap is rigid `*ToeBase`. | `BALL_BAND` .014 |
 | Clavicles | `*Shoulder` is cleared from the neck, sternum and spine (it would collapse the neck when both arms go up). | — |
 | Neck | Inside the neck cylinder, Neck+Head weight is spread by height from the neck base to the jaw. | — |
-| Head | Rigid `Head` above a jaw plane, within the head's measured half-width. | `JAW_BAND` .014 |
+| Head | Rigid `Head` above a jaw plane, within the head's measured half-width. Hunter's and Tycoon's narrow jaws also pin the central face and cranium rigid (`autorig.py`). | `JAW_BAND` .014 |
 | Trapezius | Behind and beside the head, Head weight fades with distance from the rigid head (for the neckless boxers). | `TRAP_FALLOFF` .07 |
 | Smoothing | Laplacian smoothing over mesh edges; the neck/traps get extra passes, with the rigid head and arms pinned. | `SMOOTH_ITERS` 6, `NECK_SMOOTH_ITERS` 16 |
 | Final | Top 4 influences, descending, weights < 0.01 pruned, renormalised. | `PRUNE` .01 |

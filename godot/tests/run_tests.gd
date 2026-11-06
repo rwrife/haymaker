@@ -129,12 +129,14 @@ func _pressure(book: OpponentBook) -> float:
 func test_ladder() -> void:
 	for i in 20:
 		var ladder := OpponentBook.random_ladder()
-		expect(ladder.size() == 10, "ladder size")
+		expect(ladder.size() == 11, "ladder size")
 		expect(ladder[-1].id == "baxter", "boss last")
+		expect(ladder.any(func(b): return b.id == "tycoon"), "tycoon shuffled into the ladder")
 	var authored := OpponentBook.authored_ladder()
 	var ids := authored.map(func(b): return b.id)
 	expect(ids == OpponentBook.career_roster().map(func(b): return b.id), "authored order")
 	for book in OpponentBook.career_roster():
+		expect(book.bio() != "" and book.style() != "" and book.taunt() != "", "%s has a profile" % book.id)
 		expect(_pressure(book.scaled(0)) < _pressure(book.scaled(0.5)), "%s harder mid" % book.id)
 		expect(_pressure(book.scaled(0.5)) < _pressure(book.scaled(1)), "%s harder end" % book.id)
 		for d in [0.0, 0.5, 1.0]:

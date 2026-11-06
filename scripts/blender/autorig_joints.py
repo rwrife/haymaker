@@ -14,6 +14,8 @@ import numpy as np
 from autorig_common import B, BONES, PARENTS, AIM_CHILD, load_obj, reference_skeleton, surface_samples, triangulate
 
 SIDES = ((1, 'Left'), (-1, 'Right'))
+# Sculpts whose sleeves reach past the shoulder colour sample (Tycoon's turtleneck).
+SLEEVED = ('tycoon',)
 
 
 class Sculpt:
@@ -61,7 +63,14 @@ def landmarks(m):
             mc = np.array([np.linalg.norm(np.median(m.Q[k], 0) - fore) if k.sum() > 20 else np.nan
                            for k in (arm & (sx >= a) & (sx < a + 0.005) for a in xs)])
             cuff = next(float(xs[i]) for i in range(len(xs) - 2) if (mc[i:i + 3] > 0.2).all())
-        tip = float(np.max(s * m.V[(s * m.V[:, 0] > 0.2) & (m.V[:, 1] > 0.6), 0]))
+        if m.name in SLEEVED:
+            # A long sleeve covers the shoulder sample, so the first colour change is the sleeve hem on the
+            # upper forearm. The glove starts at the wrist wrap's dark binding stripe: the darkest slab
+            # 0.04-0.09 past the hem.
+            hem = np.arange(cuff + 0.04, cuff + 0.09, 0.005)
+            lum = [np.median(m.Q[arm & (sx >= a) & (sx < a + 0.005)].mean(1)) for a in hem]
+            cuff = float(hem[int(np.argmin(lum))])
+        tip =  float(np.max(s * m.V[(s * m.V[:, 0] > 0.2) & (m.V[:, 1] > 0.6), 0]))
         foot = (sx > 0) & (y < 0.03)
         L[side] = dict(armpit=armpit, cuff=cuff, tip=tip, heel=float(z[foot].min()), toe=float(z[foot].max()))
     # Chin: the largest forward jump of the front silhouette above the shoulder line.
