@@ -29,6 +29,8 @@ class Config:
 	var knockdown_ticks := 180
 	var block_reduction := 8
 	var parry_window := 6
+	## Damage the player shrugs off from every hit that connects (min 1).
+	var armor := 0
 	var player_table: Dictionary = PLAYER_TABLE.duplicate(true)
 
 	func copy() -> Config:
@@ -113,6 +115,8 @@ var _rng: SeededRNG
 var _next_index := 0
 var _opp_waiting := 0
 var _rest_left := 0
+## Only the first punch to land in each tell is a counter.
+var _tell_countered := false
 
 
 func _init(p_config: Config, p_seed: int, p_book: OpponentBook) -> void:
@@ -121,7 +125,7 @@ func _init(p_config: Config, p_seed: int, p_book: OpponentBook) -> void:
 	book = p_book
 	player.hp = config.max_hp
 	player.stamina = config.max_stamina
-	opponent.hp = config.max_hp
+	opponent.hp = book.max_hp
 	opponent.stamina = config.max_stamina
 	events = [{"type": "roundStart", "tick": 0, "round": 1}]
 	_rng = SeededRNG.new(seed ^ 0x5EED1B0000000000)
@@ -263,6 +267,7 @@ func _advance_opponent_scheduler() -> void:
 		opponent.state_duration = committed.tell
 		opponent.current_move = committed.move
 		opponent.current_damage = committed.damage
+		_tell_countered = false
 		_opp_waiting = _next_gap()
 
 
@@ -318,7 +323,7 @@ func _resolve_opponent_impact() -> void:
 			opponent_stats.whiffed += 1
 			events.append({"type": "parried", "tick": total_ticks, "attacker": HM.Who.OPPONENT, "move": move})
 		HM.State.BLOCKING:
-			var applied := HM.blocked_damage(base, config.block_reduction, move == HM.Move.UPPERCUT)
+			var applied := _soak(HM.blocked_damage(base, config.block_reduction, move == HM.Move.UPPERCUT), config.armor)
 			player_stats.blocks_made += 1
 			player.hp = maxi(0, player.hp - applied)
 			player_stats.damage_taken += applied
@@ -327,11 +332,16 @@ func _resolve_opponent_impact() -> void:
 			if player.hp <= 0:
 				_knock_down(HM.Who.PLAYER, true)
 		_:
+			var punished := book.punish > 0 and (player.state == HM.State.ATTACKING or player.state == HM.State.RECOVERING)
+			if punished:
+				base = Attributes.scaled_ticks(base, 100 + book.punish, 100)
+				opponent_stats.counters += 1
+			base = _soak(base, config.armor)
 			player.hp = maxi(0, player.hp - base)
 			player_stats.damage_taken += base
 			opponent_stats.damage_dealt += base
 			opponent_stats.landed += 1
-			events.append({"type": "landed", "tick": total_ticks, "by": HM.Who.OPPONENT, "move": move, "damage": base, "counter": false})
+			events.append({"type": "landed", "tick": total_ticks, "by": HM.Who.OPPONENT, "move": move, "damage": base, "counter": punished})
 			if player.hp <= 0:
 				_knock_down(HM.Who.PLAYER, true)
 			elif base >= config.knockdown_threshold:
@@ -379,17 +389,25 @@ func _resolve_player_impact() -> void:
 		player_stats.whiffed += 1
 		events.append({"type": "dodged", "tick": total_ticks, "attacker": HM.Who.PLAYER, "move": move})
 		return
-	var is_counter := opponent.state == HM.State.TELLING and opponent.current_move != HM.Move.FEINT
+	var is_counter := opponent.state == HM.State.TELLING and opponent.current_move != HM.Move.FEINT and not _tell_countered
 	var damage := base * config.counter_multiplier if is_counter else base
 	var blocked := false
 	if opponent.state == HM.State.BLOCKING:
 		damage = HM.blocked_damage(damage, config.block_reduction, move == HM.Move.UPPERCUT)
 		blocked = true
+	elif opponent.state == HM.State.IDLE and book.guard > 0 and opponent.hp > damage:
+		# A finishing blow breaks through; otherwise the guard soaks part of it.
+		damage = HM.blocked_damage(damage, mini(book.guard, config.block_reduction), move == HM.Move.UPPERCUT)
+		blocked = true
+		# Punching into a set guard invites the next attack.
+		_opp_waiting = mini(_opp_waiting, 1)
+	damage = _soak(damage, book.armor)
 	opponent.hp = maxi(0, opponent.hp - damage)
 	player_stats.damage_dealt += damage
 	opponent_stats.damage_taken += damage
 	if is_counter:
 		player_stats.counters += 1
+		_tell_countered = true
 	if blocked:
 		opponent_stats.blocks_made += 1
 		events.append({"type": "blocked", "tick": total_ticks, "by": HM.Who.PLAYER, "move": move, "damage": damage})
@@ -402,6 +420,12 @@ func _resolve_player_impact() -> void:
 			_knock_down(HM.Who.OPPONENT, true)
 		elif damage >= config.knockdown_threshold:
 			_knock_down(HM.Who.OPPONENT)
+
+
+static func _soak(damage: int, armor: int) -> int:
+	if armor <= 0 or damage <= 0:
+		return damage
+	return maxi(1, damage - armor)
 
 
 func _knock_down(fighter: int, ko: bool = false) -> void:
@@ -435,7 +459,7 @@ func _answer_the_count(fighter: int) -> void:
 	var status: Status = player if fighter == HM.Who.PLAYER else opponent
 	if status.state != HM.State.KNOCKED_DOWN:
 		return
-	status.hp = maxi(status.hp, config.revival_hp)
+	status.hp = maxi(status.hp, _revival_hp(fighter))
 	status.stamina = config.max_stamina / 2
 	status.state = HM.State.IDLE
 	status.ticks_in_state = 0
@@ -448,6 +472,13 @@ func _regen(status: Status) -> void:
 	status.stamina = mini(config.max_stamina, status.stamina + HM.stamina_regen(status.state, config.stamina_regen))
 
 
+## Health after answering the count; tougher opponents revive proportionally.
+func _revival_hp(fighter: int) -> int:
+	if fighter == HM.Who.PLAYER:
+		return config.revival_hp
+	return Attributes.scaled_ticks(config.revival_hp, book.max_hp, maxi(1, config.max_hp))
+
+
 func _end_round() -> void:
 	events.append({"type": "roundEnd", "tick": total_ticks, "round": round})
 	if player.state == HM.State.KNOCKED_DOWN:
@@ -456,7 +487,7 @@ func _end_round() -> void:
 		player.state = HM.State.IDLE
 		events.append({"type": "rise", "tick": total_ticks, "fighter": HM.Who.PLAYER})
 	if opponent.state == HM.State.KNOCKED_DOWN:
-		opponent.hp = maxi(opponent.hp, config.revival_hp)
+		opponent.hp = maxi(opponent.hp, _revival_hp(HM.Who.OPPONENT))
 		opponent.stamina = config.max_stamina
 		opponent.state = HM.State.IDLE
 		opp_active = null

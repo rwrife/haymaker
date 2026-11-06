@@ -11,15 +11,29 @@ var name: String
 var sequence: Array
 var min_gap: int
 var gap_spread: int
+## Opponent health; revival health scales with it.
+var max_hp: int
+## Damage an idle opponent's guard absorbs from each player punch (uppercuts halve it).
+## Tells and recoveries stay open.
+var guard: int
+## Percent bonus damage when the opponent catches the player mid-punch.
+var punish: int
+## Damage shrugged off from every player punch that lands (min 1).
+var armor: int
 
 
-func _init(p_id: String, p_name: String, p_sequence: Array, p_min_gap: int = 6, p_gap_spread: int = 8) -> void:
+func _init(p_id: String, p_name: String, p_sequence: Array, p_min_gap: int = 6, p_gap_spread: int = 8,
+		p_max_hp: int = 100, p_guard: int = 0, p_punish: int = 0, p_armor: int = 0) -> void:
 	assert(not p_sequence.is_empty())
 	id = p_id
 	name = p_name
 	sequence = p_sequence
 	min_gap = p_min_gap
 	gap_spread = p_gap_spread
+	max_hp = p_max_hp
+	guard = p_guard
+	punish = p_punish
+	armor = p_armor
 
 
 static func entry(move: int, tell: int, impact: int, recover: int, stamina: int, damage: int) -> Dictionary:
@@ -100,16 +114,20 @@ static func by_id(book_id: String) -> OpponentBook:
 	return goldie()
 
 
+## Ladder difficulty 0 (first bout) to 1 (final boss). The curve eases in, so
+## each step up the ladder is a bigger jump than the last.
 func scaled(difficulty: float) -> OpponentBook:
 	var d := clampf(difficulty, 0.0, 1.0)
-	var pace := 1.35 - 0.60 * d
-	var patience := 1.9 - 1.35 * d
-	var power := 0.7 + 0.55 * d
+	var ramp := d * (0.6 + 0.4 * d)
+	var pace := 1.22 - 0.54 * ramp
+	var patience := 1.65 - 1.2 * ramp
+	var power := 0.8 + 0.55 * ramp
 	var entries := []
 	for e in sequence:
 		entries.append(entry(e.move, _ticks(e.tell, pace, MIN_TELL), e.impact, _ticks(e.recover, pace, MIN_RECOVER),
 			e.stamina, 0 if e.damage == 0 else maxi(int(roundf(float(e.damage) * power)), 1)))
-	return OpponentBook.new(id, name, entries, _ticks(min_gap, patience, 0), _ticks(gap_spread, patience, 0))
+	return OpponentBook.new(id, name, entries, _ticks(min_gap, patience, 0), _ticks(gap_spread, patience, 0),
+		int(roundf(120.0 + 120.0 * ramp)), int(roundf(2.0 + 6.0 * ramp)), int(roundf(50.0 + 70.0 * ramp)))
 
 
 static func _ticks(value: int, factor: float, floor_value: int) -> int:

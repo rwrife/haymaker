@@ -226,7 +226,7 @@ func _process(_delta: float) -> void:
 				_play_punch_land(e.move, e.counter)
 				_play_punch_crowd()
 				var mine: bool = e.by == HM.Who.PLAYER
-				feedback = ("COUNTER!" if e.counter else "CLEAN HIT!") if mine else "HIT!"
+				feedback = ("COUNTER!" if e.counter else "CLEAN HIT!") if mine else ("PUNISHED!" if e.counter else "HIT!")
 				feedback_color = GOLD if mine else RED
 				Game.haptic(1.0 if e.counter else 0.6)
 			"dodged":
@@ -1087,7 +1087,7 @@ func _build_versus() -> void:
 	intro.add_child(lbl("“%s”" % (book.taunt() if book.taunt() != "" else "Meet me in the ring."), 19 if portrait else 16,
 		Color.WHITE, sys_font(600), 0, HORIZONTAL_ALIGNMENT_LEFT, true))
 	if Game.mode == "career":
-		intro.add_child(_challenger_stats(Game.progression.attributes_for(book.id)))
+		intro.add_child(_challenger_stats(Game.progression.attributes_for(book.id), Game.progression.player))
 	var fight := btn("RING THE BELL  →", begin_fight, GOLD, INK, ring_font(), 19, 54 if portrait else 48)
 	_refs.primary = fight
 	var size: Vector2 = root.get_meta("content_size")
@@ -1123,10 +1123,18 @@ func _build_versus() -> void:
 		row.add_child(col)
 
 
-## The challenger's trained attributes for this ladder.
-func _challenger_stats(a: Dictionary) -> Control:
+## The challenger's trained attributes for this ladder and how they match up
+## against the player's.
+func _challenger_stats(a: Dictionary, mine: Dictionary) -> Control:
 	var col := vbox(6)
-	col.add_child(lbl("CHALLENGER STATS", 11, GOLD, sys_font(), 1.5))
+	var top := hbox(6)
+	top.add_child(lbl("CHALLENGER STATS", 11, GOLD, sys_font(), 1.5))
+	top.add_child(spacer())
+	var edge := Attributes.edge(mine, a)
+	if not Attributes.is_zero(a) or not Attributes.is_zero(mine):
+		top.add_child(lbl("FAVORABLE" if edge > 0 else ("TOUGH MATCHUP" if edge < 0 else "EVEN MATCHUP"), 11,
+			GREEN if edge > 0 else (RED if edge < 0 else Color.WHITE), sys_font(), 1.5))
+	col.add_child(top)
 	var row := hbox(6)
 	for attribute in Attributes.ALL:
 		var value: int = a[attribute]
@@ -1137,6 +1145,9 @@ func _challenger_stats(a: Dictionary) -> Control:
 	col.add_child(row)
 	if Attributes.is_zero(a):
 		col.add_child(lbl("Untrained — no wins on this ladder yet.", 11, Color(1, 1, 1, 0.7), sys_font(500), 0,
+			HORIZONTAL_ALIGNMENT_LEFT, true))
+	for note in Attributes.clashes(mine, a):
+		col.add_child(lbl(note, 11, GREEN if note.begins_with("Your") else RED, sys_font(500), 0,
 			HORIZONTAL_ALIGNMENT_LEFT, true))
 	return panel(box(Color(INK, 0.7), 8, Color(GOLD, 0.4)), col, 8)
 
@@ -1410,7 +1421,7 @@ func _update_match_ui() -> void:
 	if engine == null or not _refs.has("clock"):
 		return
 	var f := engine
-	(_refs.opp_bar as Bar).value = float(maxi(0, f.opponent.hp)) / float(f.config.max_hp)
+	(_refs.opp_bar as Bar).value = float(maxi(0, f.opponent.hp)) / float(maxi(1, f.book.max_hp))
 	(_refs.me_bar as Bar).value = float(maxi(0, f.player.hp)) / float(f.config.max_hp)
 	(_refs.opp_bar as Bar).queue_redraw()
 	(_refs.me_bar as Bar).queue_redraw()
