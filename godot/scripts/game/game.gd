@@ -221,14 +221,20 @@ func _make_progression_seed() -> int:
 	return 0x7EA12026 if _records_path == "" else randi()
 
 
-## The book actually fought: career bouts face the challenger's trained attributes.
+## The book actually fought: career bouts face the challenger's trained
+## attributes, shifted by the rock–paper–scissors matchup with the player's.
 func fight_book() -> OpponentBook:
-	return opponent.boosted(progression.attributes_for(opponent.id)) if mode == "career" else opponent
+	return opponent.boosted(fight_matchup().opponent) if mode == "career" else opponent
 
 
-## Career bouts use the player's trained attributes; sparring stays a level field.
+## Career bouts use the player's trained attributes after the matchup; sparring
+## stays a level field.
 func fight_attributes() -> Dictionary:
-	return progression.player if mode == "career" else Attributes.zero()
+	return fight_matchup().player if mode == "career" else Attributes.zero()
+
+
+func fight_matchup() -> Dictionary:
+	return Attributes.matchup(progression.player, progression.attributes_for(opponent.id))
 
 
 func prize_tokens() -> int:

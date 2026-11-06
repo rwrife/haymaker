@@ -43,6 +43,8 @@ func _init() -> void:
 	test_stamina()
 	test_roster_playable()
 	test_progression()
+	test_matchup()
+	test_difficulty()
 	print("%d checks, %d failures" % [checks, failures])
 	quit(1 if failures > 0 else 0)
 
@@ -247,21 +249,120 @@ func test_progression() -> void:
 	capped.record_win(["x"], 2)
 	expect(capped.tokens == 0, "maxed fighter forfeits")
 
-	# UI-test journey: the jab-each-tick driver must still beat the trained
-	# authored ladder in 600-tick bouts while spending power, dexterity, speed in turn.
+	# Career journey, spending power, dexterity, speed in turn: a jab masher can
+	# take the opener but the matched, trained finale punishes mashing.
 	var ladder := OpponentBook.authored_ladder()
 	var run := Attributes.Progression.new()
 	var jabs := []
-	jabs.resize(8000)
+	jabs.resize(FightEngine.Config.career().hard_tick_cap())
 	jabs.fill(HM.Cmd.JAB)
 	for i in ladder.size():
 		if i > 0:
 			expect(run.spend(Attributes.ALL[(i - 1) % 3]), "spend before bout %d" % i)
-		var fought: OpponentBook = ladder[i].boosted(run.attributes_for(ladder[i].id))
-		var config := FightEngine.Config.make(1, 600, 0).boosted(run.player)
-		var result := FightEngine.simulate(config, 0xCAFE2026, fought, jabs)
-		expect(HM.is_player_win(int(result.outcome)), "jab driver beats trained %s %s" % [ladder[i].id, str(run.attributes_for(ladder[i].id))])
+		if i == 0 or i == ladder.size() - 1:
+			var m := Attributes.matchup(run.player, run.attributes_for(ladder[i].id))
+			var fought: OpponentBook = ladder[i].boosted(m.opponent)
+			var config := FightEngine.Config.career().boosted(m.player)
+			var result := FightEngine.simulate(config, 0xCAFE2026, fought, jabs)
+			if i == 0:
+				expect(HM.is_player_win(int(result.outcome)), "jab masher beats the opener")
+			else:
+				expect(not HM.is_player_win(int(result.outcome)), "jab masher loses to trained %s" % ladder[i].id)
 		var remaining := ids.slice(i + 1)
 		run.record_win(remaining, 0x7EA12026 + ladder.size() - remaining.size())
 	expect(run.tokens == 0 and Attributes.total(run.player) == ladder.size() - 1, "player trained every bout")
 	expect(Attributes.total(run.attributes_for("baxter")) == ladder.size() - 1, "final boss trained after every win")
+
+
+func test_matchup() -> void:
+	var z := Attributes.zero()
+	var m := Attributes.matchup(z, z)
+	expect(m.player == z and m.opponent == z, "zero matchup identity")
+	var mirror := Attributes.make(2, 3, 1)
+	m = Attributes.matchup(mirror, mirror)
+	expect(m.player == m.opponent, "mirrored matchup is even")
+	var single := Attributes.make(0, 4)
+	m = Attributes.matchup(single, single)
+	expect(m.player == single and m.opponent == single, "single-attribute mirror unchanged")
+	m = Attributes.matchup(Attributes.make(0, 0, 5), Attributes.make(0, 5, 0))
+	expect(m.player == Attributes.make(0, 0, 2) and m.opponent.dexterity == 7, "dexterity outlasts speed")
+	m = Attributes.matchup(Attributes.make(5), Attributes.make(0, 5))
+	expect(m.player.power == 7 and m.opponent.dexterity == 2, "power breaks dexterity")
+	m = Attributes.matchup(Attributes.make(0, 0, 5), Attributes.make(5))
+	expect(m.player.speed == 7 and m.opponent.power == 2, "speed out-tempos power")
+	expect(Attributes.edge(Attributes.make(5), Attributes.make(0, 5)) > 0, "favorable edge")
+	expect(Attributes.edge(Attributes.make(0, 0, 5), Attributes.make(0, 5)) < 0, "tough edge")
+	expect(Attributes.edge(mirror, mirror) == 0 and Attributes.edge(Attributes.make(5), z) == 0, "even edge")
+	expect(Attributes.clashes(Attributes.make(0, 0, 3), Attributes.make(1, 2)) ==
+		["Your Speed beats their Power", "Their Dexterity beats your Speed"], "clash notes")
+	for a in Attributes.ALL:
+		expect(Attributes.BEATS[Attributes.countered_by(a)] == a, "%s has a counter" % a)
+
+	var dex := FightEngine.Config.make().boosted(Attributes.make(0, 5))
+	expect(dex.armor == 2, "dex armor")
+	var goldie := OpponentBook.goldie()
+	var trained := goldie.boosted(Attributes.make(0, 4))
+	expect(trained.armor == 2 and trained.punish == 40 and trained.max_hp == goldie.max_hp, "opponent dex armor and punish")
+
+
+func test_difficulty() -> void:
+	for book in OpponentBook.career_roster():
+		expect(book.max_hp == 100 and book.guard == 0 and book.punish == 0 and book.armor == 0, "%s raw book is neutral" % book.id)
+		var prev: OpponentBook = book.scaled(0)
+		expect(prev.max_hp > 100 and prev.punish > 0, "%s opener tougher than raw" % book.id)
+		for step in range(1, 10):
+			var s: OpponentBook = book.scaled(step / 9.0)
+			expect(s.max_hp > prev.max_hp and s.guard >= prev.guard and s.punish > prev.punish, "%s ramps at %d" % [book.id, step])
+			prev = s
+		expect(prev.guard > book.scaled(0).guard, "%s guard ramps" % book.id)
+	var authored := OpponentBook.authored_ladder()
+	var hp_steps := []
+	for i in range(1, authored.size()):
+		hp_steps.append(authored[i].max_hp - authored[i - 1].max_hp)
+	expect(hp_steps[-1] > hp_steps[0], "ladder ramp accelerates")
+
+	var src := OpponentBook.goldie()
+	var tough := OpponentBook.new(src.id, src.name, src.sequence, src.min_gap, src.gap_spread, 200, 4, 50, 0)
+	var e := FightEngine.new(test_config(), 1, tough)
+	expect(e.opponent.hp == 200, "opponent hp from book")
+	expect(e._revival_hp(HM.Who.OPPONENT) == 60 and e._revival_hp(HM.Who.PLAYER) == 30, "revival scales with max hp")
+	# Idle guard soaks part of a punch and provokes the next attack.
+	e.opponent.state = HM.State.IDLE
+	e._opp_waiting = 50
+	e.player.current_move = HM.Move.JAB
+	e.player.current_damage = 8
+	e._resolve_player_impact()
+	expect(e.opponent.hp == 196 and e.events[-1].type == "blocked", "idle guard")
+	expect(e._opp_waiting <= 1, "guard invites attack")
+	# Only the first punch into a tell is a counter.
+	e.opponent.state = HM.State.TELLING
+	e.opponent.current_move = HM.Move.JAB
+	e._tell_countered = false
+	e._resolve_player_impact()
+	expect(e.opponent.hp == 180 and e.events[-1].counter, "first counter doubles")
+	e._resolve_player_impact()
+	expect(e.opponent.hp == 172 and not e.events[-1].counter, "second hit is not a counter")
+	# Getting caught mid-punch is punished; armor soaks the rest.
+	e.player.state = HM.State.RECOVERING
+	e.player.hp = 100
+	e.opponent.state = HM.State.ATTACKING
+	e.opponent.current_move = HM.Move.JAB
+	e.opponent.current_damage = 10
+	e._resolve_opponent_impact()
+	expect(e.player.hp == 85 and e.events[-1].counter and e.opponent_stats.counters == 1, "punished mid-punch")
+	e.player.state = HM.State.IDLE
+	e.player.hp = 100
+	e.config.armor = 3
+	e._resolve_opponent_impact()
+	expect(e.player.hp == 93 and not e.events[-1].counter, "armor soaks clean hits")
+	e.config.armor = 50
+	e.player.hp = 100
+	e._resolve_opponent_impact()
+	expect(e.player.hp == 99, "armor leaves at least 1")
+	var finisher := FightEngine.new(test_config(), 1, tough)
+	finisher.opponent.state = HM.State.IDLE
+	finisher.opponent.hp = 5
+	finisher.player.current_move = HM.Move.JAB
+	finisher.player.current_damage = 8
+	finisher._resolve_player_impact()
+	expect(finisher.opponent.hp == 0 and finisher.events.any(func(v): return v.type == "landed"), "finishing blow breaks the guard")
