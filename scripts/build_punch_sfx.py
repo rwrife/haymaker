@@ -5,8 +5,8 @@ Stdlib only and seeded, so every run writes byte-identical files:
     python3 scripts/build_punch_sfx.py --check   # verify committed WAVs match
 
 Swings are band-passed noise whose centre frequency rises and falls with the
-glove's travel. Landings layer a pitch-dropping body thump, a short low-passed
-noise slap for the glove leather and a damped mid knock. Provenance:
+glove's travel. Landings layer a deep pitch-dropping body thump and a short,
+soft low-passed noise slap for the glove leather, without a ringing mid knock. Provenance:
 ArtDirection/README.md ("Punch sound effects").
 """
 import argparse
@@ -29,12 +29,12 @@ SWINGS = {
 }
 
 LANDINGS = {
-    'punch_land_light': {'seed': 303, 'seconds': 0.26, 'thump_from': 170.0, 'thump_to': 72.0, 'glide': 0.025,
-                         'thump_decay': 0.055, 'slap_decay': 0.007, 'slap_cutoff': 5200.0, 'slap': 0.65,
-                         'knock_hz': 390.0, 'knock_decay': 0.025, 'knock': 0.35, 'drive': 1.2},
-    'punch_land_heavy': {'seed': 404, 'seconds': 0.46, 'thump_from': 130.0, 'thump_to': 46.0, 'glide': 0.045,
-                         'thump_decay': 0.11, 'slap_decay': 0.012, 'slap_cutoff': 3600.0, 'slap': 0.7,
-                         'knock_hz': 260.0, 'knock_decay': 0.04, 'knock': 0.45, 'drive': 2.2},
+    'punch_land_light': {'seed': 303, 'seconds': 0.26, 'thump_from': 130.0, 'thump_to': 58.0, 'glide': 0.018,
+                         'thump_decay': 0.075, 'slap_decay': 0.006, 'slap_cutoff': 1900.0, 'slap': 0.40,
+                         'drive': 1.0},
+    'punch_land_heavy': {'seed': 404, 'seconds': 0.46, 'thump_from': 100.0, 'thump_to': 40.0, 'glide': 0.028,
+                         'thump_decay': 0.17, 'slap_decay': 0.009, 'slap_cutoff': 1300.0, 'slap': 0.45,
+                         'drive': 1.6},
 }
 
 
@@ -59,8 +59,7 @@ def swing(seed, seconds, skew, low_hz, sweep_hz, q, rumble):
     return out
 
 
-def landing(seed, seconds, thump_from, thump_to, glide, thump_decay, slap_decay, slap_cutoff, slap,
-            knock_hz, knock_decay, knock, drive):
+def landing(seed, seconds, thump_from, thump_to, glide, thump_decay, slap_decay, slap_cutoff, slap, drive):
     rng = random.Random(seed)
     n = int(RATE * seconds)
     alpha = 1.0 - math.exp(-2.0 * math.pi * slap_cutoff / RATE)
@@ -76,8 +75,7 @@ def landing(seed, seconds, thump_from, thump_to, glide, thump_decay, slap_decay,
         body = math.sin(phase) * math.exp(-t / thump_decay)
         slap_state += alpha * (rng.uniform(-1.0, 1.0) - slap_state)
         leather = slap_state * math.exp(-t / slap_decay) * 3.0
-        mid = math.sin(2.0 * math.pi * knock_hz * t) * math.exp(-t / knock_decay)
-        y = math.tanh(drive * (body + slap * leather + knock * mid)) / norm
+        y = math.tanh(drive * (body + slap * leather)) / norm
         y *= min(1.0, i / attack) * min(1.0, (n - 1 - i) / fade)
         out.append(y)
     return out
