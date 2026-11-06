@@ -20,7 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MODELS = ROOT / 'ArtDirection' / 'Models'
 RIGS = ROOT / 'ArtDirection' / 'Rigs'
-NAMES = ('mack', 'bruiser', 'goldie', 'nico', 'atlas', 'duke', 'sylvie', 'cassian', 'vera', 'jaison', 'hunter')
+NAMES = ('mack', 'bruiser', 'goldie', 'nico', 'atlas', 'duke', 'sylvie', 'cassian', 'vera', 'jaison', 'hunter', 'tycoon')
 # Fixed Mixamo bone order shared with the runtime and the clip library ("Left" = anatomical left = +X).
 BONES = ('Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head',
          'LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand',

@@ -91,6 +91,10 @@ static func hunter() -> OpponentBook:
 	return OpponentBook.new("hunter", "Hunter “Redline” Mercer", _rows([[J, 26, 8, 12, 4, 11], [J, 18, 8, 12, 4, 12], [H, 30, 12, 16, 8, 17], [J, 24, 12, 60, 10, 22]]), 8, 12)
 
 
+static func tycoon() -> OpponentBook:
+	return OpponentBook.new("tycoon", "Fruit Tycoon", _rows([[F, 34, 0, 16, 2, 0], [B, 32, 56, 20, 5, 0], [J, 26, 8, 22, 4, 11], [J, 22, 8, 20, 4, 11], [H, 34, 12, 30, 8, 17], [U, 44, 14, 46, 12, 22]]), 18, 14)
+
+
 static func baxter() -> OpponentBook:
 	return OpponentBook.new("baxter", "Bruiser Baxter", _rows([[J, 42, 12, 32, 5, 8], [H, 54, 16, 46, 10, 16], [F, 32, 0, 16, 3, 0], [J, 34, 10, 26, 5, 8], [B, 28, 65, 30, 6, 0], [U, 60, 18, 54, 14, 22]]), 32, 24)
 
@@ -104,7 +108,7 @@ static func anvil() -> OpponentBook:
 
 
 static func career_roster() -> Array:
-	return [goldie(), nico(), atlas(), vera(), duke(), sylvie(), cassian(), jaison(), hunter(), baxter()]
+	return [goldie(), nico(), atlas(), vera(), duke(), sylvie(), cassian(), jaison(), hunter(), tycoon(), baxter()]
 
 
 static func by_id(book_id: String) -> OpponentBook:
@@ -195,6 +199,8 @@ const PROFILES := {
 		"PRECISE COUNTERS • THE FINAL FITTING", "Let’s get this sorted."],
 	"hunter": ["Hunter Rowan Mercer learned to box holding pads for his brother Jaison after closing Mercer & Son. Easygoing outside the ring and fiercely competitive inside it, Redline wants a name of his own. He fights in torn-sleeve black formalwear and the crimson tie from his first night in Jaison’s corner. Closing Time drives two quick jabs into a body hook and stepping right. His relentless, shifting pressure leaves him open to a patient counter. Both brothers want the championship; neither has settled what happens if they get there together.",
 		"RELENTLESS PRESSURE • CLOSING TIME", "Try keeping up."],
+	"tycoon": ["Cyrus Pomeroy made his first billion selling sleek fruit-branded gadgets, then bought boxing piece by piece: the gyms, the arenas, the broadcast rights and the glove makers. Every fighter signs his exclusive contract and hands his company thirty percent of every purse, while anyone who refuses finds the gym rent doubled and the cards cancelled. He drains the colour from the sport he owns and steps into the ring in a black turtleneck and gold gloves to remind everyone who pays the bills. The Hostile Takeover opens with a hollow feint and a guarded pitch before two jabs, a hook and a closing uppercut. Wait out the sales pitch; the uppercut leaves him exposed. The championship belt is the one asset he can't buy, and Bruiser Baxter refuses to sell.",
+		"MONOPOLY • THE HOSTILE TAKEOVER", "Nice gloves. I own the company that made them."],
 	"baxter": ["The theatrical reigning champion was once a generous small-gym mentor. Baxter protects his reputation with heavyweight pressure, big windups, feints, guarded pauses and punishing counters. Earn his corner.",
 		"FINAL BOSS • COMPLETE PRESSURE", "You want this corner? Earn it. And try not to dent the spotlight."],
 }

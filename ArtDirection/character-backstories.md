@@ -1,6 +1,6 @@
 # Haymaker character backstories
 
-Story reference for the supplied character models, intro portraits, and defeated cut-scene portraits. These stories guide the playable roster, pre-fight dialogue, and future career scenes. Goldie and Nico retain their established concept backgrounds. Atlas, Vera, Duke, Sylvie, and Cassian's stories expand their existing concept backgrounds. Mack and Bruiser's histories are story proposals for the player and final boss. Bruiser remains the final boss as requested; Cassian is a championship contender rather than a replacement final boss. Career shuffles Goldie, Nico, Atlas, Vera, Duke, Sylvie, Cassian, and Jaison each session, then closes with Bruiser Baxter.
+Story reference for the supplied character models, intro portraits, and defeated cut-scene portraits. These stories guide the playable roster, pre-fight dialogue, and future career scenes. Goldie and Nico retain their established concept backgrounds. Atlas, Vera, Duke, Sylvie, and Cassian's stories expand their existing concept backgrounds. Mack and Bruiser's histories are story proposals for the player and final boss. Bruiser remains the final boss as requested; Cassian is a championship contender rather than a replacement final boss. Career shuffles Goldie, Nico, Atlas, Vera, Duke, Sylvie, Cassian, Jaison, Hunter, and Fruit Tycoon each session, then closes with Bruiser Baxter.
 
 | Character | Career role | Model | Intro portrait | Defeated portrait |
 | --- | --- | --- | --- | --- |
@@ -13,6 +13,7 @@ Story reference for the supplied character models, intro portraits, and defeated
 | Duke Doubletake | Opponent | [duke.obj](Models/duke.obj) | [duke.png](IntroScenes/duke.png) | [`duke-defeated.png`](DefeatedPortraits/duke-defeated.png) |
 | Sylvie “Slipstream” Sloane | Opponent | [sylvie.obj](Models/sylvie.obj) | [sylvie.png](IntroScenes/sylvie.png) | [`sylvie-defeated.png`](DefeatedPortraits/sylvie-defeated.png) |
 | Cassian “Saint” Sterling | Championship contender | [cassian.obj](Models/cassian.obj) | [cassian.png](IntroScenes/cassian.png) | [`cassian-defeated.png`](DefeatedPortraits/cassian-defeated.png) |
+| Fruit Tycoon (Cyrus Pomeroy) | Opponent | [tycoon.obj](Models/tycoon.obj) | [tycoon.png](IntroScenes/tycoon.png) | [`tycoon-defeated.png`](DefeatedPortraits/tycoon-defeated.png) |
 | Bruiser Baxter | Final boss | [bruiser.obj](Models/bruiser.obj) | [bruiser.png](IntroScenes/bruiser.png) | [`bruiser-defeated.png`](DefeatedPortraits/bruiser-defeated.png) |
 
 ## Mack — the player
@@ -186,3 +187,23 @@ He fights in black formalwear with torn sleeves and the crimson tie from his fir
 **Signature move — Closing Time:** Two quick jabs drive you backward, a body hook pulls your guard down, and a stepping right catches you trying to escape. Runtime uses the existing straight-punch (`jab`) move for the finishing right; body targeting and a dedicated right-cross animation are not separate mechanics.
 
 **Walkout line:** “Try keeping up.”
+
+## Cyrus Pomeroy — “Fruit Tycoon”
+
+Cyrus Pomeroy made his first billion selling sleek, fruit-branded gadgets that everybody wanted and nobody could repair. When the market stopped growing fast enough, he went looking for an industry that ran on loyalty and cheap labour. He found boxing.
+
+He bought it the way he bought everything: quietly, then all at once. First the glove makers and the broadcast rights, then the arenas, the sanctioning paperwork and finally the neighbourhood gyms. Every fighter on the Haymaker circuit now signs a Pomeroy exclusive contract and hands his holding company thirty percent of every purse. Fighters who refuse find their bouts cancelled, their sponsors withdrawn and their gym rent doubled overnight. The rising costs threatening Mack's gym arrive on Pomeroy letterhead.
+
+He never needed to fight, but he enjoys being seen to win. He walks out in a black turtleneck, rimless glasses and gold-plated gloves, and the arena drains of colour around him: in the ring he appears in flat greyscale, the sport stripped to whatever he can sell. Rivals call him the Fruit Tycoon behind his back; he had the name trademarked.
+
+There is one asset he can't acquire. Bruiser Baxter's championship belt is not for sale, and Bruiser has turned down every offer. If Pomeroy can't buy the title, he means to take it in the ring and own the sport outright.
+
+**Personality:** Smooth, condescending and endlessly patient in negotiations; treats every opponent as a line item.
+
+**Fighting style:** Monopoly pressure. He opens with a hollow feint and a guarded sales pitch to make opponents commit, then closes the deal with a fast combination. The final uppercut is all-in and leaves him exposed.
+
+**Signature move — The Hostile Takeover:** A feint and a high guard set the terms, two jabs and a hook push you to the ropes, and an uppercut closes the acquisition. Runtime uses the existing feint, block, jab, hook and uppercut moves in that order.
+
+**Walkout line:** “Nice gloves. I own the company that made them.”
+
+The character is an original parody of the tech-billionaire archetype. He is not based on, and should not be presented as, any real person or company.

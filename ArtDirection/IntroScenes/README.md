@@ -13,6 +13,7 @@ Nine user-supplied PNG graphics are archived here as source art. Byte-for-byte c
 | Sylvie “Slipstream” Sloane | [sylvie.png](sylvie.png) | `sylviepng.png` |
 | Vera Velvet | [vera.png](vera.png) | `vera.png` |
 | Jaison “Black Tie” Mercer | [jaison.png](jaison.png) | `jaison.png` |
+| Fruit Tycoon | [tycoon.png](tycoon.png) | `Golden Glove Tech Champion.png` |
 
 The original eight files are 1024 × 1536 RGBA PNGs, preserved byte-for-byte from the supplied files. Only Sylvie's filename is normalized. The portraits include a dark atmospheric glow around the figures and have varying alpha (observed range 0–254); preserve that alpha when compositing and review the result against the intended scene background. They are not cropped character cutouts or sprite sheets. No Mack intro portrait was supplied in this batch.
 
@@ -23,3 +24,7 @@ Jaison’s 1024 × 1536 supplied PNG is preserved byte-for-byte and bundled as `
 ## Hunter Rowan Mercer — “Redline”
 
 User-supplied original character assets received October 19, 2026: `hunter.obj`, `hunter.png` (versus portrait), and `hunter-defeated.png` (bundled unchanged for victory results). The OBJ is rigged with the existing offline pipeline; runtime uses the generated `hunter.fighter`. No external stock assets.
+
+## Fruit Tycoon
+
+The user-supplied 1024 × 1536 RGBA `Golden Glove Tech Champion.png` is preserved byte-for-byte as `tycoon.png` and bundled as `godot/assets/portraits/tycoon-intro.png`. It is used with his walkout line, “Nice gloves. I own the company that made them.” The portrait is in colour; his in-ring model is deliberately greyscale.
