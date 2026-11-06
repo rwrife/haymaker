@@ -106,9 +106,19 @@ The planned iOS port will add a Godot iOS preset and use Apple's platform build/
 
 Windows Store listing copy, a 1920 x 1080 promotional wallpaper, square icons,
 game poster/box art and real desktop screenshots are in
-[`AppStore/Windows/`](AppStore/Windows/README.md). This is a listing kit, not a
-certified Store package; its guide distinguishes listing graphics from future
-manifest assets and records screenshot provenance.
+[`AppStore/Windows/`](AppStore/Windows/README.md).
+
+To build the Microsoft Store package (Windows, needs the Windows SDK for
+`makeappx`/`makepri`, Python with Pillow, and Godot on `PATH` or in `$env:GODOT`):
+
+```powershell
+pwsh scripts/build_msix.ps1 -Version 1.0.0
+```
+
+This exports both Windows presets and writes an unsigned
+`Haymaker_1.0.0.0_x64_arm64.msixbundle` plus portable x64/ARM64 zips to
+`godot/builds/store/`. Upload the bundle in Partner Center (Store ID
+`9NHMLZ8842DJ`); the Store signs it. Bump `-Version` for every submission.
 
 ### Architecture and validation
 
