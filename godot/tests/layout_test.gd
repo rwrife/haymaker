@@ -68,6 +68,8 @@ func winning_bout(book: OpponentBook) -> Dictionary:
 
 
 func check_controls(node: Node, viewport_rect: Rect2, in_scroll: bool = false) -> void:
+	if node is CanvasItem and not node.is_visible_in_tree():
+		return
 	if node is Control and node.has_meta("width_min"):
 		check(node.size.x >= node.get_meta("width_min") - 1.0, "panel meets 30% width minimum")
 		check(node.size.x <= node.get_meta("width_max") + 1.0, "panel respects hard pixel maximum")
@@ -131,6 +133,7 @@ func _run() -> void:
 		check(main.portrait == (window_size.y > window_size.x), "orientation follows window")
 		for screen in ["home", "career", "versus", "oneThumb", "twoHanded", "pause",
 				"oneThumbController", "twoHandedController", "pauseController",
+				"getUpOneThumb", "getUpTwoHandedController",
 				"win", "loss", "draw", "sparring", "sparringLoss", "victory", "settings", "records", "detail"]:
 			clear_ui()
 			main.session_reset()
@@ -149,6 +152,11 @@ func _run() -> void:
 				"oneThumb", "twoHanded", "oneThumbController", "twoHandedController":
 					game.control_style = screen.trim_suffix("Controller")
 					main._build_match()
+				"getUpOneThumb", "getUpTwoHandedController":
+					game.control_style = "oneThumb" if screen == "getUpOneThumb" else "twoHanded"
+					main.engine.force_player_knockdown()
+					main._build_match()
+					main._update_match_ui()
 				"pause", "pauseController": main._build_pause()
 				"win", "loss", "draw", "sparring", "sparringLoss":
 					main.engine.outcome = HM.Outcome.PLAYER_WIN_BY_KO if screen in ["win", "sparring"] else (
@@ -165,6 +173,10 @@ func _run() -> void:
 				"detail": main._build_detail(game.opponent)
 			await settle()
 			check_layout("%s %s" % [window_size, screen])
+			if screen.begins_with("getUp"):
+				check(main._refs.get_up.is_visible_in_tree() and main._refs.recovery_progress.is_visible_in_tree(),
+					"get-up button and progress stay visible at every window size")
+				check(main._refs.get_up.get_global_rect().size.y >= 44, "get-up button keeps a usable tap target")
 			if screen == "home":
 				check(main._refs.title.get_theme_font_size("font_size") == 140, "larger desktop title")
 				check(main._refs.title.get_theme_font("font").font_weight == 950, "heavier desktop title")
@@ -204,5 +216,25 @@ func _run() -> void:
 				await settle()
 				check_layout("%s %s %s" % [window_size, book.id, screen])
 		print("Layout journeys: ", window_size)
+	# Exercise the mobile logical canvas, not just narrow desktop windows.
+	root.size_changed.disconnect(main._on_resize)
+	for mobile_size in [Vector2i(430, 932), Vector2i(932, 430)]:
+		root.size = mobile_size
+		root.content_scale_size = main.ui_canvas_size(mobile_size, true)
+		await settle()
+		main.portrait = mobile_size.y > mobile_size.x
+		for style in ["oneThumb", "twoHanded"]:
+			clear_ui()
+			game.control_style = style
+			main._connected_joypads = PackedInt32Array()
+			main._keyboard_hints = false
+			main.engine = FightEngine.new(FightEngine.Config.new(), 1, game.opponent)
+			main.engine.force_player_knockdown()
+			main._build_match()
+			main._update_match_ui()
+			await settle()
+			check_layout("mobile recovery %s %s" % [mobile_size, style])
+			check(main._refs.get_up.is_visible_in_tree() and main._refs.get_up.size.y >= 44,
+				"mobile recovery keeps its visible tap target")
 	print("%d layout checks, %d failures" % [checks, failures])
 	quit(1 if failures > 0 else 0)

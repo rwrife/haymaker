@@ -45,6 +45,8 @@ func _init() -> void:
 	test_progression()
 	test_matchup()
 	test_difficulty()
+	test_combo_knockdowns()
+	test_player_get_up()
 	print("%d checks, %d failures" % [checks, failures])
 	quit(1 if failures > 0 else 0)
 
@@ -115,6 +117,204 @@ func test_controls_and_countdown() -> void:
 	expect(HM.knockdown_value(30, 90) == 2 and HM.knockdown_value(59, 90) == 2, "kd 2")
 	expect(HM.knockdown_value(60, 90) == 1 and HM.knockdown_value(89, 90) == 1, "kd 1")
 	expect(HM.knockdown_value(90, 90) == 0, "kd done")
+	expect(HM.knockdown_value(0, 360, 6) == 6 and HM.knockdown_value(359, 360, 6) == 1, "six-second recovery countdown")
+
+
+func combo_engine() -> FightEngine:
+	var book := OpponentBook.new("combo", "Combo", [OpponentBook.entry(HM.Move.FEINT, 10000, 1, 1, 0, 0)],
+		10000, 0, 1000)
+	return FightEngine.new(test_config(), 42, book)
+
+
+func combo_hit(e: FightEngine, at_tick: int, damage: int = 8) -> void:
+	e.total_ticks = at_tick
+	e.player.current_move = HM.Move.JAB
+	e.player.current_damage = damage
+	e._resolve_player_impact()
+
+
+func test_combo_knockdowns() -> void:
+	var e := combo_engine()
+	e.opponent.state = HM.State.TELLING
+	e.opponent.current_move = HM.Move.JAB
+	combo_hit(e, 0, 33)
+	expect(e.opponent.hp == 934 and e.opponent.knockdown_count == 0, "even a boosted heavy counter cannot knock down alone")
+	e = combo_engine()
+	for t in [0, 60, 120]:
+		combo_hit(e, t)
+	expect(e.opponent.knockdown_count == 0, "three hits are not a knockdown")
+	combo_hit(e, 180)
+	expect(e.opponent.state == HM.State.KNOCKED_DOWN and e.opponent.knockdown_count == 1, "four hits in exactly three seconds knock down")
+	expect(e.player_stats.knockdowns_scored == 1 and e._combo_hit_ticks.is_empty(), "knockdown scores once and clears combo")
+	for i in e.config.knockdown_ticks:
+		e.tick(HM.Cmd.NONE)
+	expect(e.opponent.state == HM.State.IDLE, "opponent still rises automatically after three seconds")
+	combo_hit(e, e.total_ticks)
+	expect(e.opponent.knockdown_count == 1, "revival needs a fresh combo")
+
+	e = combo_engine()
+	for t in [0, 60, 120, 181]:
+		combo_hit(e, t)
+	expect(e.opponent.knockdown_count == 0, "four hits taking one tick too long do not knock down")
+	e = combo_engine()
+	for t in [0, 100, 150, 181, 200]:
+		combo_hit(e, t)
+	expect(e.opponent.knockdown_count == 1, "rolling window retains the latest four consecutive hits")
+	e = combo_engine()
+	combo_hit(e, 0)
+	for i in 181:
+		e.tick(HM.Cmd.NONE)
+	expect(e._combo_hit_ticks.is_empty(), "combo expires without another attack")
+
+	for interruption in ["block", "idle guard", "dodge", "exhaustion", "hit", "round"]:
+		e = combo_engine()
+		for t in [0, 20, 40]:
+			combo_hit(e, t)
+		match interruption:
+			"block":
+				e.opponent.state = HM.State.BLOCKING
+				combo_hit(e, 50)
+			"idle guard":
+				e.book.guard = 4
+				combo_hit(e, 50)
+				e.book.guard = 0
+			"dodge":
+				e.opponent.state = HM.State.DODGING
+				combo_hit(e, 50)
+			"exhaustion":
+				e.player.stamina = 0
+				e.tick(HM.Cmd.UPPERCUT)
+			"hit":
+				e.opponent.current_move = HM.Move.JAB
+				e.opponent.current_damage = 8
+				e._resolve_opponent_impact()
+			"round":
+				e._end_round()
+		e.opponent.state = HM.State.IDLE
+		combo_hit(e, 60)
+		expect(e.opponent.knockdown_count == 0 and e._combo_hit_ticks.size() == 1, interruption + " breaks the combo")
+	for defense in [HM.State.BLOCKING, HM.State.DODGING, HM.State.PARRYING]:
+		e = combo_engine()
+		for t in [0, 20, 40]:
+			combo_hit(e, t)
+		e.player.state = defense
+		e.opponent.current_move = HM.Move.JAB
+		e.opponent.current_damage = 10
+		e._resolve_opponent_impact()
+		combo_hit(e, 60)
+		expect(e.opponent.knockdown_count == 1, "successful defense preserves the combo")
+	for blocking in [false, true]:
+		e = combo_engine()
+		e.opponent.hp = 1
+		e.opponent.state = HM.State.BLOCKING if blocking else HM.State.IDLE
+		combo_hit(e, 1, 22)
+		expect(e.outcome == HM.Outcome.PLAYER_WIN_BY_KO, "zero-health knockout does not require a combo")
+	e = combo_engine()
+	for down in 3:
+		for hit in 4:
+			combo_hit(e, e.total_ticks + 15)
+		if down < 2:
+			for i in e.config.knockdown_ticks:
+				e.tick(HM.Cmd.NONE)
+	expect(e.outcome == HM.Outcome.PLAYER_WIN_BY_KO and e.opponent.knockdown_count == 3, "third combo knockdown is a TKO")
+
+	# Exercise real windups/recoveries, not just the impact helper.
+	e = combo_engine()
+	for i in 100:
+		e.tick(HM.Cmd.HOOK if e.player.state == HM.State.IDLE else HM.Cmd.NONE)
+		if e.opponent.state == HM.State.KNOCKED_DOWN:
+			break
+	expect(e.player_stats.landed == 4 and e.opponent.knockdown_count == 1, "four normally scheduled hooks knock down")
+
+
+func test_player_get_up() -> void:
+	var e := combo_engine()
+	e.force_player_knockdown()
+	expect(e.player.get_up_required == 15 and e.player.state_duration == 360, "first recovery requires 15 presses in six seconds")
+	var waiting := e._opp_waiting
+	for i in 359:
+		e.tick(HM.Cmd.NONE)
+	expect(not e.is_over() and e.player.state == HM.State.KNOCKED_DOWN, "Mack never rises without presses")
+	expect(e.tick_in_round == 0 and e._opp_waiting == waiting, "recovery freezes bout clock and opponent scheduler")
+	e.tick(HM.Cmd.NONE)
+	expect(e.outcome == HM.Outcome.PLAYER_LOSS_BY_KO and e.total_ticks == 360, "missed recovery loses at exactly six seconds")
+	expect(e.player.knockdown_count == 1 and e.opponent_stats.knockdowns_scored == 1, "failed count does not score a second knockdown")
+	expect(not e.events.any(func(v): return v.type == "rise"), "failed recovery emits no rise")
+	var event_count := e.events.size()
+	e.tick(HM.Cmd.JAB)
+	expect(e.events.size() == event_count and e.player.state == HM.State.KO, "late presses cannot revive a KO")
+
+	e = combo_engine()
+	e.force_player_knockdown()
+	for command in [HM.Cmd.HOOK, HM.Cmd.UPPERCUT, HM.Cmd.BLOCK, HM.Cmd.DODGE, HM.Cmd.PARRY]:
+		e.tick(command)
+	expect(e.player.get_up_presses == 0, "only the primary punch counts for recovery")
+	for i in 14:
+		e.tick(HM.Cmd.JAB)
+	expect(e.player.state == HM.State.KNOCKED_DOWN and e.player.get_up_presses == 14, "fourteen presses cannot recover")
+	e.tick(HM.Cmd.JAB)
+	expect(e.player.state == HM.State.IDLE and e.events[-1].type == "rise", "fifteenth press recovers")
+	expect(e.player_stats.thrown == 0 and e.player_stats.landed == 0 and e.player.stamina == 50, "recovery presses are not punches")
+	e.force_player_knockdown()
+	expect(e.player.get_up_required == 20 and e.player.get_up_presses == 0, "second recovery increases to 20 with progress reset")
+	for i in 19:
+		e.tick(HM.Cmd.JAB)
+	expect(e.player.state == HM.State.KNOCKED_DOWN, "nineteen presses cannot recover on second down")
+	e.tick(HM.Cmd.JAB)
+	expect(e.player.state == HM.State.IDLE, "twentieth press recovers on second down")
+	e.force_player_knockdown()
+	expect(e.outcome == HM.Outcome.PLAYER_LOSS_BY_KO and e.player.get_up_required == 0, "third knockdown remains a TKO")
+
+	e = combo_engine()
+	e.force_player_knockdown()
+	for i in 359:
+		e.tick(HM.Cmd.JAB if i < 14 else HM.Cmd.NONE)
+	e.tick(HM.Cmd.JAB)
+	expect(e.player.state == HM.State.IDLE and not e.is_over(), "final required press on the last tick succeeds")
+	e = combo_engine()
+	e.config.rounds = 1
+	e.tick_in_round = e.config.round_ticks - 1
+	e.force_player_knockdown()
+	e._end_round()
+	expect(e.player.state == HM.State.KNOCKED_DOWN and not e.is_over(), "round bell cannot grant a free recovery")
+	for i in 360:
+		e.tick(HM.Cmd.NONE)
+	expect(e.outcome == HM.Outcome.PLAYER_LOSS_BY_KO, "final-round recovery timeout is a KO, not a decision")
+	e = combo_engine()
+	e.tick_in_round = e.config.round_ticks - 1
+	e.force_player_knockdown()
+	for i in 15:
+		e.tick(HM.Cmd.JAB)
+	e.tick(HM.Cmd.NONE)
+	expect(e.phase == HM.Phase.RESTING and e.round == 1, "round ends normally after an earned recovery")
+
+	e = combo_engine()
+	e.opponent.state = HM.State.ATTACKING
+	e.opponent.state_duration = 1
+	e.opponent.current_move = HM.Move.HOOK
+	e.opponent.current_damage = 30
+	e.tick(HM.Cmd.NONE)
+	for i in 30:
+		e.tick(HM.Cmd.NONE)
+	expect(e.player.state == HM.State.KNOCKED_DOWN and e.opponent.state == HM.State.IDLE,
+		"opponent finishes retracting the knockdown punch and waits")
+	expect(e.player_stats.damage_taken == 30 and e.opponent_stats.whiffed == 0,
+		"opponent never attacks a downed Mack")
+
+	var config := test_config()
+	config.max_hp = 1000
+	var book := OpponentBook.new("recovery", "Recovery", [OpponentBook.entry(HM.Move.HOOK, 1, 1, 10, 0, 30)], 1, 0, 1000)
+	var live := FightEngine.new(config, 21, book)
+	var replay := FightEngine.new(config.copy(), 21, book)
+	var inputs := []
+	while not live.is_over() and live.total_ticks < config.hard_tick_cap():
+		var command := HM.Cmd.JAB if live.player.state == HM.State.KNOCKED_DOWN and live.total_ticks % 12 == 0 else HM.Cmd.NONE
+		inputs.append(command)
+		live.tick(command)
+		replay.tick(command)
+	expect(live.events == replay.events and live.result() == replay.result(), "combo and recovery state replay deterministically")
+	expect(live.events.filter(func(v): return v.type == "rise").size() == 2, "recorded input earns both recoveries before TKO")
+	expect(FightEngine.simulate(config, 21, book, inputs) == live.result(), "simulate replays recovery presses through completion")
 
 
 func _pressure(book: OpponentBook) -> float:

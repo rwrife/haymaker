@@ -149,6 +149,172 @@ func test_binding_hints() -> void:
 	main._built_key = ""
 	main.set_process(true)
 
+func click_button(button: Button, touch: bool = false) -> void:
+	var position := root.get_final_transform() * button.get_global_rect().get_center()
+	var motion_event := InputEventMouseMotion.new()
+	motion_event.position = position
+	motion_event.global_position = position
+	Input.parse_input_event(motion_event)
+	await process_frame
+	for pressed in [true, false]:
+		if touch:
+			var event := InputEventScreenTouch.new()
+			event.position = position
+			event.pressed = pressed
+			Input.parse_input_event(event)
+		else:
+			var event := InputEventMouseButton.new()
+			event.button_index = MOUSE_BUTTON_LEFT
+			event.position = position
+			event.global_position = position
+			event.pressed = pressed
+			Input.parse_input_event(event)
+		await process_frame
+
+func test_get_up_controls() -> void:
+	main.set_process(false)
+	var previous_engine: FightEngine = main.engine
+	var previous_log: Array = main.input_log
+	var game = root.get_node("Game")
+	var previous_style: String = game.control_style
+	var previous_devices: PackedInt32Array = main._connected_joypads.duplicate()
+	var previous_reduced: bool = game.reduced_motion
+	var book := OpponentBook.new("recovery", "Recovery", [OpponentBook.entry(HM.Move.FEINT, 10000, 1, 1, 0, 0)], 10000, 0, 1000)
+	for style in ["oneThumb", "twoHanded"]:
+		game.control_style = style
+		main.engine = FightEngine.new(FightEngine.Config.new(), 42, book)
+		main.input_log = []
+		main.pending.clear()
+		main.engine.force_player_knockdown()
+		main._built_key = ""
+		main._sync_view()
+		for i in 3:
+			await process_frame
+		check(main._refs.recovery.is_visible_in_tree() and not main._refs.fight_controls.visible,
+			style + " replaces fight controls with recovery")
+		check(shows("GET BACK UP") and shows("MACK IS DOWN") and shows("0 / 15 PRESSES"),
+			"recovery has a persistent notification and visible target")
+		check(main._knockdown_count().value == 6 and main._refs.get_up.focus_mode == Control.FOCUS_NONE,
+			"recovery starts at six seconds and cannot take menu focus")
+		check(main._countdown_color(6) == Color.WHITE and main._countdown_color(1) == main.RED,
+			"recovery countdown only turns red near timeout")
+		await key(KEY_SPACE)
+		main._advance()
+		await key(KEY_J)
+		main._advance()
+		await joy(JOY_BUTTON_A)
+		main._advance()
+		check(main.engine.player.get_up_presses == 3, "Space, J and Xbox A each count once")
+		var echo := InputEventKey.new()
+		echo.physical_keycode = KEY_SPACE
+		echo.pressed = true
+		echo.echo = true
+		Input.parse_input_event(echo)
+		await process_frame
+		main._advance()
+		check(main.engine.player.get_up_presses == 3, "holding a punch key cannot generate recovery presses")
+		await joy(JOY_BUTTON_X)
+		await key(KEY_UP)
+		await joy(JOY_BUTTON_B)
+		check(main.pending.is_empty(), "other attacks and dodge cannot advance recovery")
+		await click_button(main._refs.get_up)
+		main._advance()
+		check(main.engine.player.get_up_presses == 4 and main.pending.is_empty(), "mouse Get back up click counts exactly once")
+		await click_button(main._refs.get_up, true)
+		main._advance()
+		check(main.engine.player.get_up_presses == 5 and main.pending.is_empty(), "touch Get back up tap counts exactly once")
+		main._update_match_ui()
+		check(shows("5 / 15 PRESSES") and is_equal_approx(main._refs.recovery_bar.value, 5.0 / 15.0),
+			"tap label and meter follow engine progress")
+
+		await joy(JOY_BUTTON_START)
+		main._sync_view()
+		main.submit(HM.Cmd.JAB)
+		check(main.paused and main.pending.is_empty() and main._refs.get_up.disabled,
+			"pause disables recovery input without discarding progress")
+		var paused_recovery_ticks: int = main.engine.player.ticks_in_state
+		main.set_process(true)
+		await wait(0.12)
+		main.set_process(false)
+		check(main.engine.player.ticks_in_state == paused_recovery_ticks, "pause freezes the recovery timer")
+		await key(KEY_ESCAPE)
+		main._sync_view()
+		check(not main.paused and main.engine.player.get_up_presses == 5, "resume preserves recovery progress")
+		main.modal = "settings"
+		main.submit(HM.Cmd.JAB)
+		check(main.pending.is_empty(), "settings cannot queue recovery inputs")
+		main.modal = ""
+
+		# UI rebuilds (controller changes, resize/settings) must not restart the engine's count.
+		main._connected_joypads = PackedInt32Array([99])
+		game.reduced_motion = true
+		main._built_key = ""
+		main._sync_view()
+		check(main.engine.player.get_up_presses == 5 and main._refs.recovery.visible,
+			"controller/reduced-motion rebuild preserves recovery")
+		check(main._refs.get_up.find_children("*", "Label", true, false).any(func(l): return l.text == "A"),
+			"recovery uses the primary Xbox A hint")
+		for i in 10:
+			await key(KEY_SPACE)
+			main._advance()
+		main._update_match_ui()
+		check(main.engine.player.state == HM.State.IDLE and not main._refs.recovery.visible
+			and main._refs.fight_controls.visible, "fifteenth press restores fight controls")
+		check(main.engine.player_stats.thrown == 0, "get-up presses never throw a punch")
+		main.engine.force_player_knockdown()
+		main._update_match_ui()
+		check(shows("0 / 20 PRESSES") and main._knockdown_count().value == 6,
+			"second knockdown resets progress and raises the target to 20")
+		main._connected_joypads = previous_devices
+
+	main.engine = FightEngine.new(FightEngine.Config.new(), 42, book)
+	main.engine.opponent.state = HM.State.ATTACKING
+	main.engine.opponent.state_duration = 1
+	main.engine.opponent.current_move = HM.Move.HOOK
+	main.engine.opponent.current_damage = 30
+	main.pending = [HM.Cmd.NONE, HM.Cmd.JAB, HM.Cmd.JAB]
+	main._advance()
+	check(main.engine.player.state == HM.State.KNOCKED_DOWN and main.pending.is_empty(),
+		"knockdown discards punches queued before Mack fell")
+	main.engine.player.get_up_presses = 14
+	main.pending = [HM.Cmd.JAB, HM.Cmd.JAB]
+	main._advance()
+	check(main.engine.player.state == HM.State.IDLE and main.pending.is_empty(),
+		"recovery discards extra presses rather than throwing an accidental punch")
+	main._advance()
+	check(main.engine.player_stats.thrown == 0, "no queued punch leaks into the resumed fight")
+
+	# Presentation never starts an automatic get-up before Mack earns it.
+	main.engine.force_player_knockdown()
+	main.arena.render(main.engine, false, 0.1)
+	var director: FighterDirector = main.arena.choreographer.hero.director
+	check(director._knockdown.get_up_start == null, "Mack's get-up animation waits for earned recovery")
+	var anchor: float = director._knockdown.anchor
+	for i in 360:
+		main.engine.tick(HM.Cmd.NONE)
+	main.arena.render(main.engine, false, 0.1)
+	check(director._knockdown.get_up_start == null and director._knockdown.anchor == anchor,
+		"failed recovery keeps Mack down without replaying the fall")
+	main._update_match_ui()
+	check(not main._refs.recovery.visible, "timeout removes the recovery button")
+	main.engine = FightEngine.new(FightEngine.Config.new(), 42, book)
+	main.engine.force_player_knockdown()
+	main.arena.render(main.engine, false, 0.1)
+	for i in 15:
+		main.engine.tick(HM.Cmd.JAB)
+	main.arena.render(main.engine, false, 0.1)
+	check(director._knockdown.risen and director._knockdown.get_up_start != null,
+		"earned recovery starts Mack's get-up animation")
+	main.engine = previous_engine
+	main.input_log = previous_log
+	main.pending.clear()
+	main.arena.reset_for_next_bout(game.opponent.asset(), previous_reduced)
+	game.control_style = previous_style
+	game.reduced_motion = previous_reduced
+	main._connected_joypads = previous_devices
+	main._built_key = ""
+	main.set_process(true)
+
 func _run() -> void:
 	await wait(0.3)
 	crowd_player = main.crowd_audio_player
@@ -177,6 +343,7 @@ func _run() -> void:
 	check_crowd("fight")
 	await test_fight_bindings()
 	await test_binding_hints()
+	await test_get_up_controls()
 	await joy(JOY_BUTTON_X)
 	await wait(0.2)
 	await key(KEY_UP)

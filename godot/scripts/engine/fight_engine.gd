@@ -1,6 +1,6 @@
 class_name FightEngine
 extends RefCounted
-## Bit-exact GDScript port of HaymakerKit's deterministic FightEngine.
+## Authoritative deterministic match simulation.
 ## 60 ticks per second, integer-only state. Events are dictionaries:
 ## {type: "landed"|"blocked"|"dodged"|"parried"|"whiffed"|"knockdown"|"rise"|"roundStart"|"roundEnd"|"boutEnd", tick, ...}
 
@@ -27,6 +27,11 @@ class Config:
 	var stamina_regen := 2
 	var knockdown_threshold := 25
 	var knockdown_ticks := 180
+	var opponent_combo_hits := 4
+	var opponent_combo_ticks := 180
+	var player_get_up_ticks := 360
+	var player_get_up_presses := 15
+	var player_get_up_increment := 5
 	var block_reduction := 8
 	var parry_window := 6
 	## Damage the player shrugs off from every hit that connects (min 1).
@@ -48,7 +53,8 @@ class Config:
 		return rounds * round_ticks + (rounds - 1) * maxi(0, rest_ticks)
 
 	func hard_tick_cap() -> int:
-		return total_fight_ticks() + maxi(0, knockdown_ticks) + 4096
+		return total_fight_ticks() + maxi(0, knockdown_ticks) \
+			+ maxi(0, max_knockdowns - 1) * maxi(0, player_get_up_ticks) + 4096
 
 	static func make(p_rounds: int = 3, p_round_ticks: int = 3600, p_rest_ticks: int = 600, p_dodge_ticks: int = 8) -> Config:
 		var c := Config.new()
@@ -74,6 +80,8 @@ class Status:
 	var current_move := HM.Move.IDLE
 	var current_damage := 0
 	var knockdown_count := 0
+	var get_up_presses := 0
+	var get_up_required := 0
 
 
 class Stats:
@@ -117,6 +125,7 @@ var _opp_waiting := 0
 var _rest_left := 0
 ## Only the first punch to land in each tell is a counter.
 var _tell_countered := false
+var _combo_hit_ticks: Array[int] = []
 
 
 func _init(p_config: Config, p_seed: int, p_book: OpponentBook) -> void:
@@ -177,6 +186,7 @@ func tick(input: int) -> void:
 	if is_over():
 		return
 	total_ticks += 1
+	_expire_combo()
 	if phase == HM.Phase.RESTING:
 		_rest_left -= 1
 		if _rest_left <= 0:
@@ -184,6 +194,9 @@ func tick(input: int) -> void:
 			round += 1
 			tick_in_round = 0
 			events.append({"type": "roundStart", "tick": total_ticks, "round": round})
+		return
+	if player.state == HM.State.KNOCKED_DOWN:
+		_tick_player_get_up(input)
 		return
 	_start_player_action(input)
 	_advance_opponent_scheduler()
@@ -197,6 +210,8 @@ func tick(input: int) -> void:
 		return
 	_regen(player)
 	_regen(opponent)
+	if player.state == HM.State.KNOCKED_DOWN:
+		return
 	tick_in_round += 1
 	if tick_in_round >= config.round_ticks:
 		_end_round()
@@ -212,6 +227,7 @@ func _start_player_action(input: int) -> void:
 			player.current_move = move
 			player_stats.thrown += 1
 			if player.stamina < timing.stamina:
+				_combo_hit_ticks.clear()
 				player.stamina = maxi(0, player.stamina - maxi(1, timing.stamina / 2))
 				_enter_player_recovering(config.whiff_recover_ticks)
 				player_stats.whiffed += 1
@@ -332,6 +348,7 @@ func _resolve_opponent_impact() -> void:
 			if player.hp <= 0:
 				_knock_down(HM.Who.PLAYER, true)
 		_:
+			_combo_hit_ticks.clear()
 			var punished := book.punish > 0 and (player.state == HM.State.ATTACKING or player.state == HM.State.RECOVERING)
 			if punished:
 				base = Attributes.scaled_ticks(base, 100 + book.punish, 100)
@@ -346,8 +363,6 @@ func _resolve_opponent_impact() -> void:
 				_knock_down(HM.Who.PLAYER, true)
 			elif base >= config.knockdown_threshold:
 				_knock_down(HM.Who.PLAYER)
-			if player.state == HM.State.KNOCKED_DOWN and player.ticks_in_state >= player.state_duration:
-				_answer_the_count(HM.Who.PLAYER)
 
 
 func _resolve_player_phase() -> void:
@@ -366,9 +381,22 @@ func _resolve_player_phase() -> void:
 			if done:
 				player.state = HM.State.IDLE
 				player.current_move = HM.Move.IDLE
-		HM.State.KNOCKED_DOWN:
-			if done:
-				_answer_the_count(HM.Who.PLAYER)
+
+
+func _tick_player_get_up(input: int) -> void:
+	player.ticks_in_state += 1
+	opponent.ticks_in_state += 1
+	# Finish retracting the knockdown punch, but never schedule another attack.
+	if opponent.state == HM.State.RECOVERING:
+		_resolve_opponent_phase()
+	if input == HM.Cmd.JAB:
+		player.get_up_presses += 1
+	if player.get_up_presses >= player.get_up_required:
+		_answer_the_count(HM.Who.PLAYER)
+	elif player.ticks_in_state >= player.state_duration:
+		player.state = HM.State.KO
+		player.hp = 0
+		_finish(HM.Outcome.PLAYER_LOSS_BY_KO)
 
 
 func _player_recover() -> int:
@@ -381,10 +409,12 @@ func _resolve_player_impact() -> void:
 	var move := player.current_move
 	var base := player.current_damage
 	if opponent.state == HM.State.KNOCKED_DOWN:
+		_combo_hit_ticks.clear()
 		player_stats.whiffed += 1
 		events.append({"type": "whiffed", "tick": total_ticks, "by": HM.Who.PLAYER, "move": move})
 		return
 	if opponent.state == HM.State.DODGING:
+		_combo_hit_ticks.clear()
 		opponent_stats.dodges_made += 1
 		player_stats.whiffed += 1
 		events.append({"type": "dodged", "tick": total_ticks, "attacker": HM.Who.PLAYER, "move": move})
@@ -409,6 +439,7 @@ func _resolve_player_impact() -> void:
 		player_stats.counters += 1
 		_tell_countered = true
 	if blocked:
+		_combo_hit_ticks.clear()
 		opponent_stats.blocks_made += 1
 		events.append({"type": "blocked", "tick": total_ticks, "by": HM.Who.PLAYER, "move": move, "damage": damage})
 		if opponent.hp <= 0:
@@ -416,10 +447,20 @@ func _resolve_player_impact() -> void:
 	else:
 		player_stats.landed += 1
 		events.append({"type": "landed", "tick": total_ticks, "by": HM.Who.PLAYER, "move": move, "damage": damage, "counter": is_counter})
+		_expire_combo()
+		if damage > 0:
+			_combo_hit_ticks.append(total_ticks)
+		else:
+			_combo_hit_ticks.clear()
 		if opponent.hp <= 0:
 			_knock_down(HM.Who.OPPONENT, true)
-		elif damage >= config.knockdown_threshold:
+		elif _combo_hit_ticks.size() >= config.opponent_combo_hits:
 			_knock_down(HM.Who.OPPONENT)
+
+
+func _expire_combo() -> void:
+	while not _combo_hit_ticks.is_empty() and total_ticks - _combo_hit_ticks[0] > config.opponent_combo_ticks:
+		_combo_hit_ticks.pop_front()
 
 
 static func _soak(damage: int, armor: int) -> int:
@@ -429,6 +470,7 @@ static func _soak(damage: int, armor: int) -> int:
 
 
 func _knock_down(fighter: int, ko: bool = false) -> void:
+	_combo_hit_ticks.clear()
 	var status: Status = player if fighter == HM.Who.PLAYER else opponent
 	var down_number := status.knockdown_count + 1
 	var is_ko := ko or down_number >= config.max_knockdowns
@@ -440,6 +482,9 @@ func _knock_down(fighter: int, ko: bool = false) -> void:
 		player_stats.knockdowns_scored += 1
 		opponent_stats.knockdowns_suffered += 1
 	status.knockdown_count += 1
+	status.get_up_presses = 0
+	status.get_up_required = config.player_get_up_presses + (down_number - 1) * config.player_get_up_increment \
+		if fighter == HM.Who.PLAYER and not is_ko else 0
 	status.current_move = HM.Move.IDLE
 	status.current_damage = 0
 	if is_ko:
@@ -448,7 +493,7 @@ func _knock_down(fighter: int, ko: bool = false) -> void:
 	else:
 		status.state = HM.State.KNOCKED_DOWN
 		status.ticks_in_state = 0
-		status.state_duration = config.knockdown_ticks
+		status.state_duration = config.player_get_up_ticks if fighter == HM.Who.PLAYER else config.knockdown_ticks
 	if fighter == HM.Who.OPPONENT:
 		opp_active = null
 	if is_ko:
@@ -458,6 +503,8 @@ func _knock_down(fighter: int, ko: bool = false) -> void:
 func _answer_the_count(fighter: int) -> void:
 	var status: Status = player if fighter == HM.Who.PLAYER else opponent
 	if status.state != HM.State.KNOCKED_DOWN:
+		return
+	if fighter == HM.Who.PLAYER and status.get_up_presses < status.get_up_required:
 		return
 	status.hp = maxi(status.hp, _revival_hp(fighter))
 	status.stamina = config.max_stamina / 2
@@ -480,12 +527,10 @@ func _revival_hp(fighter: int) -> int:
 
 
 func _end_round() -> void:
-	events.append({"type": "roundEnd", "tick": total_ticks, "round": round})
 	if player.state == HM.State.KNOCKED_DOWN:
-		player.hp = maxi(player.hp, config.revival_hp)
-		player.stamina = config.max_stamina
-		player.state = HM.State.IDLE
-		events.append({"type": "rise", "tick": total_ticks, "fighter": HM.Who.PLAYER})
+		return
+	_combo_hit_ticks.clear()
+	events.append({"type": "roundEnd", "tick": total_ticks, "round": round})
 	if opponent.state == HM.State.KNOCKED_DOWN:
 		opponent.hp = maxi(opponent.hp, _revival_hp(HM.Who.OPPONENT))
 		opponent.stamina = config.max_stamina

@@ -283,6 +283,10 @@ func _enter(status, previous, input: Dictionary) -> void:
 			_tail = null
 			_guard = null
 			_feint = false
+			# A failed count leaves Mack on the canvas instead of replaying the fall.
+			if status.state == HM.State.KO and prev_state == HM.State.KNOCKED_DOWN and _knockdown != null:
+				_knockdown.get_up_start = null
+				return
 			_start_knockdown(status, input)
 
 
@@ -364,7 +368,7 @@ func _start_knockdown(status, input: Dictionary) -> void:
 		var budget := window - A.MINIMUM_LIE
 		speed = minf(A.MAX_DOWN_SPEEDUP, maxf(1.0, (fall_time + up_time) / maxf(0.1, budget)))
 	var get_up_start = null
-	if not ko:
+	if not ko and status.get_up_required == 0:
 		get_up_start = maxf(anchor + window - up_time / speed, anchor + fall_time / speed)
 	_knockdown = {"key": _next_key(), "get_up_key": _next_key(), "anchor": anchor, "fall_rate": fall.fps * speed,
 		"get_up_rate": rise.fps * speed, "get_up_start": get_up_start, "risen": false}

@@ -318,7 +318,11 @@ func _advance() -> void:
 	input_log.append(input)
 	var player_thrown: int = engine.player_stats.thrown
 	var opponent_thrown: int = engine.opponent_stats.thrown
+	var was_down := engine.player.state == HM.State.KNOCKED_DOWN
 	engine.tick(input)
+	if was_down != (engine.player.state == HM.State.KNOCKED_DOWN):
+		pending.clear()
+		_swipe_start = null
 	if engine.player_stats.thrown > player_thrown:
 		_play_punch_swing(engine.player.current_move)
 	if engine.opponent_stats.thrown > opponent_thrown:
@@ -326,7 +330,9 @@ func _advance() -> void:
 
 
 func submit(input: int) -> void:
-	if engine == null or engine.is_over():
+	if not _fighting() or countdown >= 0.0 or engine.phase != HM.Phase.FIGHTING:
+		return
+	if engine.player.state == HM.State.KNOCKED_DOWN and input != HM.Cmd.JAB:
 		return
 	if pending.size() < 4:
 		pending.append(input)
@@ -362,8 +368,9 @@ func _knockdown_count() -> Dictionary:
 		var status: FightEngine.Status = pair[1]
 		if status.state != HM.State.KNOCKED_DOWN:
 			continue
-		var value := HM.knockdown_value(status.ticks_in_state, status.state_duration)
-		var progress := HM.knockdown_step_progress(status.ticks_in_state, status.state_duration)
+		var beats: int = maxi(1, ceili(status.state_duration / 60.0)) if pair[0] else 3
+		var value := HM.knockdown_value(status.ticks_in_state, status.state_duration, beats)
+		var progress := HM.knockdown_step_progress(status.ticks_in_state, status.state_duration, beats)
 		if value <= 0 or progress < 0.0:
 			continue
 		return {"value": value, "progress": progress, "player": pair[0]}
@@ -1344,10 +1351,28 @@ func _build_match() -> void:
 	_refs.counters = counters
 	_refs.stamina_bar = stam_bar
 	_refs.stamina_value = stam_value
-	if Game.control_style == "oneThumb":
-		console.add_child(_one_thumb_controls(roomy))
-	else:
-		console.add_child(_two_handed_controls(roomy, wide))
+	var controls := _one_thumb_controls(roomy) if Game.control_style == "oneThumb" else _two_handed_controls(roomy, wide)
+	console.add_child(controls)
+	_refs.fight_controls = controls
+	var recovery := vbox(5)
+	var recovery_progress := lbl("", 12, GOLD, mono_font(), 0, HORIZONTAL_ALIGNMENT_CENTER)
+	recovery.add_child(recovery_progress)
+	var recovery_bar := Bar.new()
+	recovery_bar.custom_minimum_size.y = 12
+	recovery_bar.color = GREEN
+	recovery.add_child(recovery_bar)
+	var get_up := btn("", func(): submit(HM.Cmd.JAB), GOLD, INK, ring_font(), 22, 60)
+	get_up.focus_mode = Control.FOCUS_NONE
+	get_up.set_meta("fight_action", "hm_jab")
+	get_up.tooltip_text = "Keep pressing to get back up (Space / J / Xbox A). Holding does not count."
+	_stack_label(get_up, "GET BACK UP", ring_font(), 22, INK, "KEEP TAPPING", 8, INK, "hm_jab")
+	recovery.add_child(get_up)
+	recovery.visible = false
+	console.add_child(recovery)
+	_refs.recovery = recovery
+	_refs.recovery_progress = recovery_progress
+	_refs.recovery_bar = recovery_bar
+	_refs.get_up = get_up
 	var console_style := box(Color(INK, 0.85), 14, Color(1, 1, 1, 0.13))
 	console_style.set_content_margin_all(14 if portrait else 10)
 	var console_panel := panel(console_style, console)
@@ -1512,6 +1537,15 @@ func _update_match_ui() -> void:
 	sb.color = RED if f.player.stamina < 20 else GREEN
 	sb.queue_redraw()
 	_refs.stamina_value.text = str(f.player.stamina)
+	var recovering := f.player.state == HM.State.KNOCKED_DOWN and not f.is_over()
+	_refs.fight_controls.visible = not recovering
+	_refs.recovery.visible = recovering
+	_refs.get_up.disabled = not _fighting() or countdown >= 0.0
+	if recovering:
+		_refs.recovery_progress.text = "%d / %d PRESSES - KEEP TAPPING!" % [f.player.get_up_presses, f.player.get_up_required]
+		var recovery_bar: Bar = _refs.recovery_bar
+		recovery_bar.value = float(f.player.get_up_presses) / maxi(1, f.player.get_up_required)
+		recovery_bar.queue_redraw()
 	# Countdown
 	var cd: Control = _refs.countdown
 	cd.visible = countdown >= 0.0 and not paused and not f.is_over()
@@ -1539,7 +1573,7 @@ func _update_match_ui() -> void:
 		v.add_theme_color_override("font_shadow_color", Color(c, 0.6))
 		v.pivot_offset = v.size / 2.0
 		v.scale = Vector2.ONE * (1.0 if reduced() else 1.0 + 0.7 * slam * slam)
-		_refs.knockdown_caption.text = "GET UP!" if down.player else "%s IS DOWN" % Game.opponent.name.to_upper()
+		_refs.knockdown_caption.text = "MACK IS DOWN! KEEP TAPPING!" if down.player else "%s IS DOWN" % Game.opponent.name.to_upper()
 
 
 func _set_stars(stars: Array, count: int) -> void:
@@ -1548,9 +1582,10 @@ func _set_stars(stars: Array, count: int) -> void:
 
 
 func _countdown_color(value: int) -> Color:
-	match value:
-		3: return Color.WHITE
-		2: return GOLD
+	if value >= 3:
+		return Color.WHITE
+	if value == 2:
+		return GOLD
 	return RED
 
 
@@ -1562,6 +1597,8 @@ func _clock_text(f: FightEngine) -> String:
 
 
 func _tell_title(f: FightEngine) -> String:
+	if f.player.state == HM.State.KNOCKED_DOWN:
+		return "GET BACK UP BEFORE THE COUNT!"
 	if f.phase == HM.Phase.RESTING:
 		return "BACK TO YOUR CORNER"
 	match f.opponent.state:
@@ -1576,6 +1613,8 @@ func _tell_title(f: FightEngine) -> String:
 
 
 func _tell_hint(f: FightEngine) -> String:
+	if f.player.state == HM.State.KNOCKED_DOWN:
+		return "Tap Get back up or your main punch button. Don't hold it!"
 	if f.phase == HM.Phase.RESTING:
 		return "Recover your stamina. Next round is coming."
 	match f.opponent.state:
