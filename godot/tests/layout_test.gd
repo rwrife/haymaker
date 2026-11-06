@@ -78,6 +78,16 @@ func check_controls(node: Node, viewport_rect: Rect2, in_scroll: bool = false) -
 	if node is BaseButton:
 		var button := node as BaseButton
 		var rect := button.get_global_rect()
+		if button.tooltip_text == "Settings":
+			check(button.text.is_empty() and button.icon != null, "settings uses an icon rather than a font glyph")
+			check(button.icon_alignment == HORIZONTAL_ALIGNMENT_CENTER
+				and button.vertical_icon_alignment == VERTICAL_ALIGNMENT_CENTER, "settings icon is centred on both axes")
+			check(button.custom_minimum_size == Vector2(44, 44), "settings retains its 44-unit hit target")
+			check(button.accessibility_name == "Settings", "icon-only settings button has an accessible name")
+			var image: Image = button.icon.get_image()
+			var bounds := image.get_used_rect()
+			check((Vector2(bounds.position) + Vector2(bounds.size) / 2.0).is_equal_approx(Vector2(image.get_size()) / 2.0),
+				"visible gear artwork is centred within its texture")
 		check(rect.position.x >= -1.0 and rect.end.x <= viewport_rect.end.x + 1.0,
 			"button fits viewport horizontally: " + button.text)
 		if not in_scroll:
@@ -116,6 +126,11 @@ func _run() -> void:
 	await settle()
 	main.set_process(false)
 	test_portrait_framing()
+	var settings: Button = main.settings_button()
+	settings.pressed.emit()
+	check(main.modal == "settings", "settings icon still opens settings")
+	main.modal = ""
+	settings.free()
 	for window_size in SIZES:
 		var canvas: Vector2i = main.ui_canvas_size(window_size, false)
 		check(main.ui_canvas_size(window_size, true) == Vector2i(430, 430),
