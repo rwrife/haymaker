@@ -1,8 +1,9 @@
 # Windows Store listing kit
 
-English (en-US) listing materials for the Godot game. These are ready for listing
-upload/review, not a certified Windows package or a completed Store submission.
-No account, signing, permissions or Store submission has been configured.
+English (en-US) listing materials for the Godot game. The MSIX manifest for the
+Store package is in [`msix/AppxManifest.xml`](msix/AppxManifest.xml); build the
+upload bundle with `scripts/build_msix.ps1` (see the root README). Partner
+Center submission is done manually.
 
 ## Deliverables and Partner Center fields
 
@@ -65,13 +66,11 @@ dark background, separate from the text-free hero.
 **Listing graphics are not manifest assets.** The user-requested 300, 150 and
 71 square icons are preserved exactly. For games, Microsoft recommends poster
 art as the main Store logo, with box art as another game-listing surface; the
-300 square app tile is not a replacement for those. A future MSIX package needs
-its own correctly named manifest resources, appropriate scale/target-size
-variants, and certification checks. These three PNGs do not establish that an
-MSIX manifest, Windows executable icon or Start-menu tiles are configured.
-Confirm fields against the chosen EXE/MSI or MSIX submission route in Partner
-Center before upload; this kit follows the documented MSIX listing image sizes.
-It does not claim Xbox support.
+300 square app tile is not a replacement for those. The MSIX package uses its
+own tile, scale and target-size images, generated from `godot/icon.png` by
+`scripts/build_msix_assets.py` at build time; these three PNGs are not
+packaged. Certification checks (Windows App Certification Kit) are not yet
+recorded. It does not claim Xbox support.
 
 ## Capture evidence and refreshing screenshots
 

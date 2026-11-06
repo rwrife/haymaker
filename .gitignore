@@ -20,7 +20,16 @@ Package.resolved.lock
 *.mobileprovision
 *.provisionprofile
 *.cer
+*.pfx
 asc_private/
+
+# Windows Store packages (built by scripts/build_msix.ps1)
+*.msix
+*.msixbundle
+*.appx
+*.appxbundle
+*.msixupload
+*.appxupload
 
 # Python helper-script bytecode
 __pycache__/

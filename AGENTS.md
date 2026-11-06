@@ -16,7 +16,7 @@ Instructions for AI coding agents (and humans) working in this repository. Read 
 ## Hard constraints
 
 - Godot is the only game implementation, including the planned iOS version. Do not add or maintain a separate platform-specific game.
-- Package/bundle id stays `com.infinityball.haymaker`.
+- Package/bundle id stays `com.infinityball.haymaker`. The Microsoft Store identity is fixed by Partner Center: `Infinityball.Haymaker`, publisher `CN=874CA4CF-90B8-4C53-AFBC-CCAC42030583` (see `AppStore/Windows/msix/AppxManifest.xml`).
 - Zero network: no runtime networking code or network permissions in export presets.
 - Signing material (`.p8`, `.p12`, `.mobileprovision`, `.cer`) must never be committed.
 - Original characters and assets only; keep provenance current in `ArtDirection/README.md`.
