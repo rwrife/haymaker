@@ -20,6 +20,13 @@ const CROWD_AUDIO: AudioStreamMP3 = preload("res://assets/audio/boxing_crowd.mp3
 const PUNCH_CROWD_AUDIO: AudioStreamWAV = preload("res://assets/audio/punch_crowd.wav")
 const TITLE_MUSIC: AudioStreamMP3 = preload("res://assets/music/title_intro.mp3")
 const WIN_CHEER_AUDIO: AudioStreamMP3 = preload("res://assets/audio/win_cheer.mp3")
+const PUNCH_SWING_LIGHT_AUDIO: AudioStreamWAV = preload("res://assets/audio/punch_swing_light.wav")
+const PUNCH_SWING_HEAVY_AUDIO: AudioStreamWAV = preload("res://assets/audio/punch_swing_heavy.wav")
+const PUNCH_LAND_LIGHT_AUDIO: AudioStreamWAV = preload("res://assets/audio/punch_land_light.wav")
+const PUNCH_LAND_HEAVY_AUDIO: AudioStreamWAV = preload("res://assets/audio/punch_land_heavy.wav")
+const PUNCH_SWING_DB := -8.0
+const PUNCH_LAND_LIGHT_DB := -3.0
+const PUNCH_PITCH_VARIANCE := 0.06
 
 var arena: Arena
 var layer: CanvasLayer
@@ -55,6 +62,7 @@ var _refs := {}
 var _fonts := {}
 var _swipe_start = null
 var _win_cheer_played := false
+var _sfx_rng := RandomNumberGenerator.new() # presentation-only; never touches the seeded engine
 
 
 func _ready() -> void:
@@ -215,6 +223,7 @@ func _process(_delta: float) -> void:
 		var e: Dictionary = events[i]
 		match e.type:
 			"landed":
+				_play_punch_land(e.move, e.counter)
 				_play_punch_crowd()
 				var mine: bool = e.by == HM.Who.PLAYER
 				feedback = ("COUNTER!" if e.counter else "CLEAN HIT!") if mine else "HIT!"
@@ -253,14 +262,40 @@ func _process(_delta: float) -> void:
 	_update_match_ui()
 
 
-func _play_punch_crowd() -> void:
+func _play_one_shot(stream: AudioStream, player_name: String, volume_db := 0.0, pitch_scale := 1.0) -> void:
 	var player := AudioStreamPlayer.new()
-	player.name = "PunchCrowdPlayer"
+	player.name = player_name
 	player.process_mode = Node.PROCESS_MODE_ALWAYS
-	player.stream = PUNCH_CROWD_AUDIO
+	player.stream = stream
+	player.volume_db = volume_db
+	player.pitch_scale = pitch_scale
 	player.finished.connect(player.queue_free)
 	add_child(player)
 	player.play()
+
+
+func _play_punch_crowd() -> void:
+	_play_one_shot(PUNCH_CROWD_AUDIO, "PunchCrowdPlayer")
+
+
+static func _is_power_punch(move: int) -> bool:
+	return move == HM.Move.HOOK or move == HM.Move.UPPERCUT
+
+
+func _sfx_pitch() -> float:
+	return _sfx_rng.randf_range(1.0 - PUNCH_PITCH_VARIANCE, 1.0 + PUNCH_PITCH_VARIANCE)
+
+
+func _play_punch_swing(move: int) -> void:
+	var heavy := _is_power_punch(move)
+	_play_one_shot(PUNCH_SWING_HEAVY_AUDIO if heavy else PUNCH_SWING_LIGHT_AUDIO, "PunchSwingPlayer",
+		PUNCH_SWING_DB, _sfx_pitch())
+
+
+func _play_punch_land(move: int, counter: bool) -> void:
+	var heavy := counter or _is_power_punch(move)
+	_play_one_shot(PUNCH_LAND_HEAVY_AUDIO if heavy else PUNCH_LAND_LIGHT_AUDIO, "PunchLandPlayer",
+		0.0 if heavy else PUNCH_LAND_LIGHT_DB, _sfx_pitch())
 
 
 func _play_win_cheer() -> void:
@@ -275,7 +310,13 @@ func _advance() -> void:
 		return
 	var input: int = HM.Cmd.NONE if pending.is_empty() else pending.pop_front()
 	input_log.append(input)
+	var player_thrown: int = engine.player_stats.thrown
+	var opponent_thrown: int = engine.opponent_stats.thrown
 	engine.tick(input)
+	if engine.player_stats.thrown > player_thrown:
+		_play_punch_swing(engine.player.current_move)
+	if engine.opponent_stats.thrown > opponent_thrown:
+		_play_punch_swing(engine.opponent.current_move)
 
 
 func submit(input: int) -> void:
