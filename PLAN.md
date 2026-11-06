@@ -81,9 +81,14 @@ Rules:
 - Review `AppStore/description.txt` and icon artwork against actual exported features before release.
 - Windows listing materials are prepared in `AppStore/Windows/`: English copy,
   exact-size icons, promotional hero/poster/box art and real Godot screenshots.
-  Windows package/manifest resources, release-export validation and Store
-  certification/submission remain separate distribution work. The historical
-  Apple copy is not the Windows listing.
+  The historical Apple copy is not the Windows listing.
+- Microsoft Store: `scripts/build_msix.ps1 -Version X.Y.Z` exports both Windows
+  presets and packs an unsigned x64 + ARM64 `.msixbundle` from
+  `AppStore/Windows/msix/AppxManifest.xml` (Partner Center identity
+  `Infinityball.Haymaker`, full-trust desktop app, no network capability), plus
+  portable zips. The Store signs on ingestion. Partner Center submission, age
+  rating and certification remain manual; Windows App Certification Kit results
+  are not yet recorded.
 
 ## Risks and invariants
 
