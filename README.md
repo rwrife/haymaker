@@ -111,7 +111,7 @@ manifest assets and records screenshot provenance.
 - `godot/scripts/game/` owns the shell, career progression, settings and local records.
 - Headless tests cover engine regressions and input/UI journeys. They do not establish visual fidelity, physical-device frame rate or store readiness.
 
-Legacy source and Apple project files remain in the repository but are not maintained game targets. The existing `.github/workflows/ci.yml` still checks those legacy targets and has not been migrated to Godot. Legacy CI results and simulator screenshots are not evidence that a Godot export works on iOS.
+Legacy source and Apple project files remain in the repository but are not maintained game targets. `.github/workflows/ci.yml` runs only platform-neutral repository checks; Swift and iOS builds and tests were removed from CI, and Godot suites are not yet run there. Legacy simulator screenshots are not evidence that a Godot export works on iOS.
 
 ## Asset workflow
 
