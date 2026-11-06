@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24">
+  <g fill="#ffffff">
+    <path fill-rule="evenodd" d="M12 4a8 8 0 1 1 0 16 8 8 0 0 1 0-16Zm0 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/>
+    <rect x="10" y="2" width="4" height="4" rx="1"/>
+    <rect x="10" y="2" width="4" height="4" rx="1" transform="rotate(45 12 12)"/>
+    <rect x="10" y="2" width="4" height="4" rx="1" transform="rotate(90 12 12)"/>
+    <rect x="10" y="2" width="4" height="4" rx="1" transform="rotate(135 12 12)"/>
+    <rect x="10" y="2" width="4" height="4" rx="1" transform="rotate(180 12 12)"/>
+    <rect x="10" y="2" width="4" height="4" rx="1" transform="rotate(225 12 12)"/>
+    <rect x="10" y="2" width="4" height="4" rx="1" transform="rotate(270 12 12)"/>
+    <rect x="10" y="2" width="4" height="4" rx="1" transform="rotate(315 12 12)"/>
+  </g>
+</svg>

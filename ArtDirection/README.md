@@ -36,6 +36,13 @@ Prompt:
 
 ## Godot 3D assets
 
+### Settings icon
+
+`godot/assets/ui/settings.svg` is an original, hand-authored eight-tooth gear
+made from SVG geometry. Its artwork is symmetric around the texture centre,
+so the settings button does not depend on system-font glyph metrics. No
+external icon library or font asset is used.
+
 ### Title music
 
 `godot/assets/music/title_intro.mp3` is the unchanged user-supplied song
