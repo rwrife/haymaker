@@ -2150,7 +2150,7 @@ func _build_records() -> void:
 		head.add_child(link("Retry loading records", func():
 			Game.reload_history()
 			_built_key = ""))
-	for book in OpponentBook.career_roster():
+	for book in Game.record_roster():
 		_record_summary(_section(list, book.name), book)
 
 

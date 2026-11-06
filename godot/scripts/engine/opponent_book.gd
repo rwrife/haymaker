@@ -108,11 +108,20 @@ static func anvil() -> OpponentBook:
 
 
 static func career_roster() -> Array:
+	return all_roster().filter(func(b): return b.id != "tycoon")
+
+
+static func all_roster() -> Array:
 	return [goldie(), nico(), atlas(), vera(), duke(), sylvie(), cassian(), jaison(), hunter(), tycoon(), baxter()]
 
 
+static func reveals_tycoon(result: Dictionary) -> bool:
+	return result.opponentID != "tycoon" and HM.is_player_win(int(result.outcome)) \
+		and int(result.playerStats.knockdownsScored) >= 2 and int(result.playerStats.damageTaken) == 0
+
+
 static func by_id(book_id: String) -> OpponentBook:
-	for b in career_roster():
+	for b in all_roster():
 		if b.id == book_id:
 			return b
 	return goldie()

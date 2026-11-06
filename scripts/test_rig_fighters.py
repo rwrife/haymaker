@@ -57,9 +57,9 @@ def bones_of(row):
 
 
 def godot_roster():
-    """(id, asset) pairs from the Godot OpponentBook: career_roster() order, asset() maps baxter to bruiser."""
+    """All Godot opponents, including secrets; asset() maps baxter to bruiser."""
     book = (ROOT/'godot'/'scripts'/'engine'/'opponent_book.gd').read_text(encoding='utf-8')
-    roster = re.search(r'func career_roster\(\) -> Array:\s*return \[([^\]]+)\]', book).group(1)
+    roster = re.search(r'func all_roster\(\) -> Array:\s*return \[([^\]]+)\]', book).group(1)
     ids = re.findall(r'(\w+)\(\)', roster)
     return [(i, 'bruiser' if i == 'baxter' else i) for i in ids]
 
