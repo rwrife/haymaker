@@ -57,7 +57,7 @@ Rules:
 ## Current state and remaining milestones
 
 1. **Playable Godot game:** engine, arena, ten-opponent career, sparring, versus/countdown, results, records, settings and career finale are implemented.
-2. **Godot validation and CI:** headless engine and input/UI suites exist. Migrate the existing legacy-target CI to Godot checks and relevant asset/privacy checks; no Godot CI coverage is claimed yet.
+2. **Godot validation and CI:** headless engine and input/UI suites exist. Swift/iOS CI has been removed; CI keeps fighter asset and signing-material checks. Add the Godot suites to CI; no Godot CI coverage is claimed yet.
 3. **Data and accessibility:** finish backup/restore/export and verify controls, reduced motion, tell readability and assistive technology on each supported platform.
 4. **iOS via Godot:** add an iOS export preset and validate iPhone/iPad layout, touch, haptics, local persistence, privacy metadata and signing on an Apple build environment. Do not create a second game implementation.
 5. **Distribution:** validate release exports, original icon and store copy against shipped features; configure iOS/TestFlight distribution from the Godot export when ready.
@@ -70,7 +70,7 @@ Rules:
 - **Layout:** `godot --headless --path godot --script res://tests/layout_test.gd -- --isolated-store` checks desktop panel minima/caps, scrolling and control bounds from small windows through 4K, ultrawide and portrait, plus the resolution-independent mobile canvas rule. Run without `--headless` for rendered desktop journeys.
 - **Assets:** run the existing Python rig, clip and crowd regression suites when changing their assets or generators. `python3 scripts/build_punch_sfx.py --check` verifies the committed punch sounds match their generator. Tooling currently stages generated files in `Haymaker/Models/`; copy them into `godot/assets/models/` for the game.
 - **Runtime/export:** inspect the actual Godot arena and exports on affected platforms. Headless tests are not visual, physical-device performance or store-submission evidence.
-- **CI honesty:** `.github/workflows/ci.yml` still checks legacy targets. Those results do not verify Godot builds, and legacy toolchain configuration is not the current game's development contract.
+- **CI honesty:** `.github/workflows/ci.yml` runs only platform-neutral repository checks. It does not verify Godot builds.
 
 ## Packaging / distribution
 
@@ -91,4 +91,4 @@ Rules:
 - **Asset fidelity:** preserve original sources and HMR2 rig/contact geometry. Optional HMT1 `.fighteruv` sidecars duplicate render vertices at UV seams while retaining normals and bone weights; base-color JPEGs preserve supplied artwork. Vertex-colored meshes remain the fallback.
 - **Mobile performance:** measure actual device frame times, memory and touch readability; do not infer them from desktop or headless checks.
 - **Adaptive displays:** use Godot's viewport/layout support for portrait, landscape and resizing. Dual-screen/foldable layouts remain a design target, not a compatibility claim.
-- **Legacy migration:** asset staging paths and existing CI need focused migration work, not ongoing parallel game maintenance.
+- **Legacy migration:** asset staging paths and Godot CI need focused migration work, not ongoing parallel game maintenance.
