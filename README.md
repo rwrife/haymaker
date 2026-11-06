@@ -29,6 +29,8 @@ The stands hold 105 rigged spectators: four Tripo3D-generated bodies in ten outf
 
 The supplied boxing-crowd recording loops quietly in the background from launch until exit, including menus, introductions, fights, pause screens, results and the career finale. Screen changes do not restart it. Every landed punch by either fighter also plays a six-second crowd reaction, cropped from seconds 3–9 of the second supplied recording and amplified by 50%. Rapid hits overlap instead of cutting off earlier reactions; blocked, dodged, parried and missed punches do not trigger it. Every thrown punch by either fighter whooshes as it starts, and every landed punch adds a glove impact: jabs swing and land light, while hooks, uppercuts and counters swing or land heavy. Opponent feints stay silent. These original effects are synthesized by `scripts/build_punch_sfx.py`, overlap freely and vary slightly in pitch. Player wins by knockout or decision play the supplied loud crowd cheer once when the winning screen appears, including the career finale; losses and draws do not. The cheer stops when leaving for the next bout or title screen. The supplied **Brisk Tread** song loops as title music and stops when a bout starts. The Music setting controls title music only; crowd ambience, punch sounds and reactions, and victory cheers continue independently.
 
+Glove impacts use deep bass thumps with a soft leather slap rather than a ringing midrange knock. Power punches have a fuller, longer bass decay; the swing whooshes are unchanged.
+
 Four show spotlights hang above the arena. Each has a hazy beam that softens at its edges and light that reaches the ring and crowd. On the title and victory screens they sweep the ring and stands like a pre-fight walkout, periodically converging on Mack. During bouts only the two overhead spotlights stay lit, sweeping at half speed and converging on the fighters. With Reduced Motion, they hold still and aim into the stands.
 
 ## Overview
@@ -139,8 +141,11 @@ python3 scripts/test_rig_fighters.py
 python3 scripts/test_fighter_clips.py
 python3 scripts/test_crowd.py
 python3 scripts/build_punch_sfx.py --check
+python3 scripts/test_punch_sfx.py
 ```
 
 Existing tooling stages generated models, textures, crowd assets and `fighter.clips` in `Haymaker/Models/`; copy the relevant output into `godot/assets/models/`. This staging path does not make the legacy app authoritative. Blender is needed only to refit skin weights, recover source textures or rebake clips; runtime play does not require it. Never commit raw Mixamo FBX downloads.
+
+The punch sound checks cover reproducible WAVs, bass/midrange balance, impact weight and peak headroom. They complement the Godot audio journeys; a listening pass on the target speakers is still needed to judge the mix.
 
 All eleven fighters use supplied base-color textures. HMT1 UV sidecars preserve the HMR2 rigs and contact geometry while duplicating render vertices at seams. The exporter converts OBJ's bottom-origin V to the image's top-origin convention once; runtime materials must not flip it again. See [fighter texture provenance and format](ArtDirection/Models/README.md#fighter-texture-fidelity).
