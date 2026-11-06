@@ -18,11 +18,27 @@ func check(condition: bool, label: String) -> void:
 
 
 func reactions() -> Array[AudioStreamPlayer]:
+	return players_of([main.PUNCH_CROWD_AUDIO])
+
+
+func players_of(streams: Array) -> Array[AudioStreamPlayer]:
 	var players: Array[AudioStreamPlayer] = []
 	for child in main.get_children():
-		if child is AudioStreamPlayer and child.stream == main.PUNCH_CROWD_AUDIO:
+		if child is AudioStreamPlayer and child.stream in streams:
 			players.append(child)
 	return players
+
+
+func swings() -> Array[AudioStreamPlayer]:
+	return players_of([main.PUNCH_SWING_LIGHT_AUDIO, main.PUNCH_SWING_HEAVY_AUDIO])
+
+
+func landings() -> Array[AudioStreamPlayer]:
+	return players_of([main.PUNCH_LAND_LIGHT_AUDIO, main.PUNCH_LAND_HEAVY_AUDIO])
+
+
+func varied(player: AudioStreamPlayer) -> bool:
+	return absf(player.pitch_scale - 1.0) <= main.PUNCH_PITCH_VARIANCE + 0.0001
 
 
 func present_events() -> void:
@@ -56,6 +72,14 @@ func _run() -> void:
 		and main.PUNCH_CROWD_AUDIO.data.size() == 288000 * 2 * 2,
 		"import preserves the boosted PCM without lossy compression")
 	check(reactions().is_empty(), "no punch reactions before a landed punch")
+	for stream in [main.PUNCH_SWING_LIGHT_AUDIO, main.PUNCH_SWING_HEAVY_AUDIO,
+			main.PUNCH_LAND_LIGHT_AUDIO, main.PUNCH_LAND_HEAVY_AUDIO]:
+		check(stream.loop_mode == AudioStreamWAV.LOOP_DISABLED and stream.format == AudioStreamWAV.FORMAT_16_BITS
+			and not stream.stereo and stream.get_length() > 0.1 and stream.get_length() < 0.5,
+			"%s is a short lossless mono one-shot" % stream.resource_path.get_file())
+	check(main.PUNCH_SWING_HEAVY_AUDIO.get_length() > main.PUNCH_SWING_LIGHT_AUDIO.get_length()
+		and main.PUNCH_LAND_HEAVY_AUDIO.get_length() > main.PUNCH_LAND_LIGHT_AUDIO.get_length(),
+		"power punches swing and land longer than jabs")
 	check(not main.WIN_CHEER_AUDIO.loop and main.WIN_CHEER_AUDIO.get_length() > 1.0,
 		"supplied winning-screen cheer is a playable one-shot")
 	check(not main.win_cheer_player.playing, "winning-screen cheer does not play during a bout")
@@ -70,6 +94,10 @@ func _run() -> void:
 	main.last_event_count = 0
 	present_events()
 	check(reactions().size() == 2, "both fighters trigger reactions; blocks, dodges, parries and misses do not")
+	check(players_of([main.PUNCH_LAND_LIGHT_AUDIO]).size() == 2 and landings().size() == 2,
+		"each landed jab plays one light impact; blocks, dodges, parries and misses do not")
+	check(landings().all(func(player): return player.playing and varied(player)),
+		"landing impacts play with subtle pitch variation")
 	check(reactions().all(func(player): return player.playing),
 		"simultaneous hits play independently even when music is disabled")
 	present_events()
@@ -78,6 +106,15 @@ func _run() -> void:
 		{"type": "landed", "tick": 1, "by": HM.Who.PLAYER, "move": HM.Move.HOOK, "damage": 16, "counter": true})
 	present_events()
 	check(reactions().size() == 3, "counter reaction overlaps without interrupting earlier hits")
+	check(players_of([main.PUNCH_LAND_HEAVY_AUDIO]).size() == 1 and landings().size() == 3,
+		"a power counter adds a heavy impact without replaying earlier ones")
+	main.engine.events.append(
+		{"type": "landed", "tick": 2, "by": HM.Who.OPPONENT, "move": HM.Move.UPPERCUT, "damage": 22, "counter": false})
+	main.engine.events.append(
+		{"type": "landed", "tick": 3, "by": HM.Who.PLAYER, "move": HM.Move.JAB, "damage": 24, "counter": true})
+	present_events()
+	check(players_of([main.PUNCH_LAND_HEAVY_AUDIO]).size() == 3,
+		"opponent power punches and countered jabs land heavy")
 	paused = true
 	await create_timer(0.2).timeout
 	check(reactions().all(func(player): return player.playing and not player.stream_paused),
@@ -88,6 +125,42 @@ func _run() -> void:
 		player.seek(5.9)
 	await create_timer(0.5).timeout
 	check(reactions().is_empty(), "finished reactions free their audio players instead of looping")
+	check(landings().is_empty(), "finished impacts free their audio players")
+	main.start_bout()
+	main.begin_fight()
+	main.countdown = -1.0
+	main.pending = [HM.Cmd.BLOCK]
+	main._advance()
+	check(swings().is_empty(), "guarding does not swing")
+	main.engine.player.state = HM.State.IDLE
+	main.pending = [HM.Cmd.JAB]
+	main._advance()
+	check(players_of([main.PUNCH_SWING_LIGHT_AUDIO]).size() == 1 and swings().size() == 1,
+		"throwing a jab plays one light swing")
+	check(swings().all(func(player): return player.playing and varied(player) and is_equal_approx(player.volume_db, main.PUNCH_SWING_DB)),
+		"swings sit under impacts with pitch variation")
+	main._advance()
+	check(swings().size() == 1, "the swing plays once per punch, not every windup tick")
+	main.engine.player.state = HM.State.IDLE
+	main.engine.player.stamina = 100
+	main.pending = [HM.Cmd.UPPERCUT]
+	main._advance()
+	check(players_of([main.PUNCH_SWING_HEAVY_AUDIO]).size() == 1, "throwing an uppercut plays a heavy swing")
+	var opponent: FightEngine.Status = main.engine.opponent
+	opponent.state = HM.State.TELLING
+	opponent.current_move = HM.Move.HOOK
+	opponent.ticks_in_state = 0
+	opponent.state_duration = 1
+	main._advance()
+	check(players_of([main.PUNCH_SWING_HEAVY_AUDIO]).size() == 2, "the opponent's hook swings heavy as it is thrown")
+	opponent.state = HM.State.TELLING
+	opponent.current_move = HM.Move.FEINT
+	opponent.ticks_in_state = 0
+	opponent.state_duration = 1
+	main._advance()
+	check(swings().size() == 3, "opponent feints do not swing")
+	await create_timer(0.5).timeout
+	check(swings().is_empty(), "finished swings free their audio players")
 	main.start_bout()
 	main.begin_fight()
 	main.countdown = -1.0

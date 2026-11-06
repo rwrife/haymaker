@@ -70,6 +70,18 @@ It plays once at its original level when a player-winning results screen or
 career finale appears. It is not cropped, amplified or looped. The original
 author and licence were not supplied.
 
+### Punch sound effects
+
+`godot/assets/audio/punch_swing_light.wav`, `punch_swing_heavy.wav`,
+`punch_land_light.wav` and `punch_land_heavy.wav` are original effects
+synthesized by `scripts/build_punch_sfx.py` from seeded noise and sine
+oscillators, using only the Python standard library. No recordings or external
+samples are involved. Swings sweep band-passed noise with the glove's travel;
+landings combine a pitch-dropping thump, a low-passed leather slap and a damped
+knock. Each file is 44.1 kHz mono 16-bit PCM, normalized to about -1 dBFS and
+imported without compression. Rebuild them with `python3 scripts/build_punch_sfx.py`;
+`--check` confirms the committed files still match.
+
 Eleven user-supplied character models are archived in [`Models`](Models/README.md): Mack, Goldie Voltage, Nico “Nightshift” Navarro, Bruiser Baxter, Atlas “Undertow” Reed, Duke Doubletake, Sylvie “Slipstream” Sloane, Cassian “Saint” Sterling, Vera Velvet, Jaison “Black Tie” Mercer, and Hunter “Redline” Mercer. Ten supplied 2D portraits are archived in [`IntroScenes`](IntroScenes/README.md) and bundled for pre-fight versus introductions. Eleven "just lost the fight" portraits, one for each character including Mack, are archived in [`DefeatedPortraits`](DefeatedPortraits/README.md) and copied unchanged into `godot/assets/portraits/`. Wins show the defeated opponent; losses show Mack. Intro and defeated portraits open zoomed 2× on the head and ease out to 1.5×. The career finale uses Mack's existing 3D victory animation, not a new asset. See [character backstories](character-backstories.md) for story direction for all eleven characters, including the player and final boss.
 
 The eleven supplied OBJ sculpts in `ArtDirection/Models` are the character source assets.

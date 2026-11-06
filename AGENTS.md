@@ -53,6 +53,7 @@ godot --headless --path godot --script res://tests/input_test.gd -- --isolated-s
 python3 scripts/test_rig_fighters.py                  # when touching fighter assets or rigs
 python3 scripts/test_fighter_clips.py                 # when touching fighter.clips or the clip extractor
 python3 scripts/test_crowd.py                         # when touching crowd assets or scripts/build_crowd.py
+python3 scripts/build_punch_sfx.py --check            # when touching punch sounds or their generator
 ```
 
 Verify runtime and export changes in Godot on the affected platforms. The iOS export is planned, not yet configured or verified; do not claim device or store compatibility without evidence.
