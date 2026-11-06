@@ -59,6 +59,7 @@ var replay_matches := false
 var _built_key := ""
 var _last_frame := -1.0
 var _refs := {}
+var _refocus_attribute := "" # keeps controller focus on a stat after spending a token rebuilds the screen
 var _fonts := {}
 var _swipe_start = null
 var _win_cheer_played := false
@@ -118,7 +119,7 @@ func _fit_desktop_window() -> void:
 		return
 	var screen := DisplayServer.window_get_current_screen()
 	var usable := DisplayServer.screen_get_usable_rect(screen)
-	var w := mini(int(usable.size.x * 0.8), int(usable.size.y * 0.8 * 16.0 / 9.0))
+	var w := mini(int(usable.size.x * 0.75), int(usable.size.y * 0.75 * 16.0 / 9.0))
 	var size := Vector2i(maxi(w, 640), maxi(int(w * 9.0 / 16.0), 360))
 	DisplayServer.window_set_min_size(Vector2i(480, 320))
 	DisplayServer.window_set_size(size)
@@ -601,7 +602,7 @@ func _focus_default() -> void:
 	if owner != null and owner.is_visible_in_tree() and ui.is_ancestor_of(owner):
 		return
 	var target: Control = null
-	var primary = _refs.get("primary")
+	var primary = _refs.get("focus_first", _refs.get("primary"))
 	if modal == "" and primary is BaseButton and is_instance_valid(primary) and not (primary as BaseButton).disabled \
 			and (primary as Control).is_visible_in_tree():
 		target = primary
@@ -1667,9 +1668,11 @@ func _results_summary(win: bool, draw: bool, p: bool) -> Control:
 			17 if p else 15, Color.WHITE, sys_font(500), 0, align))
 	if Game.error != "":
 		col.add_child(lbl(Game.error, 14, RED, null, 0, align, true))
-		col.add_child(link("Retry saving", func():
+		var retry := link("Retry saving", func():
 			Game.save(engine, input_log)
-			_built_key = ""))
+			_built_key = "")
+		_refs.retry = retry
+		col.add_child(retry)
 	return col
 
 
@@ -1698,6 +1701,7 @@ func _sparring_stats(p: bool) -> Control:
 
 func _results_buttons(p: bool) -> Control:
 	var col := vbox(12 if p else 8)
+	var rows := []
 	var win := HM.is_player_win(engine.outcome)
 	var advance: Button = null
 	if Game.mode == "sparring":
@@ -1716,22 +1720,100 @@ func _results_buttons(p: bool) -> Control:
 	var advance_primary := advance != null and win
 	if advance_primary:
 		col.add_child(advance)
+		rows.append([advance])
 		_refs.primary = advance
 	var rematch := btn("REMATCH", func(): _begin(Game.opponent, Game.mode),
 		Color(INK, 0.8) if advance_primary else GOLD, GOLD if advance_primary else INK, ring_font(true),
 		19 if advance_primary else 23, 44 if advance_primary else (52 if p else 46), Color(GOLD, 0.5))
 	rematch.disabled = not Game.saved
 	col.add_child(rematch)
+	rows.append([rematch])
 	if not advance_primary:
 		_refs.primary = rematch
 		if advance != null:
 			col.add_child(advance)
-	var home := btn("CAREER LADDER", func():
+			rows.append([advance])
+	var exits := hbox(8)
+	var ladder := btn("CAREER LADDER", func():
 		session_reset()
 		showing_career = true, Color(0, 0, 0, 0), Color.WHITE, _tracked(sys_font(), 1.4), 11, 36 if p else 30)
-	home.disabled = not Game.saved
-	col.add_child(home)
+	var title := btn("EXIT TO TITLE", func():
+		session_reset()
+		showing_career = false, Color(0, 0, 0, 0), Color.WHITE, _tracked(sys_font(), 1.4), 11, 36 if p else 30)
+	for b in [ladder, title]:
+		b.disabled = not Game.saved
+		exits.add_child(fill(b))
+	col.add_child(exits)
+	rows.append([ladder, title])
+	_refs.result_actions = rows
 	return col
+
+
+## Wires D-pad/arrow/Tab focus row by row (each row left to right) so navigation follows the on-screen
+## order instead of Godot's geometric guess, and never lands on a disabled button. Returns the live rows.
+func _link_focus_rows(rows: Array) -> Array:
+	var live := []
+	for row in rows:
+		var r := []
+		for c in row:
+			if c is BaseButton and (c as BaseButton).disabled:
+				(c as Control).focus_mode = Control.FOCUS_NONE
+			elif c is Control and (c as Control).focus_mode != Control.FOCUS_NONE:
+				r.append(c)
+		if not r.is_empty():
+			live.append(r)
+	for y in live.size():
+		var row: Array = live[y]
+		var above: Array = live[maxi(y - 1, 0)]
+		var below: Array = live[mini(y + 1, live.size() - 1)]
+		for x in row.size():
+			var c: Control = row[x]
+			_set_focus_neighbor(c, SIDE_LEFT, row[maxi(x - 1, 0)])
+			_set_focus_neighbor(c, SIDE_RIGHT, row[mini(x + 1, row.size() - 1)])
+			_set_focus_neighbor(c, SIDE_TOP, above[mini(x, above.size() - 1)])
+			_set_focus_neighbor(c, SIDE_BOTTOM, below[mini(x, below.size() - 1)])
+	return live
+
+
+func _set_focus_neighbor(c: Control, side: Side, target: Control) -> void:
+	c.set_focus_neighbor(side, c.get_path_to(target))
+
+
+func _link_focus_order(controls: Array) -> void:
+	for i in controls.size():
+		var c: Control = controls[i]
+		c.focus_next = c.get_path_to(controls[(i + 1) % controls.size()])
+		c.focus_previous = c.get_path_to(controls[(i - 1 + controls.size()) % controls.size()])
+
+
+## Results focus: stacked layouts read top to bottom (save retry, stat upgrades, then actions); the landscape
+## layout puts actions in the left column beside the stats, so Left/Right crosses between the two.
+func _link_results_focus(beside: bool) -> void:
+	var extras := []
+	if _refs.has("retry"):
+		extras.append([_refs.retry])
+	if _refs.has("attributes"):
+		extras.append(_refs.attributes)
+	var actions: Array = _refs.get("result_actions", [])
+	var order := []
+	if not beside:
+		for row in _link_focus_rows(extras + actions):
+			order.append_array(row)
+	else:
+		var live_actions := _link_focus_rows(actions)
+		var live_extras := _link_focus_rows(extras)
+		for row in live_actions + live_extras:
+			order.append_array(row)
+		if not live_actions.is_empty() and not live_extras.is_empty():
+			var primary = _refs.get("primary")
+			var home: Control = primary if primary is Control and order.has(primary) else live_actions[0][0]
+			var across: Control = live_extras[-1][0]
+			for row in live_actions:
+				_set_focus_neighbor(row[-1], SIDE_RIGHT, across)
+			for row in live_extras:
+				_set_focus_neighbor(row[0], SIDE_LEFT, home)
+	if not order.is_empty():
+		_link_focus_order(order)
 
 
 ## Fight prize token total and Mack's fighter stats; tokens are spent here.
@@ -1745,6 +1827,7 @@ func _progression_panel(p: bool) -> Control:
 		1.5, HORIZONTAL_ALIGNMENT_RIGHT))
 	col.add_child(head)
 	var row := hbox(6)
+	var attribute_buttons := []
 	for attribute in Attributes.ALL:
 		var a: String = attribute
 		var value: int = Game.progression.player[a]
@@ -1752,10 +1835,16 @@ func _progression_panel(p: bool) -> Control:
 		var b := btn("%s  +\n%s" % [Attributes.TITLES[a].to_upper(), pips] if Game.can_spend(a) else
 			"%s\n%s" % [Attributes.TITLES[a].to_upper(), pips], func():
 			if Game.spend(a):
+				_refocus_attribute = a
 				_built_key = "", Color(INK, 0.8), Color.WHITE, sys_font(600), 12, 50, Color(GOLD, 0.6))
 		b.disabled = not Game.can_spend(a)
 		b.tooltip_text = "Spend a fight prize token on %s" % Attributes.TITLES[a]
+		if a == _refocus_attribute and not b.disabled:
+			_refs.focus_first = b
+		attribute_buttons.append(b)
 		row.add_child(fill(b))
+	_refocus_attribute = ""
+	_refs.attributes = attribute_buttons
 	col.add_child(row)
 	var note := "Spend a token to train an attribute (max %d each)." % Attributes.MAX_POINTS if tokens > 0 \
 		else "Win a new career fight to earn a fight prize token."
@@ -1797,6 +1886,7 @@ func _build_results() -> void:
 			m.add_theme_constant_override("margin_" + side, 28)
 		m.add_child(col)
 		center.add_child(m)
+		_link_results_focus(false)
 		return
 	var center := CenterContainer.new()
 	root.add_child(center)
@@ -1840,6 +1930,7 @@ func _build_results() -> void:
 			actions.add_child(_progression_panel(false))
 		actions.add_child(_results_buttons(false))
 		row.add_child(actions)
+	_link_results_focus(not draw)
 
 
 # MARK: - Career victory
