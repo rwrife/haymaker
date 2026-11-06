@@ -83,6 +83,10 @@ func check_controls(node: Node, viewport_rect: Rect2, in_scroll: bool = false) -
 		if not in_scroll:
 			check(rect.position.y >= -1.0 and rect.end.y <= viewport_rect.end.y + 1.0,
 				"button fits viewport vertically: " + button.text)
+		if button.has_meta("fight_action"):
+			for label in button.find_children("*", "Label", true, false):
+				check(rect.grow(1).encloses(label.get_global_rect()),
+					"fight title and binding hint fit inside button: " + label.text)
 	for child in node.get_children():
 		check_controls(child, viewport_rect, in_scroll)
 
@@ -126,9 +130,11 @@ func _run() -> void:
 		await settle()
 		check(main.portrait == (window_size.y > window_size.x), "orientation follows window")
 		for screen in ["home", "career", "versus", "oneThumb", "twoHanded", "pause",
+				"oneThumbController", "twoHandedController", "pauseController",
 				"win", "loss", "draw", "sparring", "sparringLoss", "victory", "settings", "records", "detail"]:
 			clear_ui()
 			main.session_reset()
+			main._connected_joypads = PackedInt32Array([99]) if screen.ends_with("Controller") else PackedInt32Array()
 			game.opponent = game.ladder[0]
 			game.mode = "career"
 			game.bouts = []
@@ -140,10 +146,10 @@ func _run() -> void:
 				"home": main._build_home()
 				"career": main._build_career()
 				"versus": main._build_versus()
-				"oneThumb", "twoHanded":
-					game.control_style = screen
+				"oneThumb", "twoHanded", "oneThumbController", "twoHandedController":
+					game.control_style = screen.trim_suffix("Controller")
 					main._build_match()
-				"pause": main._build_pause()
+				"pause", "pauseController": main._build_pause()
 				"win", "loss", "draw", "sparring", "sparringLoss":
 					main.engine.outcome = HM.Outcome.PLAYER_WIN_BY_KO if screen in ["win", "sparring"] else (
 						HM.Outcome.PLAYER_LOSS_BY_KO if screen in ["loss", "sparringLoss"] else HM.Outcome.DRAW)

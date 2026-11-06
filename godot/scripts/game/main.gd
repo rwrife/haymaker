@@ -63,6 +63,9 @@ var _fonts := {}
 var _swipe_start = null
 var _win_cheer_played := false
 var _sfx_rng := RandomNumberGenerator.new() # presentation-only; never touches the seeded engine
+var _connected_joypads := PackedInt32Array()
+var _keyboard_hints := not OS.has_feature("mobile")
+var _pressed_triggers := {}
 
 
 func _ready() -> void:
@@ -100,6 +103,8 @@ func _ready() -> void:
 	add_child(title_music_player)
 	_update_title_music()
 	register_input_actions()
+	_connected_joypads = Input.get_connected_joypads()
+	Input.joy_connection_changed.connect(_on_joy_connection_changed)
 	get_tree().root.size_changed.connect(_on_resize)
 	_fit_desktop_window()
 	_on_resize()
@@ -441,11 +446,34 @@ const FIGHT_ACTIONS := {
 	"hm_dodge": HM.Cmd.DODGE, "hm_guard": HM.Cmd.BLOCK, "hm_parry": HM.Cmd.PARRY,
 }
 
+const CONTROL_HINTS := {
+	"hm_jab": ["Space / J", "A", GREEN],
+	"hm_hook": ["A / K", "X", Color(0.3, 0.65, 1.0)],
+	"hm_uppercut": ["W / I", "Y", GOLD],
+	"hm_dodge": ["D / L", "B", RED],
+	"hm_guard": ["S / Down", "LB / LT", Color.WHITE],
+	"hm_parry": ["Shift / P", "RB / RT", Color.WHITE],
+	"hm_pause": ["Esc", "Menu", Color.WHITE],
+}
+
 var _nav_mode := false # true once keyboard/gamepad drives the UI; touch/mouse clears it
 
 
+func _on_joy_connection_changed(device: int, connected: bool) -> void:
+	if connected and not _connected_joypads.has(device):
+		_connected_joypads.append(device)
+	elif not connected:
+		var index := _connected_joypads.find(device)
+		if index >= 0:
+			_connected_joypads.remove_at(index)
+		for trigger in _pressed_triggers.keys():
+			if trigger.x == device:
+				_pressed_triggers.erase(trigger)
+	_built_key = ""
+
+
 ## Registers the fight bindings. Gamepad layout: A jab, X hook, Y uppercut, B dodge, LB/LT guard, RB/RT parry,
-## D-pad mirrors the PUNCH swipes (left hook, up uppercut, right dodge, down guard), Start pauses.
+## D-pad mirrors the PUNCH swipes (left hook, up uppercut, right dodge, down guard), Xbox Menu pauses.
 static func register_input_actions() -> void:
 	var bindings := {
 		"hm_jab": [KEY_SPACE, KEY_J, JOY_BUTTON_A],
@@ -491,6 +519,18 @@ func _fighting() -> bool:
 
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not _keyboard_hints:
+		_keyboard_hints = true
+		_built_key = ""
+	if event is InputEventJoypadMotion and event.axis in [JOY_AXIS_TRIGGER_LEFT, JOY_AXIS_TRIGGER_RIGHT]:
+		var trigger := Vector2i(event.device, event.axis)
+		var action := "hm_guard" if event.axis == JOY_AXIS_TRIGGER_LEFT else "hm_parry"
+		var pressed: bool = event.axis_value >= InputMap.action_get_deadzone(action)
+		var was_pressed: bool = _pressed_triggers.get(trigger, false)
+		_pressed_triggers[trigger] = pressed
+		# Trigger motion reports continuously; queue one move per squeeze, like a button press.
+		if not pressed or was_pressed:
+			return
 	if event is InputEventMouseButton or event is InputEventScreenTouch:
 		if _nav_mode:
 			_nav_mode = false
@@ -1238,7 +1278,8 @@ func _build_match() -> void:
 	var pause := btn("❚❚", func(): paused = true, Color(0, 0, 0, 0.4), Color(1, 1, 1, 0.8), sys_font(), 14, 44)
 	pause.custom_minimum_size.x = 44
 	pause.focus_mode = Control.FOCUS_NONE
-	pause.tooltip_text = "Pause bout"
+	pause.tooltip_text = "Pause bout (Esc / Xbox Menu)"
+	_stack_label(pause, "❚❚", sys_font(), 14, Color.WHITE, "", 6, Color.WHITE, "hm_pause")
 	pause.disabled = engine.is_over()
 	bar.add_child(pause)
 	col.add_child(bar)
@@ -1349,12 +1390,32 @@ func _control(title: String, hint: String, input: int, color: Color, height: flo
 	var b := btn("", func(): submit(input), Color(1, 1, 1, 0.08), color, ring_font(), 16, height, Color(color, 0.25), 9)
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	b.focus_mode = Control.FOCUS_NONE # moves come from the input map, never from focus activation
-	_stack_label(b, title, ring_font(), 16, color, hint if height > 50.0 else "", 6, Color(1, 1, 1, 0.45))
+	var action: String = FIGHT_ACTIONS.find_key(input)
+	b.set_meta("fight_action", action)
+	b.tooltip_text = "%s (%s / %s)" % [title, CONTROL_HINTS[action][0], CONTROL_HINTS[action][1]]
+	_stack_label(b, title, ring_font(), 16, color, hint if height > 50.0 else "", 6, Color(1, 1, 1, 0.45), action)
 	return b
 
 
-## Replaces a button's text with a centred title over a small hint line, like the SwiftUI VStack labels.
-func _stack_label(b: Button, title: String, font: Font, size: float, color: Color, hint: String, hint_size: float, hint_color: Color) -> void:
+func _binding_badge(action: String) -> Control:
+	if action == "" or (_connected_joypads.is_empty() and not _keyboard_hints):
+		return null
+	var controller := not _connected_joypads.is_empty()
+	var text: String = CONTROL_HINTS[action][1 if controller else 0]
+	var color: Color = CONTROL_HINTS[action][2] if controller else Color.WHITE
+	var round_button := controller and text.length() == 1
+	var badge := panel(box(INK, 9 if round_button else 3, Color(color, 0.8)),
+		lbl(text, 11 if round_button else 9, color, sys_font(900), 0, HORIZONTAL_ALIGNMENT_CENTER), 0)
+	badge.set_meta("binding_action", action)
+	badge.set_meta("controller_glyph", round_button)
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	badge.custom_minimum_size = Vector2(16, 16) if round_button else Vector2(0, 14)
+	return badge
+
+
+## Keep binding hints visible even in the compact 44-point controls.
+func _stack_label(b: Button, title: String, font: Font, size: float, color: Color, hint: String, hint_size: float, hint_color: Color, action: String = "") -> void:
 	b.text = ""
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -1364,7 +1425,10 @@ func _stack_label(b: Button, title: String, font: Font, size: float, color: Colo
 	var t := lbl(title, size, color, font, 0.0, HORIZONTAL_ALIGNMENT_CENTER)
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(t)
-	if hint != "":
+	var badge := _binding_badge(action)
+	if badge != null:
+		col.add_child(badge)
+	elif hint != "":
 		var h := lbl(hint, hint_size, hint_color, sys_font(900), 0.6, HORIZONTAL_ALIGNMENT_CENTER)
 		h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		col.add_child(h)
@@ -1377,13 +1441,14 @@ func _one_thumb_controls(roomy: bool) -> Control:
 	var row := hbox(10)
 	row.add_child(_control("⛨ GUARD", "HOLD THE LINE", HM.Cmd.BLOCK, Color.WHITE, h))
 	var punch := btn("", func(): pass, GOLD, INK, ring_font(true), 25 if roomy else 22, h, Color(1, 1, 1, 0.45), 9)
-	_stack_label(punch, "⚡ PUNCH", ring_font(true), 25 if roomy else 22, INK, "TAP JAB · SWIPE COMBO" if roomy else "", 7, INK)
+	punch.set_meta("fight_action", "hm_jab")
+	_stack_label(punch, "⚡ PUNCH", ring_font(true), 25 if roomy else 20, INK, "TAP JAB · SWIPE COMBO" if roomy else "", 7, INK, "hm_jab")
 	var grad := _rounded_gradient([GOLD, ORANGE], 9, Color(1, 1, 1, 0.45))
 	punch.add_theme_stylebox_override("normal", grad)
 	punch.add_theme_stylebox_override("hover", grad)
 	punch.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	punch.focus_mode = Control.FOCUS_NONE
-	punch.tooltip_text = "Jab. Swipe left for hook, up for uppercut, right for dodge, down for guard."
+	punch.tooltip_text = "Jab (Space / J / Xbox A). Swipe left for hook, up for uppercut, right for dodge, down for guard."
 	punch.gui_input.connect(_on_punch_input)
 	row.add_child(punch)
 	row.add_child(_control("↶ DODGE", "MAKE HIM MISS", HM.Cmd.DODGE, GREEN, h))
@@ -1536,7 +1601,7 @@ func _build_pause() -> void:
 	ui.add_child(dim(Color(INK, 0.9)))
 	var root := safe_root(24, 16, 16, null, MENU_MAX)
 	var center := CenterContainer.new()
-	var col := vbox(20)
+	var col := vbox(12)
 	fit_panel_width(col, 320, MENU_MAX.x, root.get_meta("content_size").x)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_child(lbl("IN YOUR CORNER", 38, Color.WHITE, ring_font(true), 0, HORIZONTAL_ALIGNMENT_CENTER))
@@ -1548,9 +1613,16 @@ func _build_pause() -> void:
 	_refs.primary = resume
 	col.add_child(resume)
 	col.add_child(btn("Settings", func(): _open_modal("settings"), Color(0, 0, 0, 0), GOLD, sys_font(600), 17, 36))
-	col.add_child(btn("Leave bout", session_reset, Color(0, 0, 0, 0), Color(1, 1, 1, 0.6), sys_font(500), 15, 36))
+	col.add_child(btn("Return to title", func():
+		session_reset()
+		showing_career = false, Color(0, 0, 0, 0), Color(1, 1, 1, 0.8), sys_font(500), 15, 36))
+	col.add_child(btn("Quit game", _quit_game, Color(0, 0, 0, 0), Color(1, 1, 1, 0.6), sys_font(500), 15, 36))
 	center.add_child(col)
 	root.add_child(center)
+
+
+func _quit_game() -> void:
+	get_tree().quit()
 
 
 # MARK: - Results
@@ -1903,7 +1975,8 @@ func _build_settings() -> void:
 	_row_text(learn, "Counter during an opponent’s windup for double damage. Dodge just before the glove lands. An uppercut breaks the guard. Feints are a trap—wait for the opening.")
 	if not OS.has_feature("mobile"):
 		_row_text(learn, "Keyboard: Space jabs, ← hook, ↑ uppercut, → dodge, ↓ guard, Shift or P parries, Esc pauses, F11 toggles full screen. WASD mirrors the arrows, and J/K/I/L jab, hook, uppercut, and dodge.")
-	_row_text(learn, "Gamepad: A jabs, X hook, Y uppercut, B dodge, LB/LT guard, RB/RT parry, Start pauses. The D-pad also throws hook, uppercut, dodge, and guard. Menus use the D-pad or stick with A to select and B to go back.")
+	_row_text(learn, "Xbox controller: A jabs, X hook, Y uppercut, B dodge, LB/LT guard, RB/RT parry, Menu pauses. The D-pad also throws hook, uppercut, dodge, and guard. Menus use the D-pad or stick with A to select and B to go back. Pause offers Resume, Settings, Return to title, and Quit game.")
+	_row_text(learn, "Fight buttons show keyboard hints on desktop, or Xbox-style button glyphs while a controller is connected. Connecting or disconnecting a controller updates the hints automatically.")
 	var about := _section(list, "")
 	_row_text(about, "3D arena rendered with Godot. All fights and records stay on your device.", Color(1, 1, 1, 0.55), 13)
 
