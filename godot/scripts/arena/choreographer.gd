@@ -129,6 +129,8 @@ static func _copy_status(s) -> FightEngine.Status:
 	c.current_move = s.current_move
 	c.current_damage = s.current_damage
 	c.knockdown_count = s.knockdown_count
+	c.get_up_presses = s.get_up_presses
+	c.get_up_required = s.get_up_required
 	return c
 
 

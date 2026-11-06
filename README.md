@@ -23,7 +23,9 @@ Each fighter uses their supplied model and an authored rhythm based on their bio
 
 Completing the ladder opens a victory screen with Mack's looping victory animation and fighter statistics: score, wins/bouts, landed/thrown punches, accuracy, knockouts and counters. Totals include rematches and losses on the current ladder but exclude sparring and earlier ladders. **End game** returns to the title screen and starts a fresh ladder without deleting local records. Reduced Motion uses a still victory pose. The finale waits until the final win is saved; a failed save keeps the retry action available.
 
-The Godot arena uses real 3D meshes and an authoritative deterministic engine. All twelve fighters share the Mixamo-compatible 22-bone HMR2 skeleton and a motion-capture library covering guard idle, punches, blocks, slips, hit reactions, knockdown, get-up, victory and warm-up. The runtime cross-fades clips, separates arm and footwork timing, plants feet, steers punches until contact and preserves boxing distance. Knockdowns last three seconds, with a fall, opponent taunt and return to guard. The knockout and celebration play before the results card.
+The Godot arena uses real 3D meshes and an authoritative deterministic engine. All twelve fighters share the Mixamo-compatible 22-bone HMR2 skeleton and a motion-capture library covering guard idle, punches, blocks, slips, hit reactions, knockdown, get-up, victory and warm-up. The runtime cross-fades clips, separates arm and footwork timing, plants feet, steers punches until contact and preserves boxing distance. Opponents only suffer non-finishing knockdowns after **four consecutive clean hits within three seconds**, not from a single heavy counter. A blocked or missed punch, an exhausted swing, or a clean hit taken by Mack breaks the combo; successful defense preserves it. Opponents get up automatically after three seconds.
+
+When Mack is knocked down, a prominent **Get back up** button replaces the fight controls, with a six-second countdown and press-progress meter. Repeatedly press the main punch button: **15 presses on the first knockdown, 20 on the second**, within six seconds each. Holding the button does not count. The bout clock and opponent wait during recovery, so the bell cannot grant a free get-up. Missing the target means a knockout. Zero-health knockouts and the third-knockdown TKO still end the bout immediately for either fighter. The knockout and celebration play before the results card.
 
 The stands hold 105 rigged spectators: four Tripo3D-generated bodies in ten outfits. Independent schedules drive sitting, clapping, yelling and cheering; heavy blows and knockdowns excite the crowd without affecting fight randomness. Reduced Motion pauses ambient crowd movement.
 
@@ -75,6 +77,8 @@ The home and career settings buttons use a centred gear icon with a 44-unit hit 
 | Touch/mouse | On-screen one-thumb/two-handed controls and swipes | On-screen menu controls |
 
 Both touch layouts show keyboard keycaps on desktop. Connecting a controller replaces them with colored Xbox-style A/B/X/Y glyphs and LB/LT, RB/RT and Menu hints; disconnecting the last controller restores keyboard hints. Compact layouts keep these hints visible too. Touch-only mobile keeps its touch labels until a keyboard is used or a controller connects. Trigger squeezes queue one move per press rather than repeating while held.
+
+While Mack is down, **Space/J**, **Xbox A**, or tapping/clicking **Get back up** all advance the same recovery meter. Other attacks and defensive buttons do not count. Pausing freezes the recovery countdown and keeps earned progress.
 
 The Xbox Menu button, Esc or the on-screen pause button opens **Resume bout**, **Settings**, **Return to title** and **Quit game**. Return to title abandons the current bout without deleting saved records; Quit game closes the application.
 
