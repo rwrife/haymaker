@@ -183,6 +183,9 @@ func _run() -> void:
 				check(collect_portraits(main.ui).is_empty(), "draw does not imply a defeated fighter")
 			if screen in ["loss", "draw", "sparringLoss"]:
 				check(main._refs.primary.text == "REMATCH", "loss/draw keeps Rematch primary")
+			if screen in ["win", "loss", "draw", "sparring", "sparringLoss"]:
+				check(main.ui.find_children("*", "Button", true, false).any(func(b): return b.text == "EXIT TO TITLE"),
+					"results offer Exit to title")
 		game.bouts = []
 		for book in game.ladder:
 			game.opponent = book

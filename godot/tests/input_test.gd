@@ -228,6 +228,16 @@ func _run() -> void:
 	var primary: Button = main._refs.primary
 	check(primary.get_index() == 0 and primary.get_parent().get_child(1).text == "REMATCH",
 		"Next fight appears before secondary Rematch")
+	await joy(JOY_BUTTON_DPAD_DOWN)
+	check(focused() == "REMATCH", "D-pad down moves from Next fight to Rematch")
+	await joy(JOY_BUTTON_DPAD_DOWN)
+	check(focused() == "CAREER LADDER", "D-pad down reaches Career ladder")
+	await joy(JOY_BUTTON_DPAD_RIGHT)
+	check(focused() == "EXIT TO TITLE", "D-pad right reaches Exit to title beside Career ladder")
+	await joy(JOY_BUTTON_DPAD_UP)
+	check(focused() == "REMATCH", "D-pad up returns to Rematch")
+	await joy(JOY_BUTTON_DPAD_UP)
+	check(focused().begins_with("NEXT FIGHT"), "D-pad up returns to Next fight")
 	await joy(JOY_BUTTON_A)
 	await wait(0.1)
 	check(main.showing_versus and game.opponent.id != defeated.id, "A on Next fight opens the next introduction")
@@ -288,6 +298,7 @@ func _run() -> void:
 		"Return to title ends the active bout and shows the title, not the career screen")
 	check(main.title_music_player.playing, "returning to title resumes title music")
 	check_crowd("pause to title")
+	await test_results_navigation(game)
 	main.start_bout()
 	main.begin_fight()
 	main.countdown = -1.0
@@ -309,6 +320,45 @@ func _run() -> void:
 	create_timer(0.2).timeout.connect(func():
 		check(false, "Quit game must terminate the application")
 		quit(1))
+
+func show_results(game, outcome: int, tokens: int) -> void:
+	main.start_bout()
+	main.begin_fight()
+	main.countdown = -1.0
+	game.saved = true
+	game.progression.tokens = tokens
+	main.engine.phase = HM.Phase.OVER
+	main.engine.outcome = outcome
+	main.post_bout_elapsed = Arena.RESULTS_DELAY
+	main.replay_matches = true
+	main._built_key = ""
+	await wait(0.1)
+
+func test_results_navigation(game) -> void:
+	await show_results(game, HM.Outcome.PLAYER_LOSS_BY_KO, 2)
+	check(focused() == "REMATCH", "loss focuses Rematch")
+	var stat: Button = main._refs.attributes[0]
+	var stat_name: String = stat.text.get_slice(" ", 0)
+	stat.grab_focus()
+	await joy(JOY_BUTTON_A)
+	await wait(0.1)
+	check(game.prize_tokens() == 1 and focused().begins_with(stat_name),
+		"spending a token keeps focus on the upgraded stat")
+	await show_results(game, HM.Outcome.PLAYER_LOSS_BY_KO, 0)
+	var landed_disabled := false
+	for button in [JOY_BUTTON_DPAD_UP, JOY_BUTTON_DPAD_RIGHT, JOY_BUTTON_DPAD_LEFT, JOY_BUTTON_DPAD_DOWN]:
+		for i in 3:
+			await joy(button)
+			var f = root.gui_get_focus_owner()
+			landed_disabled = landed_disabled or f == null or (f is BaseButton and f.disabled)
+	check(not landed_disabled, "results D-pad never focuses a disabled stat button")
+	check(focused() == "CAREER LADDER", "D-pad down settles on the bottom action row")
+	await joy(JOY_BUTTON_DPAD_RIGHT)
+	check(focused() == "EXIT TO TITLE", "D-pad right reaches Exit to title")
+	await joy(JOY_BUTTON_A)
+	await wait(0.1)
+	check(main.engine == null and not main.showing_career, "Exit to title leaves the results for the title screen")
+	check(main.title_music_player.playing, "exiting results resumes title music")
 
 func check_crowd(screen: String) -> void:
 	check(main.crowd_audio_player == crowd_player and crowd_player.playing and not crowd_player.stream_paused,
